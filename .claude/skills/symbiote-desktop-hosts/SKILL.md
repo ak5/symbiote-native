@@ -21,7 +21,8 @@ Verify against its source, especially `packages/cli/src/linux-autolinking.ts` an
 
 `core/engine/linux` supplies the C++ TurboModule; its CMake target compiles the same engine sources as Android/iOS.
 The generated factory receives a CallInvoker, not a runtime. `nativeEngine()` calls the existing synchronous
-`getVersion()` method before reading the bindings; Linux installs them there once per module instance.
+`getVersion()` method before reading the bindings; Linux installs them there once per runtime.
+The host's module factory can produce a new module on every lookup, so an instance boolean does not protect live bindings.
 Failed initialization must propagate and must not cache a missing engine.
 
 `.github/workflows/linux-engine.yml` is restricted to this fork. It generates registration from the

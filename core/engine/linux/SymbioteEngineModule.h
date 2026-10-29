@@ -11,8 +11,6 @@ class SymbioteEngineModule final
   explicit SymbioteEngineModule(std::shared_ptr<CallInvoker> jsInvoker);
   double getVersion(jsi::Runtime &runtime);
 
- private:
-  bool installed_ = false;
 };
 
 } // namespace facebook::react

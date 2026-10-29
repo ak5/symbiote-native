@@ -8,10 +8,9 @@ SymbioteEngineModule::SymbioteEngineModule(std::shared_ptr<CallInvoker> jsInvoke
     : NativeSymbioteEngineCxxSpec(std::move(jsInvoker)) {}
 
 double SymbioteEngineModule::getVersion(jsi::Runtime &runtime) {
-  // The generated factory has no runtime; this synchronous probe precedes every engine consumer.
-  if (!installed_) {
+  // The host can create a fresh module on each lookup; bindings belong to the runtime, not this instance.
+  if (runtime.global().getProperty(runtime, "__symbioteEngineNative").isUndefined()) {
     symbiote::installBindings(runtime);
-    installed_ = true;
   }
   return symbiote::kNativeVersion;
 }
