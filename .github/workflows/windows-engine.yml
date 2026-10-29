@@ -94,6 +94,7 @@ jobs:
             Select-Object -First 1
           if ($null -eq $sdk) { throw 'No installed Windows 10/11 SDK with x64 libraries found' }
           Write-Host "Using installed Windows SDK $($sdk.Name)"
+          "SYMBIOTE_WINDOWS_SDK=$($sdk.Name)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           msbuild .windows-engine-probe/windows/SymbioteEngineProbe.sln /restore /m:1 /p:Configuration=Debug /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /bl:windows-engine.binlog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compile the production WinRT package provider
@@ -104,7 +105,7 @@ jobs:
           $rn = (Resolve-Path .windows-engine-probe/node_modules/react-native).Path + '\'
           $vcpkg = (Resolve-Path .windows-vcpkg).Path + '\'
           $installed = (Resolve-Path .windows-vcpkg-installed).Path + '\'
-          msbuild core/engine/windows/SymbioteNativeEngine.sln /restore /m:1 /p:Configuration=Debug /p:Platform=x64 "/p:ReactNativeWindowsDir=$rnw" "/p:SymbioteReactNativeDirectory=$rn" "/p:VcpkgRoot=$vcpkg" "/p:VcpkgInstalledDir=$installed" /p:VcpkgManifestInstall=false /bl:windows-package.binlog
+          msbuild core/engine/windows/SymbioteNativeEngine.sln /restore /m:1 /p:Configuration=Debug /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$env:SYMBIOTE_WINDOWS_SDK" "/p:ReactNativeWindowsDir=$rnw" "/p:SymbioteReactNativeDirectory=$rn" "/p:VcpkgRoot=$vcpkg" "/p:VcpkgInstalledDir=$installed" /p:VcpkgManifestInstall=false /bl:windows-package.binlog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Create a standard Windows application
         shell: pwsh
