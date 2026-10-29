@@ -98,7 +98,14 @@ jobs:
         shell: pwsh
         run: |
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
-          msbuild .windows-engine-probe/windows/SymbioteEngineProbe.sln /restore /m:1 /p:Configuration=Debug /p:Platform=x64 /bl:windows-engine.binlog
+          $kitsRoot = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows Kits\Installed Roots').KitsRoot10
+          $sdk = Get-ChildItem (Join-Path $kitsRoot 'Lib') -Directory |
+            Where-Object { $_.Name -match '^10\.0\.\d+\.0$' -and (Test-Path (Join-Path $_.FullName 'um/x64/kernel32.lib')) } |
+            Sort-Object { [version]$_.Name } -Descending |
+            Select-Object -First 1
+          if ($null -eq $sdk) { throw 'No installed Windows 10/11 SDK with x64 libraries found' }
+          Write-Host "Using installed Windows SDK $($sdk.Name)"
+          msbuild .windows-engine-probe/windows/SymbioteEngineProbe.sln /restore /m:1 /p:Configuration=Debug /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /bl:windows-engine.binlog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()
