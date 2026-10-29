@@ -178,8 +178,7 @@ jobs:
             Where-Object { $_.Name -match '^10\.0\.\d+\.0$' -and (Test-Path (Join-Path $_.FullName 'um/x64/kernel32.lib')) } |
             Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
           if ($null -eq $sdk) { throw 'No installed x64 Windows SDK found' }
-          $solutionDir = (Resolve-Path .windows-fabric-probe/windows).Path + '\'
-          msbuild .windows-fabric-probe/windows/SymbioteFabricProbe/SymbioteFabricProbe.vcxproj /restore /m:1 /p:Configuration=Release /p:Platform=x64 "/p:SolutionDir=$solutionDir" "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /p:UseBundle=true /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true '/p:BundlerExtraArgs=--max-workers 1' /bl:windows-fabric.binlog
+          msbuild .windows-fabric-probe/windows/SymbioteFabricProbe.sln /restore /t:SymbioteFabricProbe /m:1 /p:Configuration=Release /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /p:UseBundle=true /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true '/p:BundlerExtraArgs=--max-workers 1' /bl:windows-fabric.binlog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run Fabric through the ABI runtime
         shell: pwsh
