@@ -18,8 +18,8 @@ routes.ts         route-name constants, shared by every registration and every p
 navigation-lines.ts  the wayfinding palette (LINE_COLOR / ROUTE_LINE_INFO)
 navigation-linking.ts  the deep-link config, shared by the root wiring and the DeepLinking demo
 screens/          21 screens — CanaryScreen plus the tour stops and their nested children
-babel.config.js   @vue/babel-plugin-jsx compiles the JSX → @vue/runtime-core createVNode (before RN's React-JSX transform)
-metro.config.js   aliases 'vue' → @vue/runtime-core; pins one react + one runtime-core (no custom transformer)
+babel.config.js   @vue/babel-plugin-jsx compiles the JSX → Vue createVNode (before RN's React-JSX transform)
+metro.config.js   resolves Vue to its ESM entry; pins one React + one Vue runtime (no custom transformer)
 ```
 
 ## How the JSX compiles (vs the SFC canary)
@@ -28,13 +28,10 @@ The SFC canary needs a Metro transformer to compile `.vue`. The TSX canary needs
 a babel concern:
 
 - **`@vue/babel-plugin-jsx`** (listed first in `babel.config.js`) rewrites every `JSXElement`
-  into a `@vue/runtime-core` `createVNode` call. Because babel applies `plugins` before
+  into a Vue `createVNode` call. Because babel applies `plugins` before
   `presets`, it runs ahead of the RN preset's React-JSX transform, which then finds no JSX left
   and no-ops — so there is **no `react/jsx-runtime` import** in the bundle.
-- The plugin injects its helper imports `from 'vue'`; `metro.config.js` aliases the bare `vue`
-  specifier to `@vue/runtime-core` (the resolver twin of the SFC transformer's
-  `'vue'`→runtime-core string rewrite), so the app and the adapter share **one** Vue runtime —
-  reactivity is a singleton, two copies would silently fail to react.
+- The plugin injects helper imports `from 'vue'`. Metro resolves both application and generated helper imports to the same installed Vue ESM entry, so component ownership and reactivity stay shared.
 
 So `<view onPress={onTap}>` compiles to `createVNode('view', { onPress: onTap })`; that `onX` key
 lands in `patchProp` → `routeProp` exactly as the SFC's `@press` does.

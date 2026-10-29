@@ -21,6 +21,8 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+import { verifyVueRuntime } from './lib/vue-runtime.mjs';
+
 import { publishablePackageEntries } from './lib/publishable-packages.mjs';
 
 export const INTERNAL_PREFIX = '@symbiote-native/';
@@ -283,33 +285,29 @@ function copyTrackedExample(exampleDir, destination) {
   }
 }
 
-// Each `pnpm pack` writes its own uniquely-named tarball into the shared packDirectory, so nothing
-// here is mutable shared state - safe to run concurrently (three packages - navigation, slider,
-// splash-screen - run a full Angular AOT compile as a prepack side effect and dominate either way).
+// Several packages run Angular AOT in prepack; keep those builds sequential.
 async function packPackages(names, packDirectory) {
   const entries = new Map(
     publishablePackageEntries().map(entry => [entry.name, entry]),
   );
   const tarballs = new Map();
-  await Promise.all(
-    names.map(async name => {
-      const entry = entries.get(name);
-      if (entry === undefined)
-        throw new Error(`${name} is not publishable from this checkout`);
-      const output = await runAsync(
-        'pnpm',
-        ['pack', '--pack-destination', packDirectory],
-        { cwd: join(REPO_ROOT, entry.dir) },
-      );
-      const finalLine = output.trim().split('\n').at(-1)?.trim();
-      if (!finalLine)
-        throw new Error(`pnpm pack returned no tarball path for ${name}`);
-      const tarball = resolve(join(REPO_ROOT, entry.dir), finalLine);
-      if (!existsSync(tarball))
-        throw new Error(`pnpm pack did not create ${tarball}`);
-      tarballs.set(name, tarball);
-    }),
-  );
+  for (const name of names) {
+    const entry = entries.get(name);
+    if (entry === undefined)
+      throw new Error(`${name} is not publishable from this checkout`);
+    const output = await runAsync(
+      'pnpm',
+      ['pack', '--pack-destination', packDirectory],
+      { cwd: join(REPO_ROOT, entry.dir) },
+    );
+    const finalLine = output.trim().split('\n').at(-1)?.trim();
+    if (!finalLine)
+      throw new Error(`pnpm pack returned no tarball path for ${name}`);
+    const tarball = resolve(join(REPO_ROOT, entry.dir), finalLine);
+    if (!existsSync(tarball))
+      throw new Error(`pnpm pack did not create ${tarball}`);
+    tarballs.set(name, tarball);
+  }
   return tarballs;
 }
 
@@ -394,6 +392,8 @@ async function bundleSources(exampleRoot, platform) {
         bundle,
         '--sourcemap-output',
         sourcemap,
+        '--max-workers',
+        '1',
         '--reset-cache',
       ],
       { cwd: exampleRoot },
@@ -473,6 +473,7 @@ async function processExample(
               'the matrix may be validating registry or dead code instead of this adapter',
           );
         }
+        if (ownFrameworkOf(example) === 'vue') verifyVueRuntime(sources);
         const leaks = findForeignFrameworkLeaks(
           sources,
           multiFrameworkPackages,

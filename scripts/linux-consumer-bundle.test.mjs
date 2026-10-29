@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { verifyVueRuntime } from './lib/vue-runtime.mjs';
 import { verifyLinuxConsumerBundle } from './lib/linux-consumer-bundle.mjs';
 
 const sources = [
@@ -91,4 +92,20 @@ test('requires one Vue component and reactivity runtime', () => {
       /must use one/,
     );
   }
+});
+
+test('rejects mixed Vue ESM/CommonJS runtimes and handles Windows source paths', () => {
+  const sources = ['runtime-core', 'reactivity'].map(
+    name =>
+      `C:\\app\\node_modules\\@vue\\${name}\\dist\\${name}.esm-bundler.js`,
+  );
+  verifyVueRuntime(sources);
+  assert.throws(
+    () =>
+      verifyVueRuntime([
+        ...sources,
+        '/app/node_modules/@vue/runtime-core/dist/runtime-core.cjs.prod.js',
+      ]),
+    /must use one runtime-core/,
+  );
 });

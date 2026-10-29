@@ -40,11 +40,4 @@ module.exports = [
       'vue/no-v-text-v-html-on-component': 'off',
     },
   },
-  {
-    // Deliberately re-exports FROM `@vue/runtime-core` to declare the ambient `'vue'` module —
-    // that IS the fix `vue/prefer-import-from-vue` would otherwise ask for, so the rule can never
-    // be satisfied here without breaking the file's one job.
-    files: ['vue-runtime-core.d.ts'],
-    rules: { 'vue/prefer-import-from-vue': 'off' },
-  },
 ];

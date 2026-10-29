@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { verifyVueRuntime } from './vue-runtime.mjs';
 
 function sourcePaths(map) {
   return map.sections
@@ -17,20 +18,8 @@ export function verifyLinuxConsumerBundle(map, framework = 'react') {
       `Metro did not include ${source}`,
     );
   }
-  if (framework === 'vue') {
-    for (const runtime of ['runtime-core', 'reactivity']) {
-      const entries = new Set(
-        sources.filter(path =>
-          path.includes(`/@vue/${runtime}/dist/${runtime}.`),
-        ),
-      );
-      assert.equal(
-        entries.size,
-        1,
-        `Vue must use one ${runtime} instance from its peer runtime`,
-      );
-    }
-  }
+  if (framework === 'vue') verifyVueRuntime(sources);
+
   assert(
     !sources.some(path => path.includes('@symbiote-native/engine/src/')),
     'Metro reached workspace source instead of the packed engine',
