@@ -16,7 +16,7 @@ jobs:
   native:
     if: github.repository == 'ak5/symbiote-native'
     runs-on: windows-2025-vs2026
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,6 +51,27 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx --no-install react-native init-windows --template cpp-lib --name SymbioteEngineProbe --namespace SymbioteEngineProbe --overwrite
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: 09e7d22e2d9bf97f9549c9f37759bf11758d62f0
+          path: .windows-vcpkg
+      - uses: actions/cache@v4
+        with:
+          path: .windows-vcpkg-cache
+          key: windows-vs2026-static-md-folly-${{ hashFiles('core/engine/windows/vcpkg.json') }}
+      - name: Build pinned engine dependencies
+        shell: pwsh
+        env:
+          VCPKG_MAX_CONCURRENCY: 2
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          New-Item -ItemType Directory -Force .windows-vcpkg-cache | Out-Null
+          $env:VCPKG_BINARY_SOURCES = "clear;files;$PWD/.windows-vcpkg-cache,readwrite"
+          & .windows-vcpkg/bootstrap-vcpkg.bat -disableMetrics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .windows-vcpkg/vcpkg.exe install --triplet x64-windows-static-md "--x-manifest-root=$PWD/core/engine/windows" "--x-install-root=$PWD/.windows-vcpkg-installed" --disable-metrics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Add the actual engine sources to the fixture
         shell: pwsh
         run: |
@@ -60,6 +81,28 @@ jobs:
           $rnDir = (Resolve-Path .windows-engine-probe/node_modules/react-native).Path
           [xml]$project = Get-Content $projectPath
           $ns = $project.DocumentElement.NamespaceURI
+          $dependencyRoot = (Resolve-Path .windows-vcpkg-installed).Path
+          $vcpkgRoot = (Resolve-Path .windows-vcpkg).Path
+          $properties = $project.CreateElement('PropertyGroup', $ns)
+          foreach ($entry in @{
+            VcpkgRoot = "$vcpkgRoot\"
+            VcpkgEnabled = 'true'
+            VcpkgManifestInstall = 'false'
+            VcpkgTriplet = 'x64-windows-static-md'
+            VcpkgInstalledDir = "$dependencyRoot\"
+          }.GetEnumerator()) {
+            $property = $project.CreateElement($entry.Key, $ns)
+            $property.InnerText = $entry.Value
+            [void]$properties.AppendChild($property)
+          }
+          [void]$project.DocumentElement.AppendChild($properties)
+          $vcpkgProps = $project.CreateElement('Import', $ns)
+          $vcpkgProps.SetAttribute('Project', "$vcpkgRoot/scripts/buildsystems/msbuild/vcpkg.props")
+          [void]$project.DocumentElement.AppendChild($vcpkgProps)
+          # Expose only the missing conversion header; the SDK remains the sole JSI header owner.
+          $conversionDir = Join-Path $projectDir 'engine-includes/jsi'
+          New-Item -ItemType Directory -Force $conversionDir | Out-Null
+          Copy-Item "$rnDir/ReactCommon/jsi/jsi/JSIDynamic.h" $conversionDir
           $group = $project.CreateElement('ItemGroup', $ns)
           # Exporting this function forces the linker to retain the engine and resolve its Fabric calls.
           @'
@@ -70,7 +113,7 @@ jobs:
           '@ | Set-Content (Join-Path $projectDir 'EngineLinkProbe.cpp')
           $sources = @(Get-ChildItem $engineDir -Filter '*.cpp')
           if ($sources.Count -eq 0) { throw 'No engine sources found' }
-          $paths = @($sources | ForEach-Object FullName) + @((Join-Path $projectDir 'EngineLinkProbe.cpp'))
+          $paths = @($sources | ForEach-Object FullName) + @((Join-Path $projectDir 'EngineLinkProbe.cpp'), (Join-Path $rnDir 'ReactCommon/jsi/jsi/JSIDynamic.cpp'))
           foreach ($source in $paths) {
             $item = $project.CreateElement('ClCompile', $ns)
             $item.SetAttribute('Include', $source)
@@ -84,8 +127,11 @@ jobs:
           $compile = $project.CreateElement('ClCompile', $ns)
           $includes = $project.CreateElement('AdditionalIncludeDirectories', $ns)
           # RNW's SDK owns JSI; mixing its headers with npm React Native's JSI defines the types twice.
-          $includes.InnerText = "%(AdditionalIncludeDirectories);$engineDir;$rnDir\ReactCommon"
+          $includes.InnerText = "%(AdditionalIncludeDirectories);$engineDir;$projectDir\engine-includes;$rnDir\ReactCommon"
           [void]$compile.AppendChild($includes)
+          $defines = $project.CreateElement('PreprocessorDefinitions', $ns)
+          $defines.InnerText = 'SYMBIOTE_PUBLIC_FABRIC=1;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)'
+          [void]$compile.AppendChild($defines)
           $standard = $project.CreateElement('LanguageStandard', $ns)
           $standard.InnerText = 'stdcpp20'
           [void]$compile.AppendChild($standard)
@@ -94,6 +140,9 @@ jobs:
           [void]$compile.AppendChild($parallel)
           [void]$definitions.AppendChild($compile)
           [void]$project.DocumentElement.AppendChild($definitions)
+          $vcpkgTargets = $project.CreateElement('Import', $ns)
+          $vcpkgTargets.SetAttribute('Project', "$vcpkgRoot/scripts/buildsystems/msbuild/vcpkg.targets")
+          [void]$project.DocumentElement.AppendChild($vcpkgTargets)
           $project.Save($projectPath)
       - name: Compile and link against the released Windows SDK
         shell: pwsh

@@ -86,3 +86,10 @@ module registration and actual Windows app journeys still need integration and v
 Configure the existing harness with `-DSYMBIOTE_PUBLIC_FABRIC=ON` and build the same targets in
 `core/engine/cpp/tests/build-public`. Use `SYMBIOTE_ITEST_BUILD=build-public` for `scripts/run-itests.mjs`.
 Pass files individually for sequential execution; the script otherwise uses all available workers.
+
+The Windows `native` CI job now selects `SYMBIOTE_PUBLIC_FABRIC` and consumes Folly through the
+pinned vcpkg manifest in `core/engine/windows/vcpkg.json`. The static-md triplet keeps the SDK's
+DLL CRT contract while avoiding a second set of dependency DLLs. Dependency builds use two workers
+and a binary cache. The fixture compiles the installed RN package's unchanged `JSIDynamic.cpp` and
+exposes only its conversion header in a generated include directory; it never adds npm's JSI
+include directory alongside the SDK's JSI. Actual Windows compile/link verification is pending.
