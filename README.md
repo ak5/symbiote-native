@@ -378,6 +378,16 @@ example apps are the working spec and they stay green.
 
 ---
 
+### Mac Catalyst
+
+The Svelte example includes a native UIKit/Fabric Mac Catalyst host. The
+[Mac Catalyst guide](./examples/svelte/README.md#mac-catalyst) covers building the
+Mac application, the dedicated canary entry, native UI tests and installed
+package verification. Companion packages and platform-specific integrations
+need their own Catalyst checks.
+
+---
+
 ## Testing
 
 SymbioteNative never forks the native core, so a SymbioteNative app **is** a stock React Native app
