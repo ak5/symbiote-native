@@ -25,6 +25,9 @@ The generated factory receives a CallInvoker, not a runtime. `nativeEngine()` ca
 The host's module factory can produce a new module on every lookup, so an instance boolean does not protect live bindings.
 Failed initialization must propagate and must not cache a missing engine.
 
+The native engine gate passed in fork run `40911697553` at `6713de2690a9d22eeb1b1cb1289596506217b6c7`:
+real C++ compile/link, initial Fabric commit, width update, and repeated module lookup without replacing bindings.
+
 `core/engine/src/platform/index.linux.ts` reads the host's `PlatformConstants` and selects Linux
 before host registration. All adapters inherit the shared `linux` selection type. Its native smoke
 import is explicit; a real Metro example must still prove automatic platform-file resolution.
@@ -34,6 +37,18 @@ package's actual configuration, compiles the real engine and Linux host, then ru
 `core/engine/linux/tests/native-smoke.ts` in Hermes. That test creates and updates a Fabric view through
 the production mutation buffer. esbuild is used for this native test, as in the existing engine itests;
 it is not an application bundler.
+
+`scripts/prepare-linux-consumer.mjs <host checkout> <new app directory>` builds and packs the engine,
+shared components and React adapter into a disposable npm app. It uses the pinned host template's
+React Native version and the host's packed Metro resolver, then checks the production sourcemap
+for the installed Linux Platform and adapter. Run it under `nice -n 10` with Node 24 after installing
+both workspaces. CI runs the resulting Metro bundle through the compiled host and verifies the
+mounted view's updated dimensions. This React startup check does not establish other adapters or
+keyboard, clipboard, persistence and window-system behavior.
+
+React Native's `componentNameByReactViewName` already translates the iOS-shaped view, text,
+scroll-content and text-input names to the Linux host's descriptors. Audit that translation before
+duplicating the component-name table. Native props and events still need their own runtime checks.
 
 This is engine bring-up, not a completed Linux application target. Before claiming Linux support:
 

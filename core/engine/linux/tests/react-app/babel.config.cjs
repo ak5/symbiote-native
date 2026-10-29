@@ -1,0 +1,6 @@
+module.exports = {
+  presets: [
+    ['module:@react-native/babel-preset', { disableDeepImportWarnings: true }],
+  ],
+  plugins: ['babel-plugin-transform-flow-enums'],
+};

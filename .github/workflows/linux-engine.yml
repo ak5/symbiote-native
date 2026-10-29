@@ -80,3 +80,20 @@ jobs:
         with:
           path: ~/.cache/ccache
           key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+      - name: Build a Metro application from packed packages
+        run: |
+          nice -n 10 node --test scripts/linux-consumer-bundle.test.mjs
+          nice -n 10 node scripts/prepare-linux-consumer.mjs .linux-host .linux-host/symbiote-app
+      - name: Run the packaged application in the native host
+        run: |
+          set -o pipefail
+          nice -n 10 .linux-host/build/symbiote/bin/hello_react --fabric .linux-host/symbiote-app/index.linux.bundle.js 2>&1 | tee .linux-host/symbiote-app.log
+          grep -F 'Symbiote Linux React app updated' .linux-host/symbiote-app.log
+          grep -F 'frame=(0.00, 0.00, 240.00, 80.00)' .linux-host/symbiote-app.log
+          if grep -F 'has no native component registered' .linux-host/symbiote-app.log; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-engine-runtime-logs
+          path: .linux-host/symbiote-*.log
+          if-no-files-found: ignore
