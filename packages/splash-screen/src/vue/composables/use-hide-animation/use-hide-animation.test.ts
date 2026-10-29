@@ -13,13 +13,7 @@
 // unguarded, and the throw propagates straight out of this composable's setup body. The
 // React/Angular/Svelte sibling files prove both through their own lifecycles.
 
-import {
-  effectScope,
-  nextTick,
-  ref,
-  type EffectScope,
-  type Ref,
-} from '@vue/runtime-core';
+import { effectScope, nextTick, ref, type EffectScope, type Ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hide } from 'react-native-bootsplash';
 import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';

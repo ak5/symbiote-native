@@ -1,6 +1,6 @@
 // Vue lifecycle wiring over the framework-agnostic core (core/font.ts). Loads once on mount,
 // matching upstream's own useFonts contract (a changed font map prop is not reloaded).
-import { onMounted, ref, type Ref } from '@vue/runtime-core';
+import { onMounted, ref, type Ref } from 'vue';
 import { isFontMapLoaded, loadAsync, type FontSource } from '../../../core';
 
 export function useFonts(map: string | Record<string, FontSource>): {

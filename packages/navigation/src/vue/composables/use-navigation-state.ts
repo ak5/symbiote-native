@@ -8,8 +8,8 @@
 // selector reading e.g. `state.routes.at(-1)?.name` still resolves correctly on first paint for
 // the common single-route case - the same async gap useIsFocused documents.
 
-import { onMounted, onUnmounted, shallowRef } from '@vue/runtime-core';
-import type { ShallowRef } from '@vue/runtime-core';
+import { onMounted, onUnmounted, shallowRef } from 'vue';
+import type { ShallowRef } from 'vue';
 import type { INavigatorState } from '../../core';
 import { NAVIGATION_EVENT_STATE, isRecord } from '../../core';
 import { requireNavigationScope } from '../navigation-context';

@@ -1,4 +1,4 @@
-import { defineComponent, h, shallowRef } from '@vue/runtime-core';
+import { defineComponent, h, shallowRef } from 'vue';
 import type { IScrollViewProps } from '@symbiote-native/vue';
 import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
 import type { SharedValue } from 'react-native-reanimated/src/commonTypes';

@@ -1,12 +1,6 @@
 // Vue `useVideoPlayer` over the shared player controller
 
-import {
-  defineComponent,
-  h,
-  ref,
-  type ComputedRef,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, h, ref, type ComputedRef, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

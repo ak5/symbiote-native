@@ -2,7 +2,7 @@
 // initial value with one-shot getOrientationAsync()/getOrientationLockAsync() calls before the
 // first native event fires, mirroring packages/network's useNetworkState.
 
-import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted, ref, type Ref } from 'vue';
 import {
   addOrientationChangeListener,
   getOrientationAsync,

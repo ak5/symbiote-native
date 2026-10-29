@@ -2,7 +2,7 @@
 // The router, swipe math and imperative handle live in core, shared with every other adapter
 // The view is rebuilt as vnodes on every render, see drawer-view.ts
 
-import { defineComponent, shallowRef, useId } from '@vue/runtime-core';
+import { defineComponent, shallowRef, useId } from 'vue';
 import {
   Animated,
   normalizeVueAttrs,

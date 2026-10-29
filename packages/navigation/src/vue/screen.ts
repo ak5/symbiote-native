@@ -6,8 +6,8 @@
 // Design Vue's `<a-menu-item>`): the parent inspects `vnode.type === Screen` and reads
 // `vnode.props` directly, so Screen's own setup() never actually runs.
 
-import { defineComponent } from '@vue/runtime-core';
-import type { Component, Ref } from '@vue/runtime-core';
+import { defineComponent } from 'vue';
+import type { Component, Ref } from 'vue';
 import type { IRoute } from '../core';
 import type {
   ISearchBarCommands,

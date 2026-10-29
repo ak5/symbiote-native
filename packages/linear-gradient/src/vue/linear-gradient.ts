@@ -1,4 +1,4 @@
-import { defineComponent, type VNode } from '@vue/runtime-core';
+import { defineComponent, type VNode } from 'vue';
 import { descriptorToVue, normalizeVueAttrs } from '@symbiote-native/vue';
 import type { IViewProps } from '@symbiote-native/vue';
 import { renderLinearGradient } from '../core/linear-gradient';

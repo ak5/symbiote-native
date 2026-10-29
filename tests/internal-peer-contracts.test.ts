@@ -16,6 +16,7 @@ const INTERNAL_PREFIX = '@symbiote-native/';
 interface IManifest {
   readonly name?: string;
   readonly version?: string;
+  readonly dependencies?: Readonly<Record<string, string>>;
   readonly peerDependencies?: Readonly<Record<string, string>>;
   readonly devDependencies?: Readonly<Record<string, string>>;
 }
@@ -86,4 +87,22 @@ describe('internal peer contracts', () => {
     }
     expect(problems.sort().join('\n')).toBe('');
   });
+});
+
+it('Vue packages share the application peer instead of installing a second renderer runtime', () => {
+  const vuePackages = [...WORKSPACE_PACKAGES.values()].filter(
+    ({ manifest }) => manifest.peerDependencies?.vue !== undefined,
+  );
+  expect(vuePackages.length).toBeGreaterThan(30);
+  for (const { file, manifest } of vuePackages) {
+    expect(manifest.dependencies?.['@vue/runtime-core'], file).toBeUndefined();
+    expect(
+      manifest.peerDependencies?.['@vue/runtime-core'],
+      file,
+    ).toBeUndefined();
+    expect(
+      manifest.devDependencies?.['@vue/runtime-core'],
+      file,
+    ).toBeUndefined();
+  }
 });

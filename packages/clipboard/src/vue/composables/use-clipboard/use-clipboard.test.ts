@@ -2,7 +2,7 @@
 // expo-modules-core internals) since this exercises composable mount/unmount lifecycle timing,
 // not any native view — there is none here, so no ViewConfig fixture is needed.
 
-import { defineComponent, h, type Ref } from '@vue/runtime-core';
+import { defineComponent, h, type Ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

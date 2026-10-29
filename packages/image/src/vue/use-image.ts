@@ -1,9 +1,5 @@
-import { shallowRef, toValue, watch } from '@vue/runtime-core';
-import type {
-  MaybeRefOrGetter,
-  ShallowRef,
-  WatchSource,
-} from '@vue/runtime-core';
+import { shallowRef, toValue, watch } from 'vue';
+import type { MaybeRefOrGetter, ShallowRef, WatchSource } from 'vue';
 import { createImageRefLoader, resolveSource } from '../core';
 import type { IImageLoadOptions, IImageSource, ImageRef } from '../core';
 

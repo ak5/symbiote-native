@@ -1,9 +1,4 @@
-import {
-  defineComponent,
-  onErrorCaptured,
-  shallowRef,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, onErrorCaptured, shallowRef, type VNode } from 'vue';
 import { reportCaughtError } from '../core/report-caught-error';
 
 export type IAppMetricsErrorBoundaryFallbackProps = {

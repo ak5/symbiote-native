@@ -1,7 +1,7 @@
 // The Vue Drawer's view: the core plan turned into vnodes on each render
 
-import { h } from '@vue/runtime-core';
-import type { VNode } from '@vue/runtime-core';
+import { h } from 'vue';
+import type { VNode } from 'vue';
 import { Animated } from '@symbiote-native/vue';
 import type {
   AnimatedValue,

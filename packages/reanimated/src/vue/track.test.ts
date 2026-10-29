@@ -1,4 +1,4 @@
-import { nextTick, reactive } from '@vue/runtime-core';
+import { nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import { trackReads } from './track';
 

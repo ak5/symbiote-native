@@ -4,7 +4,7 @@
 // `effect` is read once at composable-call time and closed over directly by onMounted/onUnmounted -
 // there's no dependency array to go stale.
 
-import { onMounted, onUnmounted } from '@vue/runtime-core';
+import { onMounted, onUnmounted } from 'vue';
 import { NAVIGATION_EVENT_BLUR, NAVIGATION_EVENT_FOCUS } from '../../core';
 import { requireNavigationScope } from '../navigation-context';
 

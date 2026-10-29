@@ -1,5 +1,5 @@
 // Vue `SymbolView` через recording fabric с подставленным view config
-import { h, type VNode } from '@vue/runtime-core';
+import { h, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { processColor } from '@symbiote-native/engine';
 import {

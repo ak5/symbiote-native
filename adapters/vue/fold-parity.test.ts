@@ -28,7 +28,7 @@
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
 import { transformAsync } from '@babel/core';
-import type { Component, Ref } from '@vue/runtime-core';
+import type { Component, Ref } from 'vue';
 import * as engine from '@symbiote-native/engine';
 import { clearGlobalStyles } from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';

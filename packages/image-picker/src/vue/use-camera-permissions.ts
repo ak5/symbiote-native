@@ -5,7 +5,7 @@ import {
 } from '../core';
 import type { ICameraPermissionResponse } from '../core';
 import type { IPermissionHookBehavior } from '@symbiote-native/engine';
-import type { Ref } from '@vue/runtime-core';
+import type { Ref } from 'vue';
 
 export type IUseCameraPermissionsResult = [
   Ref<ICameraPermissionResponse | null>,

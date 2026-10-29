@@ -1,4 +1,4 @@
-import { onUnmounted, watch } from '@vue/runtime-core';
+import { onUnmounted, watch } from 'vue';
 import { subscribeAudioSampleListener } from '../core/audio-sample-listener';
 import type { IAudioSamplePlayer } from '../core/audio-sample-listener';
 import type { IAudioSample } from '../core/types';

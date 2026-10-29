@@ -3,7 +3,7 @@
 // isLowPowerModeEnabledAsync() call before the first native event fires, matching upstream's
 // own useLowPowerMode.
 
-import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted, ref, type Ref } from 'vue';
 import {
   addLowPowerModeListener,
   isLowPowerModeEnabledAsync,

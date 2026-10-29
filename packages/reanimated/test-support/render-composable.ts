@@ -1,4 +1,4 @@
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { mount, unmount } from '@symbiote-native/vue';
 import { firstResultOf } from './first-result';
 

@@ -1,6 +1,6 @@
 // Vue twin of `../../../react`'s `useLastNotificationResponse`
 
-import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted, ref, type Ref } from 'vue';
 import {
   addNotificationResponseClearedListener,
   addNotificationResponseReceivedListener,

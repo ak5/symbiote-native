@@ -5,7 +5,7 @@
 // across reactive updates), this subscribes exactly once at mount and never needs to react to
 // a later change of updateIntervalMs, so a plain numeric param is enough.
 
-import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted, ref, type Ref } from 'vue';
 import {
   DeviceMotion,
   type EventSubscription,

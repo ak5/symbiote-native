@@ -1,7 +1,7 @@
 // Twin of use-stack-navigation.ts, narrowing to a Drawer handle instead.
 
-import { computed } from '@vue/runtime-core';
-import type { ComputedRef } from '@vue/runtime-core';
+import { computed } from 'vue';
+import type { ComputedRef } from 'vue';
 import type { IDrawerNavigatorHandle } from '../../core';
 import { isDrawerNavigatorHandle } from '../../core';
 import { useNavigation } from './use-navigation';

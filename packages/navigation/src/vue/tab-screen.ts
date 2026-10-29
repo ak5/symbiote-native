@@ -5,8 +5,8 @@
 // stack-only concepts (no push/pop lifecycle events to wire); see CLAUDE.md
 // <third_party_rn_packages_are_react_only> - this and Tab import nothing from react-native.
 
-import { defineComponent } from '@vue/runtime-core';
-import type { Component } from '@vue/runtime-core';
+import { defineComponent } from 'vue';
+import type { Component } from 'vue';
 import type { IRoute, ITabOptions, ITabNavigatorHandle } from '../core';
 
 export type ITabScreenOptionsArgs = {

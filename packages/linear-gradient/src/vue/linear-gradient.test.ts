@@ -1,5 +1,5 @@
 // Vue `LinearGradient` через recording fabric с подставленным view config
-import { defineComponent, h, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   mount,

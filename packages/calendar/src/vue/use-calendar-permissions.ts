@@ -6,7 +6,7 @@ import {
 } from '../core/calendar-permission-api';
 import type { PermissionResponse } from 'expo-modules-core';
 import type { IPermissionHookOptions } from '@symbiote-native/engine';
-import type { Ref } from '@vue/runtime-core';
+import type { Ref } from 'vue';
 
 export type IUseCalendarPermissionsOptions = ICalendarPermissionMethodOptions;
 

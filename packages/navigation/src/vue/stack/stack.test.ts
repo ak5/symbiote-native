@@ -14,7 +14,7 @@
 // route" is a no-op the reducer already fails closed on (core's contract), observed here as an
 // unchanged screen count, not a thrown error.
 
-import { Fragment, defineComponent, h, ref } from '@vue/runtime-core';
+import { Fragment, defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,

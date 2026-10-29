@@ -1,4 +1,4 @@
-import { h, type FunctionalComponent } from '@vue/runtime-core';
+import { h, type FunctionalComponent } from 'vue';
 import {
   SHARED_TRANSITION_BOUNDARY_VIEW,
   sharedTransitionBoundaryProps,

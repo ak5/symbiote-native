@@ -1,7 +1,7 @@
 import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
 import { createLiveTree } from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/vue';
-import { defineComponent, h, nextTick } from '@vue/runtime-core';
+import { defineComponent, h, nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { updateProps } from 'react-native-reanimated/src/updateProps';
 import {

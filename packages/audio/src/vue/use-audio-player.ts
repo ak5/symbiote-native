@@ -1,8 +1,4 @@
-import {
-  toValue,
-  type ComputedRef,
-  type MaybeRefOrGetter,
-} from '@vue/runtime-core';
+import { toValue, type ComputedRef, type MaybeRefOrGetter } from 'vue';
 import { createResourceHook } from '@symbiote-native/vue';
 import { createAudioPlayerController } from '../core/audio-player-controller';
 import type { AudioPlayer } from '../core';

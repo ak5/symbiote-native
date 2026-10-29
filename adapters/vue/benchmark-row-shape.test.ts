@@ -9,7 +9,7 @@
 // (`findAll`), not a derived committed shape.
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import {
   childrenOf,
   isAnchor,

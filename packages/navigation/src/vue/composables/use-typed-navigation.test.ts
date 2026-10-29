@@ -2,7 +2,7 @@
 // narrowed twins of useNavigation() that hide the union guard. Vue twin of
 // react/hooks/use-typed-navigation.test.tsx.
 
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   mount,

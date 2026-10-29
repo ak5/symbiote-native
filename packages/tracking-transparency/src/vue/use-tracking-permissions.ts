@@ -2,7 +2,7 @@ import { createPermissionHook } from '@symbiote-native/vue';
 import { trackingPermissionMethods } from '../core/tracking-permission-api';
 import type { PermissionResponse } from '../core';
 import type { IPermissionHookBehavior } from '@symbiote-native/engine';
-import type { Ref } from '@vue/runtime-core';
+import type { Ref } from 'vue';
 
 export type IUseTrackingPermissionsHook = (
   options?: IPermissionHookBehavior,

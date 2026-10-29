@@ -1,11 +1,7 @@
 // Vue twins of `expo-auth-session`'s auth request hooks: ref or getter arguments, ref results
 
-import { toValue } from '@vue/runtime-core';
-import type {
-  ComputedRef,
-  MaybeRefOrGetter,
-  ShallowRef,
-} from '@vue/runtime-core';
+import { toValue } from 'vue';
+import type { ComputedRef, MaybeRefOrGetter, ShallowRef } from 'vue';
 import { createEventValueHook, createResourceHook } from '@symbiote-native/vue';
 import { createAuthRequestHooks } from '../core';
 import type { IHkt } from '../core';

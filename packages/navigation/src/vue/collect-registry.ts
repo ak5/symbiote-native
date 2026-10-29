@@ -1,6 +1,6 @@
 // The screens a Vue navigator's slot registers, read off its marker vnodes by name
 
-import type { VNode } from '@vue/runtime-core';
+import type { VNode } from 'vue';
 import { isRecord } from '../core';
 import { collectScreenVnodes } from './collect-screen-vnodes';
 

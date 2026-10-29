@@ -1,6 +1,6 @@
 // The Vue Drawer's untyped `attrs` and screen markers, narrowed at the one edge they enter
 
-import type { VNode } from '@vue/runtime-core';
+import type { VNode } from 'vue';
 import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
 import { isRecord } from '../../core';
 import type { IDrawerOptions, IDrawerPosition, IDrawerType } from '../../core';

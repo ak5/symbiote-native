@@ -4,8 +4,8 @@
 // a screen genuinely isn't focused at the instant it mounts, the same async gap real native
 // transitions have.
 
-import { onMounted, onUnmounted, ref } from '@vue/runtime-core';
-import type { Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted, ref } from 'vue';
+import type { Ref } from 'vue';
 import { NAVIGATION_EVENT_BLUR, NAVIGATION_EVENT_FOCUS } from '../../core';
 import { requireNavigationScope } from '../navigation-context';
 

@@ -2,7 +2,7 @@
 // walks a DESCENDANT `defineComponent`'s own `.parent` chain (adapters/vue's own
 // render-error-reporting.test.ts), so every throwing fixture here is a real component
 
-import { defineComponent, h, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import {

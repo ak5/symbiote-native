@@ -1,8 +1,4 @@
-import {
-  toValue,
-  type ComputedRef,
-  type MaybeRefOrGetter,
-} from '@vue/runtime-core';
+import { toValue, type ComputedRef, type MaybeRefOrGetter } from 'vue';
 import { createResourceHook } from '@symbiote-native/vue';
 import type { IImageManipulatorContext, IImageRef } from '../core';
 import { createImageManipulatorResourceController } from '../core/manipulator-resource-controller';

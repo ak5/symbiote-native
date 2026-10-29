@@ -7,7 +7,7 @@ import {
 import type { ILocationPermissionResponse } from '../core';
 import type { IPermissionHookBehavior } from '@symbiote-native/engine';
 import type { PermissionResponse } from 'expo-modules-core';
-import type { Ref } from '@vue/runtime-core';
+import type { Ref } from 'vue';
 
 export type IUseLocationPermissionsHook<TPermission> = (
   options?: IPermissionHookBehavior,

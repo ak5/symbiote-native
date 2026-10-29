@@ -1,4 +1,4 @@
-import { defineComponent, h, onMounted, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, onMounted, type VNode } from 'vue';
 import { markFirstRender } from '../core';
 import {
   AppMetricsErrorBoundary,

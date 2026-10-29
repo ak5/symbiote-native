@@ -3,7 +3,7 @@
 // equivalent, so the default tag comes from a small monotonically-incrementing module-local
 // counter instead — simplest robust way to give each composable instance its own tag when the
 // caller doesn't supply one.
-import { onMounted, onUnmounted } from '@vue/runtime-core';
+import { onMounted, onUnmounted } from 'vue';
 import {
   activateKeepAwakeAsync,
   deactivateKeepAwake,

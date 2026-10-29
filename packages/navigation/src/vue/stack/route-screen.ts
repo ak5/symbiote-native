@@ -1,7 +1,7 @@
 // Stack rendering: one native `RNSScreen` per route, with its header config and screen content
 
-import { h } from '@vue/runtime-core';
-import type { VNode } from '@vue/runtime-core';
+import { h } from 'vue';
+import type { VNode } from 'vue';
 import { descriptorToVue } from '@symbiote-native/vue';
 import { dlog } from '@symbiote-native/engine';
 import {

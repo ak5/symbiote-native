@@ -1,7 +1,7 @@
 // The Vue Tab's view: the bar and the focused screen as vnodes on each render
 
-import { h } from '@vue/runtime-core';
-import type { VNode } from '@vue/runtime-core';
+import { h } from 'vue';
+import type { VNode } from 'vue';
 import { descriptorToVue } from '@symbiote-native/vue';
 import type {
   INavigationEmitter,

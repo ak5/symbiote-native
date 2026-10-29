@@ -1,8 +1,4 @@
-import {
-  toValue,
-  type ComputedRef,
-  type MaybeRefOrGetter,
-} from '@vue/runtime-core';
+import { toValue, type ComputedRef, type MaybeRefOrGetter } from 'vue';
 import { createResourceHook } from '@symbiote-native/vue';
 import { createVideoPlayerController } from '../core/video-player-controller';
 import type {

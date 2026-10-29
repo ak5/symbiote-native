@@ -15,8 +15,8 @@
 // name is a no-op the reducer already fails closed on (core's contract), observed here as
 // unchanged content, not a thrown error.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
-import type { Ref } from '@vue/runtime-core';
+import { defineComponent, h, ref } from 'vue';
+import type { Ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import {

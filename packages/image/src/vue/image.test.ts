@@ -1,12 +1,6 @@
 // Vue `Image`, `ImageBackground` and `useImage` over the recording fabric
 
-import {
-  defineComponent,
-  h,
-  nextTick,
-  ref,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, h, nextTick, ref, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   mount,

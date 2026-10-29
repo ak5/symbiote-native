@@ -107,7 +107,6 @@
     "react-native": ">=0.86",
     "react": ">=19.0.0",
     "vue": ">=3.5.0",
-    "@vue/runtime-core": "^3.5.13",
     "svelte": ">=5.56.0",
     "solid-js": ">=1.9.0",
     "@angular/core": ">=20",
@@ -118,9 +117,6 @@
       "optional": true
     },
     "vue": {
-      "optional": true
-    },
-    "@vue/runtime-core": {
       "optional": true
     },
     "svelte": {
@@ -137,23 +133,22 @@
     }
   },
   "devDependencies": {
+    "@angular/common": "catalog:",
+    "@angular/compiler": "catalog:",
+    "@angular/compiler-cli": "catalog:",
+    "@angular/core": "catalog:",
+    "@symbiote-native/engine": "workspace:*",
+    "@symbiote-native/svelte": "workspace:*",
+    "@symbiote-native/test-utils": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-reconciler": "catalog:",
     "better-sqlite3": "catalog:",
-    "typescript": "catalog:",
     "react": "catalog:",
     "react-reconciler": "catalog:",
-    "vue": "catalog:",
-    "@vue/runtime-core": "catalog:",
-    "svelte": "catalog:",
     "solid-js": "catalog:",
-    "@angular/core": "catalog:",
-    "@angular/common": "catalog:",
-    "@angular/compiler": "catalog:",
-    "@angular/compiler-cli": "catalog:",
-    "@symbiote-native/svelte": "workspace:*",
-    "@symbiote-native/engine": "workspace:*",
-    "@symbiote-native/test-utils": "workspace:*"
+    "svelte": "catalog:",
+    "typescript": "catalog:",
+    "vue": "catalog:"
   }
 }

@@ -102,9 +102,6 @@ catalogs:
     '@vue/compiler-sfc':
       specifier: ^3.5.13
       version: 3.5.39
-    '@vue/runtime-core':
-      specifier: ^3.5.13
-      version: 3.5.39
     astro:
       specifier: ^7.0.3
       version: 7.0.6
@@ -636,15 +633,15 @@ importers:
       '@symbiote-native/vue':
         specifier: workspace:*
         version: link:../vue
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
       svelte:
         specifier: 'catalog:'
         version: 5.56.8(@typescript-eslint/types@8.63.0)
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   adapters/vue:
     dependencies:
@@ -782,9 +779,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -822,9 +816,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -837,6 +828,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/android:
     dependencies:
@@ -855,9 +849,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -895,9 +886,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -910,6 +898,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/app-metrics:
     dependencies:
@@ -922,9 +913,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -962,9 +950,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -977,6 +962,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/apple-authentication:
     dependencies:
@@ -992,9 +980,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1032,9 +1017,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1047,6 +1029,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/application:
     dependencies:
@@ -1059,9 +1044,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1099,9 +1081,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1114,6 +1093,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/asset:
     dependencies:
@@ -1132,9 +1114,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1172,9 +1151,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1187,6 +1163,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/audio:
     dependencies:
@@ -1202,9 +1181,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1242,9 +1218,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1257,6 +1230,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/auth-session:
     dependencies:
@@ -1275,9 +1251,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1318,9 +1291,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1333,6 +1303,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/background-fetch:
     dependencies:
@@ -1348,9 +1321,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1388,9 +1358,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1403,6 +1370,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/background-task:
     dependencies:
@@ -1418,9 +1388,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1458,9 +1425,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1473,6 +1437,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/battery:
     dependencies:
@@ -1485,9 +1452,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1525,9 +1489,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1540,6 +1501,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/blob:
     dependencies:
@@ -1552,9 +1516,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1592,9 +1553,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1607,6 +1565,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/blur:
     dependencies:
@@ -1622,9 +1583,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1662,9 +1620,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1677,6 +1632,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/brightness:
     dependencies:
@@ -1689,9 +1647,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1729,9 +1684,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1744,6 +1696,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/calendar:
     dependencies:
@@ -1756,9 +1711,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1796,9 +1748,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1811,6 +1760,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/camera:
     dependencies:
@@ -1826,9 +1778,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1866,9 +1815,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1881,6 +1827,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/cellular:
     dependencies:
@@ -1893,9 +1842,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -1933,9 +1879,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1948,6 +1891,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/cli:
     devDependencies:
@@ -1984,9 +1930,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2024,9 +1967,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2039,6 +1979,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/constants:
     dependencies:
@@ -2051,9 +1994,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2091,9 +2031,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2106,6 +2043,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/contacts:
     dependencies:
@@ -2121,9 +2061,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2161,9 +2098,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2176,6 +2110,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/crypto:
     dependencies:
@@ -2188,9 +2125,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2228,9 +2162,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2243,6 +2174,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/device:
     dependencies:
@@ -2255,9 +2189,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2295,9 +2226,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2310,6 +2238,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/document-picker:
     dependencies:
@@ -2322,9 +2253,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2362,9 +2290,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2377,6 +2302,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/expo-modules-link: {}
 
@@ -2391,9 +2319,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2431,9 +2356,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2446,6 +2368,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/font:
     dependencies:
@@ -2461,9 +2386,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2501,9 +2423,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2516,6 +2435,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/gl:
     dependencies:
@@ -2531,9 +2453,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2571,9 +2490,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2586,6 +2502,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/glass-effect:
     dependencies:
@@ -2601,9 +2520,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2641,9 +2557,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2656,6 +2569,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/haptics:
     dependencies:
@@ -2668,9 +2584,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2708,9 +2621,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2723,6 +2633,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/image:
     dependencies:
@@ -2741,9 +2654,6 @@ importers:
       sf-symbols-typescript:
         specifier: 'catalog:'
         version: 2.2.0
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2781,9 +2691,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2796,6 +2703,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/image-manipulator:
     dependencies:
@@ -2808,9 +2718,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2848,9 +2755,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2863,6 +2767,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/image-picker:
     dependencies:
@@ -2875,9 +2782,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2915,9 +2819,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2930,6 +2831,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/intent-launcher:
     dependencies:
@@ -2942,9 +2846,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -2982,9 +2883,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -2997,6 +2895,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/keep-awake:
     dependencies:
@@ -3009,9 +2910,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3049,9 +2947,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3064,6 +2959,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/linear-gradient:
     dependencies:
@@ -3079,9 +2977,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3119,9 +3014,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3134,6 +3026,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/live-photo:
     dependencies:
@@ -3149,9 +3044,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3189,9 +3081,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3204,6 +3093,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/local-auth:
     dependencies:
@@ -3219,9 +3111,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3262,9 +3151,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3277,6 +3163,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/localization:
     dependencies:
@@ -3289,9 +3178,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3329,9 +3215,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3344,6 +3227,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/location:
     dependencies:
@@ -3356,9 +3242,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3396,9 +3279,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3411,6 +3291,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/mail-composer:
     dependencies:
@@ -3423,9 +3306,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3463,9 +3343,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3478,6 +3355,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/media-library:
     dependencies:
@@ -3490,9 +3370,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3530,9 +3407,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3545,6 +3419,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/navigation:
     dependencies:
@@ -3557,9 +3434,6 @@ importers:
       react-native-screens:
         specifier: 'catalog:'
         version: 4.26.0(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/common':
         specifier: 'catalog:'
@@ -3600,9 +3474,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3615,6 +3486,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/navigation-bar:
     dependencies:
@@ -3627,9 +3501,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3667,9 +3538,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3682,6 +3550,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/network:
     dependencies:
@@ -3694,9 +3565,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3734,9 +3602,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3749,6 +3614,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/notifications:
     dependencies:
@@ -3764,9 +3632,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3804,9 +3669,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3819,6 +3681,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/print:
     dependencies:
@@ -3831,9 +3696,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3871,9 +3733,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3886,15 +3745,15 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/reanimated:
     dependencies:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -3932,9 +3791,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -3953,6 +3809,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/screen-capture:
     dependencies:
@@ -3965,9 +3824,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4005,9 +3861,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4020,6 +3873,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/screen-orientation:
     dependencies:
@@ -4032,9 +3888,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4072,9 +3925,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4087,6 +3937,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/secure-store:
     dependencies:
@@ -4099,9 +3952,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4139,9 +3989,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4154,6 +4001,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/sensors:
     dependencies:
@@ -4166,9 +4016,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4206,9 +4053,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4221,6 +4065,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/sharing:
     dependencies:
@@ -4233,9 +4080,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4273,9 +4117,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4288,6 +4129,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/slider:
     dependencies:
@@ -4300,9 +4144,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4343,9 +4184,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4358,6 +4196,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/sms:
     dependencies:
@@ -4370,9 +4211,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4410,9 +4248,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4425,6 +4260,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/speech:
     dependencies:
@@ -4437,9 +4275,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4477,9 +4312,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4492,6 +4324,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/splash-screen:
     dependencies:
@@ -4507,9 +4342,6 @@ importers:
       react-native-is-edge-to-edge:
         specifier: 'catalog:'
         version: 1.3.1(react-native@0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4547,9 +4379,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4562,6 +4391,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/sqlite:
     dependencies:
@@ -4611,9 +4443,6 @@ importers:
       '@types/react-reconciler':
         specifier: 'catalog:'
         version: 0.32.3(@types/react@19.2.17)
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       better-sqlite3:
         specifier: 'catalog:'
         version: 13.0.3
@@ -4644,9 +4473,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4684,9 +4510,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4699,6 +4522,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/store-review:
     dependencies:
@@ -4711,9 +4537,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4751,9 +4574,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4766,6 +4586,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/symbols:
     dependencies:
@@ -4790,9 +4613,6 @@ importers:
       sf-symbols-typescript:
         specifier: 'catalog:'
         version: 2.2.0
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4830,9 +4650,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4845,6 +4662,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/system-ui:
     dependencies:
@@ -4857,9 +4677,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4897,9 +4714,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4912,6 +4726,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/task-manager:
     dependencies:
@@ -4930,9 +4747,6 @@ importers:
       unimodules-app-loader:
         specifier: 'catalog:'
         version: 57.0.1
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -4970,9 +4784,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4985,6 +4796,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/tracking-transparency:
     dependencies:
@@ -4997,9 +4811,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -5037,9 +4848,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -5052,6 +4860,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/video:
     dependencies:
@@ -5067,9 +4878,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -5107,9 +4915,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -5122,6 +4927,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/video-thumbnails:
     dependencies:
@@ -5134,9 +4942,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -5174,9 +4979,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -5189,6 +4991,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
   packages/web-browser:
     dependencies:
@@ -5201,9 +5006,6 @@ importers:
       react-native:
         specifier: '>=0.86'
         version: 0.86.0(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@6.0.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
-      vue:
-        specifier: '>=3.5.0'
-        version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@angular/compiler':
         specifier: 'catalog:'
@@ -5241,9 +5043,6 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.17
-      '@vue/runtime-core':
-        specifier: 'catalog:'
-        version: 3.5.39
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -5256,6 +5055,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.39(typescript@6.0.3)
 
 packages:
 

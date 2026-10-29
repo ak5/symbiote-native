@@ -7,13 +7,7 @@
 // the side-effect import in ../register (pulled in by the package barrel, NOT here, so this module
 // and its tests stay free of the third-party spec).
 
-import {
-  defineComponent,
-  h,
-  ref,
-  type SetupContext,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, h, ref, type SetupContext, type VNode } from 'vue';
 import {
   descriptorToVue,
   normalizeVueAttrs,

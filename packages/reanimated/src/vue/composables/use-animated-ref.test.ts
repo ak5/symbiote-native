@@ -1,6 +1,6 @@
 import { getNativeTag } from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/vue';
-import { defineComponent, h, nextTick } from '@vue/runtime-core';
+import { defineComponent, h, nextTick } from 'vue';
 import { describe, expect, it } from 'vitest';
 import { renderComposable } from '../../../test-support/render-composable';
 import { installWrapperHost } from '../../../test-support/wrapper-host';

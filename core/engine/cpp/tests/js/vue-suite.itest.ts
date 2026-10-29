@@ -12,7 +12,7 @@
 //
 // RUN ON `build-release` (`pnpm run bench:itest`).
 
-import { nextTick, shallowRef } from '@vue/runtime-core';
+import { nextTick, shallowRef } from 'vue';
 
 import { readSurfaceTelemetry } from '@symbiote-native/engine';
 import { h, mount } from '@symbiote-native/vue';
