@@ -83,7 +83,8 @@ jobs:
           $definitions = $project.CreateElement('ItemDefinitionGroup', $ns)
           $compile = $project.CreateElement('ClCompile', $ns)
           $includes = $project.CreateElement('AdditionalIncludeDirectories', $ns)
-          $includes.InnerText = "$engineDir;$rnDir\ReactCommon;$rnDir\ReactCommon\jsi;%(AdditionalIncludeDirectories)"
+          # RNW's SDK owns JSI; mixing its headers with npm React Native's JSI defines the types twice.
+          $includes.InnerText = "%(AdditionalIncludeDirectories);$engineDir;$rnDir\ReactCommon"
           [void]$compile.AppendChild($includes)
           $standard = $project.CreateElement('LanguageStandard', $ns)
           $standard.InnerText = 'stdcpp20'
