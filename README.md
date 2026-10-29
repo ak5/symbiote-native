@@ -380,6 +380,17 @@ example apps are the working spec and they stay green.
 
 ---
 
+### Windows
+
+An experimental Windows x64 target uses React Native Windows 0.85.0 with React
+Native 0.85.3. React, Vue, Svelte, Solid and Angular share the same C++ engine and
+stock Fabric host. The [Windows engine guide](./core/engine/windows/README.md)
+covers native autolinking, the Win32 host's resize-message bridge, consumer
+builds and native verification. Expo-backed companion modules need compatible
+Windows providers; a successful bundle does not establish their availability.
+
+---
+
 ## Testing
 
 SymbioteNative never forks the native core, so a SymbioteNative app **is** a stock React Native app
