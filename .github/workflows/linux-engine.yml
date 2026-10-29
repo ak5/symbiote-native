@@ -68,18 +68,13 @@ jobs:
       - name: Compile the native host and Symbiote engine
         id: native-build
         run: |
-          nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_ENABLE_SKIA=OFF -DRNL_AUTOLINKING_CMAKE="$PWD/.linux-host/symbiote-generated/rnl_autolinking.cmake"
+          nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_ENABLE_SKIA=OFF -DRNL_AUTOLINKING_CMAKE="$PWD/.linux-host/symbiote-generated/rnl_autolinking.cmake"
           nice -n 10 cmake --build .linux-host/build/symbiote --target hello_react --parallel 2
       - name: Exercise module initialization and Fabric commits in Hermes
         run: |
           set -o pipefail
           nice -n 10 .linux-host/build/symbiote/bin/hello_react --fabric .linux-host/symbiote-smoke.js 2>&1 | tee .linux-host/symbiote-smoke.log
           grep -F 'Symbiote Linux engine smoke passed' .linux-host/symbiote-smoke.log
-      - uses: actions/cache/save@v4
-        if: always() && steps.native-build.outcome == 'success'
-        with:
-          path: ~/.cache/ccache
-          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
       - name: Build a Metro application from packed packages
         run: |
           nice -n 10 node --test scripts/linux-consumer-bundle.test.mjs
@@ -107,6 +102,11 @@ jobs:
           ln -s symbiote .linux-host/build/dev
       - name: Exercise native keyboard and clipboard in each application
         run: nice -n 10 node scripts/run-linux-window-consumers.mjs .linux-host .linux-host/symbiote-app
+      - uses: actions/cache/save@v4
+        if: always() && steps.native-build.outcome == 'success'
+        with:
+          path: ~/.cache/ccache
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
