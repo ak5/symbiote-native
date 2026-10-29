@@ -166,6 +166,7 @@ jobs:
         shell: pwsh
         run: |
           $projectDir = '.windows-fabric-probe/windows/SymbioteFabricProbe'
+          Copy-Item core/engine/windows/SymbioteWindowMessages.h $projectDir
           Copy-Item core/engine/windows/tests/FabricProbe.h $projectDir
           Copy-Item core/engine/cpp/SymbioteBuffer.h $projectDir
           Copy-Item core/engine/windows/tests/index.windows.js .windows-fabric-probe
@@ -176,6 +177,10 @@ jobs:
           if (-not $source.Contains($registration)) { throw 'The SDK template registration changed' }
           $source = $source.Replace('#include "NativeModules.h"', "#include `"NativeModules.h`"`n#include <TurboModuleProvider.h>`n#include `"FabricProbe.h`"")
           $source = $source.Replace($registration, $registration + "`n" + 'winrt::Microsoft::ReactNative::AddTurboModuleProvider<symbiote::windows::probe::FabricProbe>(packageBuilder, L"SymbioteFabricProbe");')
+          $source = $source.Replace('#include "pch.h"', "#include `"pch.h`"`n#include <winrt/Microsoft.UI.Interop.h>`n#include `"SymbioteWindowMessages.h`"")
+          $start = 'reactNativeWin32App.Start();'
+          if (-not $source.Contains($start)) { throw 'The SDK app startup changed' }
+          $source = $source.Replace($start, 'symbiote::windows::WindowMessages windowMessages{winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id()), settings.Notifications()};' + "`n" + $start)
           Set-Content $sourcePath $source
       - name: Autolink the production native package into the application
         shell: pwsh

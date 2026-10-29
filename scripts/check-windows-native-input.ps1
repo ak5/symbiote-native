@@ -93,6 +93,10 @@ if (-not [InputWindow]::SetWindowPos($app.MainWindowHandle, [IntPtr]::Zero, 0, 0
     ([int][Math]::Ceiling($bounds.Width) + 160), [int][Math]::Ceiling($bounds.Height), 0x16)) {
   throw 'The native window could not be resized'
 }
+$resizedBounds = $root.Current.BoundingRectangle
+if ($resizedBounds.Width -le $bounds.Width + 1) {
+  throw "The OS window size did not increase: $($bounds.Width) -> $($resizedBounds.Width)"
+}
 $deadline = (Get-Date).AddSeconds(15)
 do {
   $resizedWidth = Read-ViewportWidth

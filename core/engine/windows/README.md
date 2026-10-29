@@ -54,3 +54,33 @@ which requires ExpoClipboard. Persistent storage and other companion APIs need
 compatible Windows native providers and native verification; a successful Metro
 bundle does not establish their availability. The standard CLI still scaffolds
 the mobile hosts; the Windows SDK application setup above supplies this host.
+
+## Forward native resize notifications
+
+The RNW 0.85 Win32 app builder resizes the Fabric surface, but its DeviceInfo
+module subscribes to the separate `DesktopWindowBridge` notification channel.
+Forward the host window's resize messages so the stock Dimensions singleton and
+all five framework hooks receive updates. This uses the SDK's public bridge;
+React Native sources stay unchanged.
+
+In the generated application's C++ entry, after `pch.h`, include:
+
+```cpp
+#include <winrt/Microsoft.UI.Interop.h>
+#include <SymbioteWindowMessages.h>
+```
+
+Add the installed engine's `windows` directory to the application's include path.
+Keep the forwarder alive around the application's blocking event loop, after
+obtaining `appWindow` and `settings` from the standard SDK template:
+
+```cpp
+symbiote::windows::WindowMessages windowMessages{
+    winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id()),
+    settings.Notifications()};
+reactNativeWin32App.Start();
+```
+
+The forwarder removes its window subclass when the native window is destroyed
+or its owner leaves scope. The native application gate installs this same
+header and requires a real OS resize to reach every framework's metrics hook.
