@@ -32,7 +32,7 @@ jobs:
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
           pnpm install --frozen-lockfile --ignore-scripts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node --test scripts/build-cli-entrypoints.test.mjs
+          node --test --test-concurrency=1 scripts/build-cli-entrypoints.test.mjs scripts/svelte-prepack.test.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm exec tsc --build core/engine
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
