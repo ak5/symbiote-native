@@ -76,6 +76,13 @@ This is engine bring-up, not a completed Linux application target. Before claimi
 - Verify keyboard input, clipboard, resize, persistence, scrolling and accessibility on a real Linux host.
 - Audit companion native packages and state any unavailable capabilities explicitly.
 
+The text-input clipboard journey does not establish `@symbiote-native/clipboard` support: that
+package resolves `ExpoClipboard` through `expo-modules-core`, while the pinned Linux host provides
+`RNCClipboard`. Likewise, its native `RNAsyncStorage` SQLite store does not implement the
+`ExpoSQLite` constructors used by `@symbiote-native/sqlite`. Neither companion is included in the
+current consumer matrix; do not present their APIs as available on Linux without an actual port
+and native verification.
+
 Windows remains a separate host integration. Resolve the React Native version contract before adding
 a consumer: this engine declares RN >=0.86, while the inspected published RNW stable requires RN 0.85.
 Do not force mismatched peer dependencies or label an empty branch as platform support.
