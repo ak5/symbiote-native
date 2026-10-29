@@ -23,7 +23,7 @@ mkdirSync(join(directory, 'e2e'));
 mkdirSync(join(directory, 'test-bundles'));
 
 const failures = [];
-for (const framework of ['react', 'svelte', 'vue']) {
+for (const framework of ['react', 'svelte', 'vue', 'solid']) {
   const bundle = `${framework}.js`;
   copyFileSync(
     join(matrix, framework, 'index.linux.bundle.js'),

@@ -110,3 +110,9 @@ existing bootstrap over the same intrinsic tags. Its packed production Metro bun
 contract passed locally; the Vue native startup, keyboard and resize journeys still require CI.
 The runner regression now checks all six journeys are attempted when one fails. React/Svelte's
 four native journeys remain verified by run40936472812.
+
+Solid is prepared in the same Linux consumer/window matrix. Its fixture uses the adapter's
+`createWindowDimensions`, Solid signals and its shipped universal JSX Babel preset. The isolated
+packed production Metro build and Linux/adapter source-map contract pass locally. The runner test
+checks all eight framework journeys are attempted after a failure. Solid's actual Linux runtime
+checks remain pending; do not replace the existing Vue run merely to add this fixture.

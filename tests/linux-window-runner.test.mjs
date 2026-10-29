@@ -19,7 +19,7 @@ test('a failed window journey preserves its trace and still runs the remaining j
     const matrix = join(root, 'matrix');
     mkdirSync(join(host, 'scripts'), { recursive: true });
     mkdirSync(join(host, 'packages'));
-    for (const framework of ['react', 'svelte', 'vue']) {
+    for (const framework of ['react', 'svelte', 'vue', 'solid']) {
       mkdirSync(join(matrix, framework), { recursive: true });
       writeFileSync(join(matrix, framework, 'index.linux.bundle.js'), '');
     }
@@ -61,6 +61,8 @@ test('a failed window journey preserves its trace and still runs the remaining j
         'symbiote-svelte-resize',
         'symbiote-vue-input',
         'symbiote-vue-resize',
+        'symbiote-solid-input',
+        'symbiote-solid-resize',
       ],
     );
   } finally {
