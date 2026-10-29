@@ -221,7 +221,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm run check:windows-consumers .windows-adapter-apps
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Run each framework through native Windows layout events
+      - name: Run each framework through native Windows layout and typing
         shell: pwsh
         run: |
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
@@ -248,6 +248,12 @@ jobs:
               if ($log -match 'FAIL:' -or -not $log.Contains("PASS: $title native layout 120->240")) {
                 throw "$title did not complete native layout and reactive update; exited=$($app.HasExited)"
               }
+              powershell.exe -NoProfile -File ./scripts/check-windows-native-input.ps1 -ApplicationProcessId $app.Id |
+                Tee-Object -FilePath "windows-$framework-input-runtime.log"
+              if ($LASTEXITCODE -ne 0) { throw "$title native input verification failed" }
+              $log = Get-Content $logPath -Raw
+              Copy-Item $logPath "windows-$framework-runtime.log" -Force
+              if ($log -match 'FAIL:') { throw "$title failed during native typing: $log" }
             } finally {
               if (-not $app.HasExited) { Stop-Process -Id $app.Id }
             }

@@ -6,14 +6,25 @@ import { createLayoutProbe } from './common';
 const probe = TurboModuleRegistry.getEnforcing('SymbioteFabricProbe');
 function App() {
   const [width, setWidth] = useState(120);
+  const [value, setValue] = useState('seed');
   const onLayout = useMemo(
     () => createLayoutProbe('React', Platform, () => setWidth(240), probe),
     [],
   );
   return createElement(
     'view',
-    { onLayout, style: { width, height: 80, backgroundColor: '#234567' } },
-    createElement('text', null, 'Windows React'),
+    null,
+    createElement(
+      'view',
+      { onLayout, style: { width, height: 80, backgroundColor: '#234567' } },
+      createElement('text', null, 'Windows React'),
+    ),
+    createElement('text-input', {
+      testID: 'windows-input',
+      value,
+      onChange: event => setValue(event.nativeEvent.text.toUpperCase()),
+      style: { width: 240, height: 40 },
+    }),
   );
 }
 registerApp(App, { appName: 'SymbioteFabricProbe', debug: true });

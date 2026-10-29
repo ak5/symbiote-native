@@ -88,7 +88,10 @@ for (const framework of frameworks) {
     '@react-native/metro-babel-transformer': '0.85.3',
     '@react-native/typescript-config': '0.85.3',
     '@types/react': '19.2.0',
-    '@types/node': moduleVersion('@types/node'),
+    '@types/node': moduleVersion(
+      '@types/node',
+      join(repository, 'adapters/react'),
+    ),
     typescript: moduleVersion('typescript'),
   };
   if (framework === 'vue')
@@ -249,6 +252,16 @@ module.exports = mergeConfig(adapter, {maxWorkers: 1, resolver: {
         .endsWith('@symbiote-native/engine/build/platform/index.windows.js'),
     ),
     'Metro must select the native Windows platform',
+  );
+  assert(
+    sources.some(path =>
+      path
+        .replaceAll('\\', '/')
+        .endsWith(
+          '@symbiote-native/components/build/component-names/index.windows.js',
+        ),
+    ),
+    'Metro must select the Windows native component names',
   );
   if (framework === 'vue') verifyVueRuntime(sources);
   console.log(`Packed Windows consumer ready: ${framework}`);
