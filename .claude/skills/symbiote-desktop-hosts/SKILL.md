@@ -99,3 +99,9 @@ Its first synchronous `getVersion()` call installs the shared bindings; later lo
 The JS resolver uses the same synchronous initialization path as Linux and propagates failures
 before caching a result. Eight resolver regression tests pass. Module syntax is checked locally;
 actual RNW registration and runtime execution still need to be added to the application gate.
+
+The native `TreeTest.portableModuleInstallsBindingsAndPreservesThemAcrossLookups` test now exercises
+the production Windows module with a real JavaScriptCore/Fabric host: it installs absent bindings,
+commits a View, recreates the module and asserts binding identity is preserved. It passed locally
+with the public backend. This establishes module behavior, while the actual Windows SDK build
+and platform registration remain separate pending gates.

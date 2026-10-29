@@ -17,6 +17,7 @@
  */
 
 #include "SymbioteEngineBindings.h"
+#include "../../windows/SymbioteEngineModule.h"
 
 #include <JSCRuntime.h>
 #include <react/renderer/componentregistry/ComponentDescriptorProviderRegistry.h>
@@ -223,6 +224,27 @@ const std::vector<std::string> kNames{"RCTView", "RCTText", "RCTScrollView"};
 
 // why: everything else here rests on a batch reaching Fabric at all -- one element under the
 // surface node has to arrive as one child of the committed root.
+TEST_F(TreeTest, portableModuleInstallsBindingsAndPreservesThemAcrossLookups) {
+  auto &runtime = *runtime_;
+  runtime.global().setProperty(runtime, "__symbioteEngineNative", jsi::Value::undefined());
+  symbiote::windows::SymbioteEngineModule first(nullptr);
+  auto name = jsi::PropNameID::forAscii(runtime, "getVersion");
+  auto method = first.create(runtime, name).asObject(runtime).asFunction(runtime);
+  EXPECT_EQ(method.call(runtime).asNumber(), symbiote::kNativeVersion);
+  auto installed = runtime.global().getPropertyAsObject(runtime, "__symbioteEngineNative");
+
+  Batch batch;
+  batch.element(0, kView).element(1, kView).append(0, 1).commit();
+  apply(batch, kNames);
+  EXPECT_EQ(namesOf(mounted()), (std::vector<std::string>{"View"}));
+
+  symbiote::windows::SymbioteEngineModule second(nullptr);
+  auto lookup = second.create(runtime, name).asObject(runtime).asFunction(runtime);
+  EXPECT_EQ(lookup.call(runtime).asNumber(), symbiote::kNativeVersion);
+  auto retained = runtime.global().getPropertyAsObject(runtime, "__symbioteEngineNative");
+  EXPECT_TRUE(jsi::Object::strictEquals(runtime, installed, retained));
+}
+
 TEST_F(TreeTest, commitsACreatedElementIntoTheTree) {
   Batch batch;
   batch.element(0, kView).element(1, kView).append(0, 1).commit();
