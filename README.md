@@ -378,6 +378,17 @@ example apps are the working spec and they stay green.
 
 ---
 
+### Linux
+
+An experimental Linux target uses a pinned React Native Linux host with React
+Native 0.87.1. React, Vue, Svelte, Solid and Angular share the same C++ engine and
+stock Fabric host. The [Linux engine guide](./core/engine/linux/README.md)
+covers the host pin, autolinking, installed consumers and native verification.
+The pinned host's clipboard is process-local; external clipboard exchange,
+AT-SPI integration and Expo-backed companion modules need further work.
+
+---
+
 ## Testing
 
 SymbioteNative never forks the native core, so a SymbioteNative app **is** a stock React Native app
