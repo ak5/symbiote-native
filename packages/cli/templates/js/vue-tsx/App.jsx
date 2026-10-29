@@ -1,4 +1,4 @@
-import { ref } from '@vue/runtime-core';
+import { ref } from 'vue';
 import './App.css';
 
 export default {

@@ -109,7 +109,7 @@ function patchSolid(source: string): string {
 function patchVueTsx(source: string): string {
   const withLifecycleImport = insertOrMergeNamedImport(
     source,
-    '@vue/runtime-core',
+    'vue',
     'onMounted',
   );
   const withHideImport = `import { hide } from '@symbiote-native/splash-screen/vue';\n${withLifecycleImport}`;
