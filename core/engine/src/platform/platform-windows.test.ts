@@ -43,6 +43,23 @@ it('selects Windows before native/default and preserves explicit undefined', asy
   expect(platform.select({ ios: 'I' })).toBeUndefined();
 });
 
+it.each([false, true])(
+  'accepts the SDK nullable animation flag with isTesting=%s',
+  async isTesting => {
+    // RNW's generated std::optional fields are written as null when unset.
+    const nativeConstants = {
+      ...constants,
+      isTesting,
+      isDisableAnimations: null,
+      reactNativeVersion: { ...constants.reactNativeVersion, prerelease: null },
+    };
+    const platform = await load(nativeConstants);
+    expect(platform.constants).toEqual(nativeConstants);
+    expect(platform.Version).toBe(19);
+    expect(platform.isDisableAnimations).toBe(isTesting);
+  },
+);
+
 it('gates testing in release builds while honoring explicit animation settings', async () => {
   const platform = await load();
   expect(platform.isTesting).toBe(true);

@@ -15,7 +15,7 @@ export type {
 export interface IPlatformConstantsWindows {
   osVersion: number;
   isTesting: boolean;
-  isDisableAnimations?: boolean;
+  isDisableAnimations?: boolean | null;
   reactNativeVersion: {
     major: number;
     minor: number;
@@ -47,6 +47,7 @@ function isPlatformConstantsWindows(
     typeof value.osVersion === 'number' &&
     typeof value.isTesting === 'boolean' &&
     (value.isDisableAnimations === undefined ||
+      value.isDisableAnimations === null ||
       typeof value.isDisableAnimations === 'boolean') &&
     isVersion(value.reactNativeVersion) &&
     isVersion(value.reactNativeWindowsVersion) &&

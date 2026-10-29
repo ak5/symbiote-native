@@ -8,7 +8,13 @@ export function createLayoutProbe(framework, platform, update, probe) {
     platform.constants?.reactNativeVersion?.minor !== 85 ||
     platform.select({ windows: 'windows', native: 'native' }) !== 'windows'
   ) {
-    fail('The packaged adapter did not resolve the Windows host');
+    fail(
+      `The packaged adapter did not resolve the Windows host: ${JSON.stringify({
+        OS: platform.OS,
+        constants: platform.constants ?? null,
+        selected: platform.select({ windows: 'windows', native: 'native' }),
+      })}`,
+    );
   }
   let initial = false;
   let complete = false;
