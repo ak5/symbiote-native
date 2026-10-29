@@ -60,7 +60,8 @@ jobs:
         id: windows-dependencies
         with:
           path: .windows-vcpkg-cache
-          key: windows-vs2026-static-md-folly-${{ hashFiles('core/engine/windows/vcpkg.json') }}
+          key: windows-vs2026-static-md-folly-${{ hashFiles('core/engine/windows/vcpkg.json') }}-${{ github.run_id }}
+          restore-keys: windows-vs2026-static-md-folly-${{ hashFiles('core/engine/windows/vcpkg.json') }}-
       - name: Build pinned engine dependencies
         shell: pwsh
         env:
@@ -71,10 +72,10 @@ jobs:
           $env:VCPKG_BINARY_SOURCES = "clear;files,$PWD/.windows-vcpkg-cache,readwrite"
           & .windows-vcpkg/bootstrap-vcpkg.bat -disableMetrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & .windows-vcpkg/vcpkg.exe install --triplet x64-windows-static-md "--x-manifest-root=$PWD/core/engine/windows" "--x-install-root=$PWD/.windows-vcpkg-installed" --disable-metrics
+          & .windows-vcpkg/vcpkg.exe install --triplet x64-windows-static-md "--x-manifest-root=$PWD/core/engine/windows" "--x-install-root=$PWD/.windows-vcpkg-installed" --x-buildtrees-root=C:/tbz-b --disable-metrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/cache/save@v4
-        if: steps.windows-dependencies.outputs.cache-hit != 'true'
+        if: always() && !cancelled() && steps.windows-dependencies.outputs.cache-primary-key != ''
         with:
           path: .windows-vcpkg-cache
           key: ${{ steps.windows-dependencies.outputs.cache-primary-key }}
@@ -190,7 +191,7 @@ jobs:
           include-hidden-files: true
           path: |
             windows-engine.binlog
-            .windows-vcpkg/buildtrees/**/*.log
+            C:/tbz-b/**/*.log
             windows-fabric.binlog
             .windows-fabric-probe/windows/**/windows-fabric-runtime.log
           if-no-files-found: ignore

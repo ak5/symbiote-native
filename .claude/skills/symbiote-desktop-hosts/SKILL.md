@@ -133,3 +133,10 @@ The public-backend sources `SymbioteTree.cpp`, `SymbioteFabricProps.cpp` and
 only React Native include paths. This establishes source compatibility for those units; it does
 not establish SDK linking, Windows runtime behavior or the full JS peer contract. Keep the peer
 range unchanged until those gates pass.
+
+Run40938617795 failed in Folly's debug compilation before the engine: MSVC C1083 on
+`ExceptionCounterLibStaticRegistration.cpp.obj`. The resolved object path was longer than 260
+characters. Use vcpkg's short `--x-buildtrees-root=C:/tbz-b`; this keeps that same path below 260
+without changing dependency sources. Retain its build logs. Save partial binary caches even when
+an installation fails, using per-run keys and a dependency-hash restore prefix so later completed
+ports can extend the cache instead of being trapped behind an immutable partial entry.
