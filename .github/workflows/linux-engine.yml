@@ -111,6 +111,7 @@ jobs:
         if: always()
         with:
           name: linux-engine-runtime-logs
+          include-hidden-files: true
           path: |
             .linux-host/symbiote-*.log
             .linux-host/build/e2e

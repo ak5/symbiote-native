@@ -1,7 +1,13 @@
 // Reuse the pinned host's Wayland keyboard/clipboard rig with our Metro bundles.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const [hostArgument, matrixArgument] = process.argv.slice(2);
@@ -42,10 +48,16 @@ for (const framework of ['react', 'svelte']) {
         ready: `Symbiote Linux ${framework === 'react' ? 'React' : 'Svelte'} app updated`,
       }),
     );
-    execFileSync(process.execPath, ['scripts/e2e.ts', '--scenario', name], {
-      cwd: host,
-      stdio: 'inherit',
-    });
+    try {
+      execFileSync(process.execPath, ['scripts/e2e.ts', '--scenario', name], {
+        cwd: host,
+        stdio: 'inherit',
+      });
+    } catch (error) {
+      const trace = join(host, 'build/e2e', name, 'trace.log');
+      if (existsSync(trace)) process.stderr.write(readFileSync(trace, 'utf8'));
+      throw error;
+    }
     assert(
       readFileSync(join(host, 'build/e2e', name, 'screenshot.png')).length > 0,
       `${framework} ${journey} window must produce a screenshot`,
