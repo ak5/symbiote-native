@@ -44,8 +44,15 @@ React Native version and the host's packed Metro resolver, then checks the produ
 for the installed Linux Platform and adapter. Run it under `nice -n 10` with Node 24 after installing
 both workspaces. The React fixture uses intrinsic tags and is type-checked before bundling. CI runs
 each Metro bundle through the compiled host and verifies the mounted view's updated dimensions.
-These startup checks do not establish other adapters or
-keyboard, clipboard, persistence and window-system behavior.
+The consumer has its own explicit TypeScript project: a command-line file list can pick up the
+host checkout's tsconfig and fail with TS5112 on TypeScript 6.
+
+The window gate builds the same host with Skia/Wayland and runs both packed Metro apps through
+the host's existing `scripts/e2e.ts` harness. `scripts/run-linux-window-consumers.mjs` installs
+disposable scenarios, types into the adapter's controlled text input and copies/pastes through
+the OS clipboard. Each app must report `HiHi` and produce a window screenshot. This gate is still
+being brought up; do not claim a pass until its CI result is verified. Other adapters, persistence,
+scrolling, resize and accessibility journeys remain to be verified.
 
 The Svelte consumer composes the existing example's Metro settings with the Linux host resolver.
 The shared CSS transformer resolves Babel through the app's React Native Metro config to keep parser

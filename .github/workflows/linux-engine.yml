@@ -94,9 +94,24 @@ jobs:
             grep -F 'frame=(0.00, 0.00, 240.00, 80.00)' "$log"
             if grep -F 'has no native component registered' "$log"; then exit 1; fi
           done
+      - name: Install window dependencies
+        run: |
+          sudo apt-get install -y libfontconfig-dev libfreetype-dev libvulkan-dev libwayland-dev mesa-vulkan-drivers wayland-protocols cage
+          nice -n 10 node .linux-host/scripts/vendor-skia.ts
+          nice -n 10 node .linux-host/scripts/vendor-fonts.ts
+      - name: Build the native window and input driver
+        run: |
+          nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON
+          nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_window rnl_inject --parallel 2
+          # The host's existing e2e harness locates its executables under build/dev.
+          ln -s symbiote .linux-host/build/dev
+      - name: Exercise native keyboard and clipboard in each application
+        run: nice -n 10 node scripts/run-linux-window-consumers.mjs .linux-host .linux-host/symbiote-app
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: linux-engine-runtime-logs
-          path: .linux-host/symbiote-*.log
+          path: |
+            .linux-host/symbiote-*.log
+            .linux-host/build/e2e
           if-no-files-found: ignore

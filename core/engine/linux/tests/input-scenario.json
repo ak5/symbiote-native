@@ -1,0 +1,27 @@
+{
+  "frames": 900,
+  "steps": [
+    "sleep 500",
+    "key Tab press",
+    "key Tab release",
+    "sleep 200",
+    "type Hi",
+    "sleep 200",
+    "key Control_L press",
+    "key a press",
+    "key a release",
+    "key c press",
+    "key c release",
+    "key Control_L release",
+    "sleep 200",
+    "key Right press",
+    "key Right release",
+    "sleep 200",
+    "key Control_L press",
+    "key v press",
+    "key v release",
+    "key Control_L release",
+    "sleep 500"
+  ],
+  "expect": ["Symbiote Linux input: Hi", "Symbiote Linux input: HiHi"]
+}
