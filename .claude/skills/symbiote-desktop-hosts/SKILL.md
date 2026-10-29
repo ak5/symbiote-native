@@ -52,8 +52,9 @@ the host's existing `scripts/e2e.ts` harness. `scripts/run-linux-window-consumer
 disposable scenarios, types into the adapter's controlled text input and copies/pastes through
 the host's in-process clipboard. Each app must report `HiHi` and produce a window screenshot. A separate resize
 scenario drives the native window from 800x600 to 1000x600; each framework's `useWindowDimensions`
-must receive both sizes. This gate is still being brought up; do not claim a pass until its CI result
-is verified. Other adapters, persistence, scrolling and accessibility journeys remain to be verified.
+must receive both sizes. All four native window scenarios passed in fork run `40936472812` at `a4c553fb`:
+React and Svelte each verified keyboard focus, controlled input, in-process copy/paste and
+800x600 → 1000x600 dimension-hook updates. Saved traces and screenshots confirm the assertions. Other adapters, persistence, scrolling and accessibility journeys remain to be verified.
 
 The pinned host uses `accessible` for Tab traversal, including the heading. The input scenario
 therefore tabs through the heading to the field and requires both focus markers. Run `40931012846`
