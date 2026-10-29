@@ -2,8 +2,10 @@
 
 // SDK-boundary probe only. The production retained tree is not implemented here.
 #include <ReactCommon/TurboModule.h>
+#include "SymbioteBuffer.h"
 #include <cstring>
 #include <fstream>
+#include <limits>
 
 namespace symbiote::windows::probe {
 namespace jsi = facebook::jsi;
@@ -61,8 +63,13 @@ struct FabricProbe final : facebook::react::TurboModule {
           if (handle.getNativeState<State>(rt)->value != 42) {
             throw jsi::JSError(rt, "NativeState did not survive the SDK boundary");
           }
-          // Allocate through Hermes: RNW's MutableBuffer constructor is unimplemented.
-          auto words = rt.global().getPropertyAsFunction(rt, "Int32Array").callAsConstructor(rt, 4).asObject(rt);
+          const jsi::Value length(4);
+          auto words = allocInt32Array(rt, jsi::Value::undefined(), &length, 1).asObject(rt);
+          for (size_t index = 0; index < 4; ++index) {
+            if (words.getProperty(rt, std::to_string(index).c_str()).asNumber() != 0) {
+              throw jsi::JSError(rt, "Command buffer must start zeroed");
+            }
+          }
           auto buffer = words.getPropertyAsObject(rt, "buffer").getArrayBuffer(rt);
           const int32_t sentinel = 42;
           if (buffer.size(rt) != 16) throw jsi::JSError(rt, "Unexpected command buffer size");
@@ -70,6 +77,29 @@ struct FabricProbe final : facebook::react::TurboModule {
           if (words.getProperty(rt, "0").asNumber() != sentinel) {
             throw jsi::JSError(rt, "ArrayBuffer memory is not shared with Hermes");
           }
+          words.setProperty(rt, "0", -17);
+          int32_t fromScript = 0;
+          std::memcpy(&fromScript, buffer.data(rt), sizeof(fromScript));
+          if (fromScript != -17) throw jsi::JSError(rt, "Native buffer did not see JS write");
+          const jsi::Value zero(0);
+          auto empty = allocInt32Array(rt, jsi::Value::undefined(), &zero, 1).asObject(rt);
+          if (empty.getProperty(rt, "length").asNumber() != 0) {
+            throw jsi::JSError(rt, "Zero-length allocation failed");
+          }
+          const jsi::Value invalid[] = {
+              jsi::Value(-1), jsi::Value(0.5), jsi::Value(std::numeric_limits<double>::infinity()),
+              jsi::Value(std::numeric_limits<double>::quiet_NaN()), jsi::Value::undefined(),
+              jsi::Value(jsi::String::createFromAscii(rt, "4"))};
+          for (const auto &value : invalid) {
+            bool rejected = false;
+            try { allocInt32Array(rt, jsi::Value::undefined(), &value, 1); }
+            catch (const jsi::JSError &) { rejected = true; }
+            if (!rejected) throw jsi::JSError(rt, "Invalid buffer length was accepted");
+          }
+          bool missingRejected = false;
+          try { allocInt32Array(rt, jsi::Value::undefined(), nullptr, 0); }
+          catch (const jsi::JSError &) { missingRejected = true; }
+          if (!missingRejected) throw jsi::JSError(rt, "Missing buffer length was accepted");
           auto fabric = rt.global().getPropertyAsObject(rt, "nativeFabricUIManager");
           jsi::Object props(rt);
           props.setProperty(rt, "width", 120);

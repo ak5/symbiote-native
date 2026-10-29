@@ -36,8 +36,7 @@ import { isRecord } from './type-guards';
 export const SUPPORTED_NATIVE_VERSION = 4;
 
 // What installJSIBindingsWithRuntime: puts on the global. allocInt32Array hands back a view over
-// memory native owns, not a copy — the only reason any of this exists, since every other route
-// from JS to native structure costs a JSI crossing per element.
+// runtime-owned memory that native reads and writes directly, without copying per element.
 export type INativeEngineBindings = {
   version: number;
   allocInt32Array: (lengthInElements: number) => Int32Array;

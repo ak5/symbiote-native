@@ -1,5 +1,6 @@
 #include "SymbioteEngineBindings.h"
 
+#include "SymbioteBuffer.h"
 #include "SymbioteDebug.h"
 #include "SymbioteTree.h"
 
@@ -7,8 +8,6 @@
 #include <react/renderer/uimanager/UIManager.h>
 #include <react/renderer/uimanager/UIManagerBinding.h>
 
-#include <cmath>
-#include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -19,60 +18,6 @@ namespace symbiote {
 using namespace facebook;
 
 namespace {
-
-/**
- * A block of `int32_t` owned by native and handed to JS as the backing store of an `Int32Array`.
- *
- * The node table's parent edge is already a flat `Int32Array` in JS (item 8b); the endpoint is that
- * the SAME array is memory the native applier writes. A `MutableBuffer`-backed `jsi::ArrayBuffer` is
- * the only JSI shape that gives JS a VIEW instead of a copy — every other route costs a crossing per
- * element, and the census that sized this design counted ~4 000 reads for a two-row swap.
- *
- * Note what this does and does not fork. `node-table.ts` is byte-identical whichever store it gets:
- * one implementation, two allocators. That is why the JS store may stand indefinitely, while the JS
- * APPLIER may not — see `native-engine.ts`'s header for the distinction, which is load-bearing.
- *
- * Lifetime is the ArrayBuffer's: `jsi::ArrayBuffer` retains the `shared_ptr`, so the store outlives
- * every JS view of it and is freed with the last one. A registry of live stores would be the leak
- * rather than the fix.
- */
-class Int32Store : public jsi::MutableBuffer {
- public:
-  explicit Int32Store(size_t lengthInInts) : data_(lengthInInts, 0) {}
-
-  size_t size() const override {
-    return data_.size() * sizeof(int32_t);
-  }
-
-  uint8_t *data() override {
-    return reinterpret_cast<uint8_t *>(data_.data());
-  }
-
- private:
-  std::vector<int32_t> data_;
-};
-
-jsi::Value allocInt32Array(
-    jsi::Runtime &runtime,
-    const jsi::Value & /*thisValue*/,
-    const jsi::Value *arguments,
-    size_t count) {
-  if (count < 1 || !arguments[0].isNumber()) {
-    throw jsi::JSError(runtime, "allocInt32Array expects a length in elements");
-  }
-
-  const double requested = arguments[0].getNumber();
-  // A negative or fractional length reaches `std::vector` as a wildly wrong `size_t`. Reject it here,
-  // where there is a message, rather than at the allocation, where the failure is a bare crash.
-  if (!(requested >= 0) || requested != std::floor(requested)) {
-    throw jsi::JSError(runtime, "allocInt32Array expects a non-negative integer length");
-  }
-
-  auto store = std::make_shared<Int32Store>(static_cast<size_t>(requested));
-  auto buffer = jsi::ArrayBuffer(runtime, store);
-  auto constructor = runtime.global().getPropertyAsFunction(runtime, "Int32Array");
-  return constructor.callAsConstructor(runtime, std::move(buffer));
-}
 
 /**
  * Count of shadow trees the real `UIManager` holds, or -1 when it was unreachable

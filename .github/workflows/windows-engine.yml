@@ -160,6 +160,7 @@ jobs:
         run: |
           $projectDir = '.windows-fabric-probe/windows/SymbioteFabricProbe'
           Copy-Item core/engine/windows/tests/FabricProbe.h $projectDir
+          Copy-Item core/engine/cpp/SymbioteBuffer.h $projectDir
           Copy-Item core/engine/windows/tests/index.windows.js .windows-fabric-probe
           Copy-Item core/engine/windows/tests/babel.config.cjs .windows-fabric-probe
           $sourcePath = Join-Path $projectDir 'SymbioteFabricProbe.cpp'
@@ -206,6 +207,7 @@ jobs:
         if: always()
         with:
           name: windows-fabric-sdk-probe
+          include-hidden-files: true
           path: |
             windows-fabric.binlog
             .windows-fabric-probe/windows/**/windows-fabric-runtime.log
