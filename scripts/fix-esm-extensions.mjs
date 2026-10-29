@@ -10,6 +10,7 @@
 // dev-mode resolution of the unbuilt source (verified directly — a local example app failed to
 // resolve adapters/vue/src/modules/app-registry/index.js). So this runs ONLY over already-compiled
 // build/**/*.js output, once, after `tsc --build` — src/*.ts is never touched.
+import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import { esmExtensionBuildDirs } from './lib/build-dirs.mjs';
@@ -288,7 +289,7 @@ export function fixEsmExtensions(buildDir) {
   return { filesChanged, importsFixed, unresolved };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   // No args → derive every publishable package's build/ dir from its own
   // publishConfig (scripts/lib/build-dirs.mjs), so a new package is covered
   // automatically instead of needing a hand-maintained arg list here.

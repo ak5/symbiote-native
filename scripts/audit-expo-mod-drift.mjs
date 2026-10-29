@@ -27,6 +27,7 @@
 // Every diff is a real structural change made with default props (no app.json in this repo).
 // Flagged unless present in the reviewed baseline, keyed on (package, path) - imprecise only if
 // the upstream plugin changes what it writes at that exact path, exactly when re-review is wanted.
+import { pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { publishablePackageEntries } from './lib/publishable-packages.mjs';
@@ -158,6 +159,6 @@ export async function main() {
   process.exit(hasFailure ? 1 : 0);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }
