@@ -126,3 +126,10 @@ holding the workflow concurrency slot after a failed production build.
 Save the Windows dependency binary cache immediately after successful installation, before compiling
 the engine. A later engine failure must not discard completed Folly builds. The workflow uses
 explicit cache restore/save steps and retains vcpkg build logs on failure.
+
+The public-backend sources `SymbioteTree.cpp`, `SymbioteFabricProps.cpp` and
+`SymbioteEngineBindings.cpp` also passed a local syntax check against the unmodified npm
+`react-native@0.85.3` headers. The check reused the native harness compiler settings, replacing
+only React Native include paths. This establishes source compatibility for those units; it does
+not establish SDK linking, Windows runtime behavior or the full JS peer contract. Keep the peer
+range unchanged until those gates pass.
