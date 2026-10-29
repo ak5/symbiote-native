@@ -18,8 +18,7 @@ component map as well as the Linux Platform module.
 The fork's Linux workflow builds the host and engine, then installs and bundles
 React, Svelte, Vue, Solid and Angular applications. Native checks cover module
 initialization, Fabric updates, keyboard focus, controlled input, process-local
-copy/paste and dimension updates. Run `40953438090` passed all five applications
-and their ten input/resize journeys. Resize uses the host's injected configure
+copy/paste and dimension updates. Resize uses the host's injected configure
 events under Cage.
 
 The scroll gate adds a forty-row ScrollView to each application and injects wheel
@@ -47,6 +46,6 @@ The persistence runner reuses the pinned host's compositor launcher and refuses
 to overwrite an earlier result directory.
 
 System clipboard exchange with other applications and accessibility journeys
-remain unverified. The scroll gate also requires a passing native run. The pinned host's clipboard is explicitly
-process-local. Expo-backed companion modules require their own Linux ports;
-their presence in the workspace does not make their native APIs available.
+remain unverified. The pinned host's clipboard is explicitly process-local.
+Expo-backed companion modules require their own Linux ports; their presence in
+the workspace does not make their native APIs available.
