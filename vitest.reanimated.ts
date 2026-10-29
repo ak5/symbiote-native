@@ -143,9 +143,6 @@ export const REANIMATED_VUE_SFC = babelStep({
 // The demos of Angular, Svelte, Solid and Vue may have an install of their own
 // A second copy of a framework splits its reactive graph, so a bare import is read from the package
 const EXAMPLE_TREE = /\/examples\/(angular|svelte|solid|vue-tsx|vue-sfc)\//;
-// The Vue JSX output imports `vue`, which an app's metro.config.js points at the runtime package
-const VUE_ENTRY = 'vue';
-const VUE_RUNTIME = '@vue/runtime-core';
 const PACKAGE_ANCHOR = join(
   import.meta.dirname,
   'packages/reanimated/package.json',
@@ -163,8 +160,7 @@ export const EXAMPLE_IMPORTS = {
     const isBare = !source.startsWith('.') && !source.startsWith('/');
     if (importer == null || !isBare || !EXAMPLE_TREE.test(importer))
       return null;
-    const name = source === VUE_ENTRY ? VUE_RUNTIME : source;
-    return this.resolve(name, PACKAGE_ANCHOR, { ...options, skipSelf: true });
+    return this.resolve(source, PACKAGE_ANCHOR, { ...options, skipSelf: true });
   },
 };
 
