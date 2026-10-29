@@ -32,10 +32,20 @@ jobs:
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
           pnpm install --frozen-lockfile --ignore-scripts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test scripts/build-cli-entrypoints.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm exec tsc --build core/engine
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory .windows-engine-packs | Out-Null
           pnpm --dir core/engine pack --pack-destination "$PWD/.windows-engine-packs"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Prepare installed framework consumers for Windows
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          node --test scripts/windows-app-fixtures.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm run check:windows-consumers .windows-adapter-apps
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Create an isolated SDK compatibility fixture
         shell: pwsh
@@ -213,14 +223,6 @@ jobs:
           } finally {
             if (-not $app.HasExited) { Stop-Process -Id $app.Id }
           }
-      - name: Prepare installed framework consumers for Windows
-        shell: pwsh
-        run: |
-          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
-          node --test scripts/windows-app-fixtures.test.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          pnpm run check:windows-consumers .windows-adapter-apps
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run each framework through native Windows layout and typing
         shell: pwsh
         run: |

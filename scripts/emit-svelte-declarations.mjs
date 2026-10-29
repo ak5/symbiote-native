@@ -25,6 +25,7 @@
 // beside it, or any LegacyComponentType left in build/ when the run finishes.
 //
 // Runs AFTER `tsc --build` in `prepublish-build` — reads and patches tsc's emitted build/.
+import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -133,7 +134,7 @@ export async function emitSvelteDeclarations(pkgDir) {
   return { components, repaired };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   let totalComponents = 0;
   let totalRepaired = 0;
   for (const { dir } of publishablePackageEntries()) {
