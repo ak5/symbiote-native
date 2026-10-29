@@ -41,7 +41,7 @@ function App() {
     dlog(`Symbiote Linux window: ${metrics.width}x${metrics.height}`);
   }, [metrics.width, metrics.height]);
   return createElement(
-    'view',
+    'safe-area-view',
     { style: { width: 240 } },
     createElement(
       'view',

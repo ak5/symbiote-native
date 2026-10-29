@@ -36,7 +36,7 @@ const App = {
       });
     });
     return () =>
-      h('view', { style: { width: 240 } }, [
+      h('safe-area-view', { style: { width: 240 } }, [
         h(
           'view',
           {

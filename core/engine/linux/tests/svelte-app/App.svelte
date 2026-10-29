@@ -20,7 +20,7 @@
   });
 </script>
 
-<view style={{ width: 240 }}>
+<safe-area-view style={{ width: 240 }}>
   <view style={{ width, height: 80, backgroundColor: '#234567' }}>
     <text onFocus={() => dlog('Symbiote Linux focus: heading')}>
       Symbiote Linux
@@ -46,4 +46,4 @@
       <text style={{ height: 30 }}>{`Scroll row ${row}`}</text>
     {/each}
   </scroll-view>
-</view>
+</safe-area-view>

@@ -6,6 +6,7 @@ import { verifyLinuxConsumerBundle } from './lib/linux-consumer-bundle.mjs';
 const sources = [
   '/app/node_modules/@symbiote-native/engine/build/platform/index.linux.js',
   '/app/node_modules/@symbiote-native/react/build/render.js',
+  '/app/node_modules/@symbiote-native/components/build/component-names/index.linux.js',
 ];
 
 test('accepts both flat and indexed Metro sourcemaps', () => {
@@ -16,11 +17,22 @@ test('accepts both flat and indexed Metro sourcemaps', () => {
 });
 
 test('checks the selected adapter in a Svelte bundle', () => {
-  const svelte = [sources[0], sources[1].replace('/react/', '/svelte/')];
+  const svelte = [
+    sources[0],
+    sources[1].replace('/react/', '/svelte/'),
+    sources[2],
+  ];
   verifyLinuxConsumerBundle({ sources: svelte }, 'svelte');
   assert.throws(
     () => verifyLinuxConsumerBundle({ sources }, 'svelte'),
     /svelte/,
+  );
+});
+
+test('rejects fallback component names even when the Linux Platform is present', () => {
+  assert.throws(
+    () => verifyLinuxConsumerBundle({ sources: sources.slice(0, 2) }),
+    /component-names\/index.linux/,
   );
 });
 
@@ -52,6 +64,7 @@ test('requires Angular native AOT renderer output', () => {
   const angular = [
     sources[0],
     '/app/node_modules/@symbiote-native/angular/build/angular/render/index.js',
+    sources[2],
   ];
   verifyLinuxConsumerBundle({ sources: angular }, 'angular');
   assert.throws(
@@ -73,6 +86,7 @@ test('requires one Vue component and reactivity runtime', () => {
   const vue = [
     sources[0],
     '/app/node_modules/@symbiote-native/vue/build/render.js',
+    sources[2],
     '/app/node_modules/vue/node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js',
     '/app/node_modules/vue/node_modules/@vue/reactivity/dist/reactivity.esm-bundler.js',
   ];

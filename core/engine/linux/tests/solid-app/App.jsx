@@ -17,7 +17,7 @@ export default function App() {
     queueMicrotask(() => dlog('Symbiote Linux Solid app updated'));
   });
   return (
-    <view style={{ width: 240 }}>
+    <safe-area-view style={{ width: 240 }}>
       <view style={{ width: width(), height: 80, backgroundColor: '#234567' }}>
         <text onFocus={() => dlog('Symbiote Linux focus: heading')}>
           Symbiote Linux
@@ -45,6 +45,6 @@ export default function App() {
           <text style={{ height: 30 }}>{`Scroll row ${row}`}</text>
         ))}
       </scroll-view>
-    </view>
+    </safe-area-view>
   );
 }

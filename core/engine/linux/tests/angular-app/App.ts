@@ -17,7 +17,7 @@ import { reportScroll } from './scroll-probe';
   standalone: true,
   imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <view [style]="{ width: 240 }">
+    <safe-area-view [style]="{ width: 240 }">
       <view
         [style]="{ width: width(), height: 80, backgroundColor: '#234567' }"
       >
@@ -40,7 +40,7 @@ import { reportScroll } from './scroll-probe';
           <text [style]="{ height: 30 }">Scroll row {{ row }}</text>
         }
       </scroll-view>
-    </view>
+    </safe-area-view>
   `,
 })
 export class App implements AfterViewInit {

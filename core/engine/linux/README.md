@@ -10,6 +10,11 @@ The target compiles the same retained tree and prop rules as Android and iOS.
 React Native, Fabric and Yoga sources remain unchanged. Application bundles use
 Metro and ordinary installed packages.
 
+The Linux component map follows React Native's non-iOS wrappers: SafeAreaView
+renders a plain View, and InputAccessoryView omits its whole subtree. Each
+framework fixture uses a SafeAreaView root; the bundle gate requires the Linux
+component map as well as the Linux Platform module.
+
 The fork's Linux workflow builds the host and engine, then installs and bundles
 React, Svelte, Vue, Solid and Angular applications. Native checks cover module
 initialization, Fabric updates, keyboard focus, controlled input, process-local
