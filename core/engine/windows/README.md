@@ -17,3 +17,7 @@ The keyboard gate also checks system clipboard exchange with a separate PowerShe
 The resize check changes the real Win32 window size through `SetWindowPos` and requires each framework's window-dimensions hook to update a native accessibility label. Initial zero-sized metrics are allowed while the window starts; the check waits for a positive viewport before resizing and requires an increased width afterward.
 
 The library scaffold derives from Microsoft's React Native Windows 0.85 cpp-lib template at commit `22f3d36d000a81ae3734a48c909a781a21a43511`. Its MIT license is retained in `REACT_NATIVE_WINDOWS_LICENSE.txt`.
+
+The scrolling gate sends OS wheel input over each application's native ScrollView.
+It requires the framework's native scroll callback to report a vertical offset of
+at least 200; merely creating the control cannot satisfy the assertion.

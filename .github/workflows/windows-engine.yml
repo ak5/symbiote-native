@@ -223,7 +223,7 @@ jobs:
           } finally {
             if (-not $app.HasExited) { Stop-Process -Id $app.Id }
           }
-      - name: Run each framework through native Windows layout, typing, clipboard and resize
+      - name: Run each framework through native Windows layout, typing, clipboard, resize and scrolling
         shell: pwsh
         run: |
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
@@ -253,8 +253,16 @@ jobs:
               powershell.exe -STA -NoProfile -File ./scripts/check-windows-native-input.ps1 -ApplicationProcessId $app.Id |
                 Tee-Object -FilePath "windows-$framework-input-runtime.log"
               if ($LASTEXITCODE -ne 0) { throw "$title native input verification failed" }
-              $log = Get-Content $logPath -Raw
+              $deadline = (Get-Date).AddSeconds(15)
+              do {
+                $log = Get-Content $logPath -Raw
+                if ($log.Contains("PASS: $title native scroll passed 200") -or $log -match 'FAIL:') { break }
+                Start-Sleep -Milliseconds 100
+              } while ((Get-Date) -lt $deadline)
               Copy-Item $logPath "windows-$framework-runtime.log" -Force
+              if (-not $log.Contains("PASS: $title native scroll passed 200")) {
+                throw "$title did not report a native scroll event after OS wheel input"
+              }
               if ($log -match 'FAIL:') { throw "$title failed during native typing: $log" }
             } finally {
               if (-not $app.HasExited) { Stop-Process -Id $app.Id }

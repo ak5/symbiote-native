@@ -1,7 +1,12 @@
 <script>
   import { TurboModuleRegistry } from 'react-native';
   import { Platform, useWindowDimensions } from '@symbiote-native/svelte';
-  import { createLayoutProbe, viewportLabel } from './common';
+  import {
+    createLayoutProbe,
+    createScrollProbe,
+    scrollRows,
+    viewportLabel,
+  } from './common';
   const metrics = useWindowDimensions();
   let width = $state(120);
   let value = $state('seed');
@@ -14,6 +19,7 @@
     },
     probe,
   );
+  const onScroll = createScrollProbe('Svelte', probe);
 </script>
 
 <safe-area-view>
@@ -35,4 +41,14 @@
   >
     {viewportLabel(metrics.current)}
   </text>
+  <scroll-view
+    testID="windows-scroll"
+    {onScroll}
+    scrollEventThrottle={16}
+    style={{ width: 240, height: 200 }}
+  >
+    {#each scrollRows as row (row)}
+      <text style={{ height: 30 }}>Scroll row {row}</text>
+    {/each}
+  </scroll-view>
 </safe-area-view>

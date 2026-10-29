@@ -6,7 +6,13 @@ import {
   SYMBIOTE_ELEMENTS,
   WindowDimensionsService,
 } from '@symbiote-native/angular';
-import { createLayoutProbe, viewportLabel, type IProbe } from '../common';
+import {
+  createLayoutProbe,
+  createScrollProbe,
+  scrollRows,
+  viewportLabel,
+  type IProbe,
+} from '../common';
 @Component({
   selector: 'symbiote-windows-app',
   standalone: true,
@@ -26,10 +32,24 @@ import { createLayoutProbe, viewportLabel, type IProbe } from '../common';
       [accessibilityLabel]="viewportLabel(metrics())"
       [style]="{ color: '#111111', backgroundColor: '#ffffff' }"
       >{{ viewportLabel(metrics()) }}</text
-    ></safe-area-view
+    ><scroll-view
+      testID="windows-scroll"
+      [onScroll]="onScroll"
+      [scrollEventThrottle]="16"
+      [style]="{ width: 240, height: 200 }"
+    >
+      @for (row of scrollRows; track row) {
+        <text [style]="{ height: 30 }">Scroll row {{ row }}</text>
+      }
+    </scroll-view></safe-area-view
   >`,
 })
 export class App {
+  readonly scrollRows = scrollRows;
+  readonly onScroll = createScrollProbe(
+    'Angular',
+    TurboModuleRegistry.getEnforcing<IProbe>('SymbioteFabricProbe'),
+  );
   readonly metrics = inject(WindowDimensionsService).dimensions;
   readonly viewportLabel = viewportLabel;
   readonly width = signal(120);

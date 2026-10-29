@@ -21,3 +21,9 @@ export function createLayoutProbe(
   update: () => void,
   probe: IProbe,
 ): (event: ISymbioteEvent) => void;
+
+export const scrollRows: number[];
+export function createScrollProbe(
+  framework: string,
+  probe: IProbe,
+): (event: ISymbioteEvent) => void;

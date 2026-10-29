@@ -1,7 +1,12 @@
 import { createSignal } from 'solid-js';
 import { TurboModuleRegistry } from 'react-native';
 import { Platform, createWindowDimensions } from '@symbiote-native/solid';
-import { createLayoutProbe, viewportLabel } from './common';
+import {
+  createLayoutProbe,
+  createScrollProbe,
+  scrollRows,
+  viewportLabel,
+} from './common';
 export default function App() {
   const metrics = createWindowDimensions();
   const [width, setWidth] = createSignal(120);
@@ -13,6 +18,7 @@ export default function App() {
     () => setWidth(240),
     probe,
   );
+  const onScroll = createScrollProbe('Solid', probe);
   return (
     <safe-area-view>
       <view
@@ -34,6 +40,16 @@ export default function App() {
       >
         {viewportLabel(metrics())}
       </text>
+      <scroll-view
+        testID="windows-scroll"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        style={{ width: 240, height: 200 }}
+      >
+        {scrollRows.map(row => (
+          <text style={{ height: 30 }}>{`Scroll row ${row}`}</text>
+        ))}
+      </scroll-view>
     </safe-area-view>
   );
 }

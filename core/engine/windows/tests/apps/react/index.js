@@ -2,7 +2,12 @@ import { createElement, useMemo, useState } from 'react';
 import { TurboModuleRegistry } from 'react-native';
 import { Platform, useWindowDimensions } from '@symbiote-native/react';
 import { registerApp } from '@symbiote-native/react/bootstrap';
-import { createLayoutProbe, viewportLabel } from './common';
+import {
+  createLayoutProbe,
+  createScrollProbe,
+  scrollRows,
+  viewportLabel,
+} from './common';
 const probe = TurboModuleRegistry.getEnforcing('SymbioteFabricProbe');
 function App() {
   const metrics = useWindowDimensions();
@@ -12,6 +17,7 @@ function App() {
     () => createLayoutProbe('React', Platform, () => setWidth(240), probe),
     [],
   );
+  const onScroll = useMemo(() => createScrollProbe('React', probe), []);
   return createElement(
     'safe-area-view',
     null,
@@ -34,6 +40,22 @@ function App() {
         style: { color: '#111111', backgroundColor: '#ffffff' },
       },
       viewportLabel(metrics),
+    ),
+    createElement(
+      'scroll-view',
+      {
+        testID: 'windows-scroll',
+        onScroll,
+        scrollEventThrottle: 16,
+        style: { width: 240, height: 200 },
+      },
+      scrollRows.map(row =>
+        createElement(
+          'text',
+          { key: row, style: { height: 30 } },
+          `Scroll row ${row}`,
+        ),
+      ),
     ),
   );
 }

@@ -10,6 +10,7 @@ using System;
 using System.Runtime.InteropServices;
 public static class InputWindow {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, int data, UIntPtr extraInfo);
   [DllImport("user32.dll", SetLastError=true)] public static extern bool SetWindowPos(
     IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
 }
@@ -102,3 +103,22 @@ if ($null -eq $resizedWidth -or $resizedWidth -le $initialWidth + 1) {
   throw "The framework window-dimensions hook did not react to OS resizing: $initialWidth -> $resizedWidth"
 }
 Write-Host "PASS: native OS resize updated framework viewport $initialWidth -> $resizedWidth"
+
+$scrollCondition = [System.Windows.Automation.PropertyCondition]::new(
+  [System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'windows-scroll')
+$scrollElement = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $scrollCondition)
+if ($null -eq $scrollElement) { throw 'The native scroll viewport is missing' }
+$scrollBounds = $scrollElement.Current.BoundingRectangle
+if ($scrollBounds.IsEmpty -or $scrollBounds.Width -le 0 -or $scrollBounds.Height -le 0) {
+  throw 'The native scroll viewport has no visible bounds'
+}
+$previousCursor = [System.Windows.Forms.Cursor]::Position
+try {
+  [System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new(
+    [int]($scrollBounds.Left + $scrollBounds.Width / 2),
+    [int]($scrollBounds.Top + $scrollBounds.Height / 2))
+  [InputWindow]::mouse_event(0x0800, 0, 0, -3600, [UIntPtr]::Zero)
+  Start-Sleep -Milliseconds 500
+} finally {
+  [System.Windows.Forms.Cursor]::Position = $previousCursor
+}

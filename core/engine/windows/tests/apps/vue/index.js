@@ -2,7 +2,12 @@ import { h, ref } from 'vue';
 import { TurboModuleRegistry } from 'react-native';
 import { Platform, useWindowDimensions } from '@symbiote-native/vue';
 import { createApp } from '@symbiote-native/vue/bootstrap';
-import { createLayoutProbe, viewportLabel } from './common';
+import {
+  createLayoutProbe,
+  createScrollProbe,
+  scrollRows,
+  viewportLabel,
+} from './common';
 const probe = TurboModuleRegistry.getEnforcing('SymbioteFabricProbe');
 const App = {
   setup() {
@@ -17,6 +22,7 @@ const App = {
       },
       probe,
     );
+    const onScroll = createScrollProbe('Vue', probe);
     return () =>
       h('safe-area-view', null, [
         h(
@@ -47,6 +53,18 @@ const App = {
             style: { color: '#111111', backgroundColor: '#ffffff' },
           },
           viewportLabel(metrics.value),
+        ),
+        h(
+          'scroll-view',
+          {
+            testID: 'windows-scroll',
+            onScroll,
+            scrollEventThrottle: 16,
+            style: { width: 240, height: 200 },
+          },
+          scrollRows.map(row =>
+            h('text', { key: row, style: { height: 30 } }, `Scroll row ${row}`),
+          ),
         ),
       ]);
   },

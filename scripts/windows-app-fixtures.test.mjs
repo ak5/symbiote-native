@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   createLayoutProbe,
+  createScrollProbe,
   viewportLabel,
 } from '../core/engine/windows/tests/apps/common.js';
 
@@ -83,4 +84,22 @@ test('requires the native engine before reporting a completed application', () =
   } finally {
     globalThis.__symbioteEngineNative = previous;
   }
+});
+
+test('scroll success requires a native offset of 200 and reports only once', () => {
+  const results = [];
+  const failures = [];
+  const handler = createScrollProbe('React', {
+    reportResult: value => results.push(value),
+    reportFailure: value => failures.push(value),
+  });
+  for (const y of [0, 100, 199])
+    handler({ nativeEvent: { contentOffset: { y } } });
+  assert.deepEqual(results, []);
+  for (const y of [200, 300])
+    handler({ nativeEvent: { contentOffset: { y } } });
+  assert.deepEqual(results, ['React native scroll passed 200']);
+  for (const event of [{}, { nativeEvent: { contentOffset: { y: NaN } } }])
+    assert.throws(() => handler(event), /no vertical offset/);
+  assert.equal(failures.length, 2);
 });

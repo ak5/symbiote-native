@@ -48,3 +48,22 @@ export function createLayoutProbe(framework, platform, update, probe) {
     }
   };
 }
+
+export const scrollRows = Array.from({ length: 40 }, (_, row) => row);
+
+export function createScrollProbe(framework, probe) {
+  let complete = false;
+  return event => {
+    const offset = event?.nativeEvent?.contentOffset?.y;
+    if (typeof offset !== 'number' || !Number.isFinite(offset)) {
+      probe.reportFailure(
+        `${framework}: Native scroll event has no vertical offset`,
+      );
+      throw new Error('Native scroll event has no vertical offset');
+    }
+    if (!complete && offset >= 200) {
+      complete = true;
+      probe.reportResult(`${framework} native scroll passed 200`);
+    }
+  };
+}
