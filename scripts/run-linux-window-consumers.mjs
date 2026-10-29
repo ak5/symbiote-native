@@ -29,6 +29,7 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
     join(matrix, framework, 'index.linux.bundle.js'),
     join(directory, 'test-bundles', bundle),
   );
+  // Resize spans the frame budget so slower first mounts still observe both native extents.
   for (const journey of ['input', 'resize']) {
     const fixture = JSON.parse(
       readFileSync(
