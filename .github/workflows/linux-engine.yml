@@ -1,0 +1,69 @@
+name: Linux engine integration
+
+on:
+  push:
+    branches: [feat/linux]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-engine-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    if: github.repository == 'ak5/symbiote-native'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CC: clang-18
+      CXX: clang++-18
+      CMAKE_BUILD_PARALLEL_LEVEL: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: react-native-linux/react-native-linux
+          ref: 4db5e336b529c15628ffb8ba94cd6d880ff9a450
+          path: .linux-host
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install compiler dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 cmake ninja-build pkg-config libboost-dev libdouble-conversion-dev libfmt-dev libgoogle-glog-dev libcurl4-openssl-dev libsqlite3-dev libxkbcommon-dev libicu-dev
+      - name: Install JavaScript dependencies
+        run: |
+          nice -n 10 pnpm install --frozen-lockfile --ignore-scripts
+          nice -n 10 pnpm --dir .linux-host install --frozen-lockfile --ignore-scripts
+      - name: Generate native registration from the package configuration
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const root = path.resolve('core/engine');
+          const config = require(path.join(root, 'react-native.config.cjs'));
+          fs.writeFileSync('.linux-host/symbiote-config.json', JSON.stringify({
+            root: process.cwd(),
+            dependencies: { '@symbiote-native/engine': { root, platforms: config.dependency.platforms } },
+          }));
+          NODE
+          nice -n 10 node .linux-host/scripts/autolink.ts .linux-host/symbiote-config.json .linux-host/symbiote-generated
+          nice -n 10 pnpm exec esbuild core/engine/linux/tests/native-smoke.ts --bundle --platform=neutral --main-fields=module,main --format=iife --define:__DEV__=true '--define:process.env.NODE_ENV="development"' --outfile=.linux-host/symbiote-smoke.js
+      - name: Fetch the host's pinned React Native source
+        run: nice -n 10 node .linux-host/scripts/vendor-react-native.ts
+      - name: Compile the native host and Symbiote engine
+        run: |
+          nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -G Ninja -DCMAKE_BUILD_TYPE=Debug -DRNL_ENABLE_SKIA=OFF -DRNL_AUTOLINKING_CMAKE="$PWD/.linux-host/symbiote-generated/rnl_autolinking.cmake"
+          nice -n 10 cmake --build .linux-host/build/symbiote --target hello_react --parallel 2
+      - name: Exercise module initialization and Fabric commits in Hermes
+        run: |
+          set -o pipefail
+          nice -n 10 .linux-host/build/symbiote/bin/hello_react --fabric .linux-host/symbiote-smoke.js 2>&1 | tee .linux-host/symbiote-smoke.log
+          grep -F 'Symbiote Linux engine smoke passed' .linux-host/symbiote-smoke.log

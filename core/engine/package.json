@@ -37,6 +37,8 @@
     "!cpp/tests",
     "ios",
     "android",
+    "linux",
+    "!linux/tests",
     "codegen-specs",
     "symbiote-engine.podspec",
     "react-native.config.cjs"
