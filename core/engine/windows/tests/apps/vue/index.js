@@ -17,7 +17,7 @@ const App = {
       probe,
     );
     return () =>
-      h('view', null, [
+      h('safe-area-view', null, [
         h(
           'view',
           {

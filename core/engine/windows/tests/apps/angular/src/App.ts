@@ -7,7 +7,7 @@ import { createLayoutProbe, type IProbe } from '../common';
   selector: 'symbiote-windows-app',
   standalone: true,
   imports: [SYMBIOTE_ELEMENTS],
-  template: `<view
+  template: `<safe-area-view
     ><view
       [onLayout]="onLayout"
       [style]="{ width: width(), height: 80, backgroundColor: '#234567' }"
@@ -17,7 +17,7 @@ import { createLayoutProbe, type IProbe } from '../common';
       [value]="value()"
       [onChangeText]="onChange"
       [style]="{ width: 240, height: 40 }"
-  /></view>`,
+  /></safe-area-view>`,
 })
 export class App {
   readonly width = signal(120);

@@ -10,4 +10,6 @@ The production project and SDK application gate import `SymbioteEngine.props`. I
 
 Text inputs resolve to the SDK's `WindowsTextInput` component for both modes. The shared engine folds controlled and initial values and selects multiline from the intrinsic tag. Windows input event names are routed using the SDK's direct-event declarations. The native application gate checks each framework's input through Windows UI Automation: initial value, keyboard focus, typing, and a controlled uppercase update. This gate must pass before claiming native input support.
 
+SafeAreaView uses the same plain View as RNW on Windows. InputAccessoryView follows RNW's iOS-only contract and omits its whole subtree. Each framework fixture uses a SafeAreaView root to exercise the Windows component map.
+
 The library scaffold derives from Microsoft's React Native Windows 0.85 cpp-lib template at commit `22f3d36d000a81ae3734a48c909a781a21a43511`. Its MIT license is retained in `REACT_NATIVE_WINDOWS_LICENSE.txt`.

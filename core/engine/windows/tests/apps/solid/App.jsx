@@ -13,7 +13,7 @@ export default function App() {
     probe,
   );
   return (
-    <view>
+    <safe-area-view>
       <view
         onLayout={onLayout}
         style={{ width: width(), height: 80, backgroundColor: '#234567' }}
@@ -26,6 +26,6 @@ export default function App() {
         onChange={event => setValue(event.nativeEvent.text.toUpperCase())}
         style={{ width: 240, height: 40 }}
       />
-    </view>
+    </safe-area-view>
   );
 }

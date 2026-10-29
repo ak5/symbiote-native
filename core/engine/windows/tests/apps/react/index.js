@@ -12,7 +12,7 @@ function App() {
     [],
   );
   return createElement(
-    'view',
+    'safe-area-view',
     null,
     createElement(
       'view',

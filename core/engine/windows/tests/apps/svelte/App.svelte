@@ -15,7 +15,7 @@
   );
 </script>
 
-<view>
+<safe-area-view>
   <view {onLayout} style={{ width, height: 80, backgroundColor: '#234567' }}>
     <text>Windows Svelte</text>
   </view>
@@ -27,4 +27,4 @@
     }}
     style={{ width: 240, height: 40 }}
   />
-</view>
+</safe-area-view>
