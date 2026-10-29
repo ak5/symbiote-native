@@ -19,6 +19,9 @@
       <PreprocessorDefinitions>SYMBIOTE_PUBLIC_FABRIC=1;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SymbioteEngineCppDirectory);$(MSBuildThisFileDirectory);$(IntDir)SymbioteEngineIncludes;$(SymbioteReactNativeDirectory)ReactCommon</AdditionalIncludeDirectories>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>dbghelp.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="$(SymbioteEngineCppDirectory)*.cpp">

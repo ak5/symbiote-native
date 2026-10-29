@@ -96,6 +96,16 @@ jobs:
           Write-Host "Using installed Windows SDK $($sdk.Name)"
           msbuild .windows-engine-probe/windows/SymbioteEngineProbe.sln /restore /m:1 /p:Configuration=Debug /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /bl:windows-engine.binlog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compile the production WinRT package provider
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          $rnw = (Resolve-Path .windows-engine-probe/node_modules/react-native-windows).Path + '\'
+          $rn = (Resolve-Path .windows-engine-probe/node_modules/react-native).Path + '\'
+          $vcpkg = (Resolve-Path .windows-vcpkg).Path + '\'
+          $installed = (Resolve-Path .windows-vcpkg-installed).Path + '\'
+          msbuild core/engine/windows/SymbioteNativeEngine.sln /restore /m:1 /p:Configuration=Debug /p:Platform=x64 "/p:ReactNativeWindowsDir=$rnw" "/p:SymbioteReactNativeDirectory=$rn" "/p:VcpkgRoot=$vcpkg" "/p:VcpkgInstalledDir=$installed" /p:VcpkgManifestInstall=false /bl:windows-package.binlog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Create a standard Windows application
         shell: pwsh
         run: |
@@ -140,16 +150,29 @@ jobs:
           $source = $source.Replace('#include "NativeModules.h"', "#include `"NativeModules.h`"`n#include <TurboModuleProvider.h>`n#include `"FabricProbe.h`"")
           $source = $source.Replace($registration, $registration + "`n" + 'winrt::Microsoft::ReactNative::AddTurboModuleProvider<symbiote::windows::probe::FabricProbe>(packageBuilder, L"SymbioteFabricProbe");')
           Set-Content $sourcePath $source
-      - name: Add the production engine to the application
+      - name: Reference the production native package from the application
         shell: pwsh
         run: |
-          & scripts/configure-windows-engine.ps1 -ProjectPath .windows-fabric-probe/windows/SymbioteFabricProbe/SymbioteFabricProbe.vcxproj -ReactNativePath .windows-fabric-probe/node_modules/react-native
           Copy-Item core/engine/windows/tests/index-engine.windows.js .windows-fabric-probe/index.windows.js
           Copy-Item core/engine/windows/tests/engine-smoke.js .windows-fabric-probe
+          $projectPath = '.windows-fabric-probe/windows/SymbioteFabricProbe/SymbioteFabricProbe.vcxproj'
+          [xml]$project = Get-Content $projectPath
+          $ns = $project.DocumentElement.NamespaceURI
+          $group = $project.CreateElement('ItemGroup', $ns)
+          $reference = $project.CreateElement('ProjectReference', $ns)
+          $reference.SetAttribute('Include', (Resolve-Path core/engine/windows/SymbioteNativeEngine/SymbioteNativeEngine.vcxproj).Path)
+          $guid = $project.CreateElement('Project', $ns)
+          $guid.InnerText = '{62C1D955-EB65-42A4-9642-BA9188529312}'
+          [void]$reference.AppendChild($guid)
+          [void]$group.AppendChild($reference)
+          [void]$project.DocumentElement.AppendChild($group)
+          $project.Save((Resolve-Path $projectPath).Path)
           $sourcePath = '.windows-fabric-probe/windows/SymbioteFabricProbe/SymbioteFabricProbe.cpp'
           $source = Get-Content $sourcePath -Raw
-          $source = $source.Replace('#include "FabricProbe.h"', "#include `"FabricProbe.h`"`n#include `"SymbioteEngineModule.h`"")
-          $source = $source.Replace('AddAttributedModules(packageBuilder, true);', 'AddAttributedModules(packageBuilder, true);' + "`n" + 'winrt::Microsoft::ReactNative::AddTurboModuleProvider<symbiote::windows::SymbioteEngineModule>(packageBuilder, L"SymbioteEngine");')
+          $source = $source.Replace('#include "FabricProbe.h"', "#include `"FabricProbe.h`"`n#include <winrt/SymbioteNativeEngine.h>")
+          $registration = 'settings.PackageProviders().Append(winrt::make<CompReactPackageProvider>());'
+          if (-not $source.Contains($registration)) { throw 'The SDK application package registration changed' }
+          $source = $source.Replace($registration, $registration + "`n" + 'settings.PackageProviders().Append(winrt::SymbioteNativeEngine::ReactPackageProvider());')
           Set-Content $sourcePath $source
       - name: Build the bundled Win32 application
         shell: pwsh
@@ -160,7 +183,11 @@ jobs:
             Where-Object { $_.Name -match '^10\.0\.\d+\.0$' -and (Test-Path (Join-Path $_.FullName 'um/x64/kernel32.lib')) } |
             Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
           if ($null -eq $sdk) { throw 'No installed x64 Windows SDK found' }
-          msbuild .windows-fabric-probe/windows/SymbioteFabricProbe.sln /restore /t:SymbioteFabricProbe /m:1 /p:Configuration=Release /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /p:UseBundle=true /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true '/p:BundlerExtraArgs=--max-workers 1' /bl:windows-fabric.binlog
+          $rnw = (Resolve-Path .windows-fabric-probe/node_modules/react-native-windows).Path + '\'
+          $rn = (Resolve-Path .windows-fabric-probe/node_modules/react-native).Path + '\'
+          $vcpkg = (Resolve-Path .windows-vcpkg).Path + '\'
+          $installed = (Resolve-Path .windows-vcpkg-installed).Path + '\'
+          msbuild .windows-fabric-probe/windows/SymbioteFabricProbe.sln /restore /t:SymbioteFabricProbe /m:1 /p:Configuration=Release /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /p:UseBundle=true /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true '/p:BundlerExtraArgs=--max-workers 1' "/p:ReactNativeWindowsDir=$rnw" "/p:SymbioteReactNativeDirectory=$rn" "/p:VcpkgRoot=$vcpkg" "/p:VcpkgInstalledDir=$installed" /p:VcpkgManifestInstall=false /bl:windows-fabric.binlog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run Fabric through the ABI runtime
         shell: pwsh
@@ -191,6 +218,7 @@ jobs:
           include-hidden-files: true
           path: |
             windows-engine.binlog
+            windows-package.binlog
             C:/tbz-b/**/*.log
             windows-fabric.binlog
             .windows-fabric-probe/windows/**/windows-fabric-runtime.log
