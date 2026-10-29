@@ -25,6 +25,10 @@ The generated factory receives a CallInvoker, not a runtime. `nativeEngine()` ca
 The host's module factory can produce a new module on every lookup, so an instance boolean does not protect live bindings.
 Failed initialization must propagate and must not cache a missing engine.
 
+`core/engine/src/platform/index.linux.ts` reads the host's `PlatformConstants` and selects Linux
+before host registration. All adapters inherit the shared `linux` selection type. Its native smoke
+import is explicit; a real Metro example must still prove automatic platform-file resolution.
+
 `.github/workflows/linux-engine.yml` is restricted to this fork. It generates registration from the
 package's actual configuration, compiles the real engine and Linux host, then runs
 `core/engine/linux/tests/native-smoke.ts` in Hermes. That test creates and updates a Fabric view through

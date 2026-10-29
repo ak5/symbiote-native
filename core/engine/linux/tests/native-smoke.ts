@@ -3,6 +3,7 @@ import {
   SUPPORTED_NATIVE_VERSION,
 } from '../../src/native-engine';
 import { getNativeModule } from '../../src/native-modules';
+import { Platform } from '../../src/platform/index.linux';
 import {
   recordAppendChild,
   recordCommit,
@@ -13,6 +14,13 @@ import {
 } from '../../src/mutation-buffer';
 
 const engine = nativeEngine();
+if (
+  Platform.OS !== 'linux' ||
+  !Platform.Version ||
+  Platform.constants?.reactNativeVersion.minor !== 87
+) {
+  throw new Error('Linux platform constants did not reach the shared engine');
+}
 if (!engine || engine.version !== SUPPORTED_NATIVE_VERSION) {
   throw new Error('Linux did not initialize the native engine');
 }

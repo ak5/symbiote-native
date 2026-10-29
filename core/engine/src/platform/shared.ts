@@ -18,7 +18,7 @@ export const PLATFORM_CONSTANTS = 'PlatformConstants';
 export const UNKNOWN_VERSION = '';
 
 export type IPlatformOSType =
-  'ios' | 'android' | 'macos' | 'windows' | 'web' | 'native';
+  'ios' | 'android' | 'macos' | 'windows' | 'linux' | 'web' | 'native';
 
 // RN's Platform.select spec: any subset of OS keys, optionally with `default`. Each
 // platform resolver consults only its own key, then `native`, then `default`.
@@ -27,6 +27,7 @@ export type IPlatformSelectSpec<T> = {
   android?: T;
   macos?: T;
   windows?: T;
+  linux?: T;
   web?: T;
   native?: T;
   default?: T;
