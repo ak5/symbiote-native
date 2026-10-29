@@ -38,13 +38,19 @@ package's actual configuration, compiles the real engine and Linux host, then ru
 the production mutation buffer. esbuild is used for this native test, as in the existing engine itests;
 it is not an application bundler.
 
-`scripts/prepare-linux-consumer.mjs <host checkout> <new app directory>` builds and packs the engine,
-shared components and React adapter into a disposable npm app. It uses the pinned host template's
+`scripts/prepare-linux-consumer.mjs <host checkout> <new directory>` builds and packs the engine,
+shared components and React/Svelte adapters into separate disposable npm apps. It uses the pinned host template's
 React Native version and the host's packed Metro resolver, then checks the production sourcemap
 for the installed Linux Platform and adapter. Run it under `nice -n 10` with Node 24 after installing
-both workspaces. CI runs the resulting Metro bundle through the compiled host and verifies the
-mounted view's updated dimensions. This React startup check does not establish other adapters or
+both workspaces. The React fixture uses intrinsic tags and is type-checked before bundling. CI runs
+each Metro bundle through the compiled host and verifies the mounted view's updated dimensions.
+These startup checks do not establish other adapters or
 keyboard, clipboard, persistence and window-system behavior.
+
+The Svelte consumer composes the existing example's Metro settings with the Linux host resolver.
+The shared CSS transformer resolves Babel through the app's React Native Metro config to keep parser
+versions aligned. Loading the package's RN 0.86 transformer against an RN 0.87 app preset installs two
+parser overrides and prevents Svelte/Vue/CSS-wrapped bundles from compiling.
 
 React Native's `componentNameByReactViewName` already translates the iOS-shaped view, text,
 scroll-content and text-input names to the Linux host's descriptors. Audit that translation before

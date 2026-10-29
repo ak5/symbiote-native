@@ -6,11 +6,11 @@ function sourcePaths(map) {
     : map.sources;
 }
 
-export function verifyLinuxConsumerBundle(map) {
+export function verifyLinuxConsumerBundle(map, framework = 'react') {
   const sources = sourcePaths(map);
   for (const source of [
     '@symbiote-native/engine/build/platform/index.linux.js',
-    '@symbiote-native/react/build/render.js',
+    `@symbiote-native/${framework}/build/render.js`,
   ]) {
     assert(
       sources.some(path => path.endsWith(source)),

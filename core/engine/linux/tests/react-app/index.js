@@ -1,12 +1,12 @@
 import { createElement, useEffect, useState } from 'react';
 import { AppRegistry as NativeAppRegistry } from 'react-native';
-import { Platform, Text, View } from '@symbiote-native/react';
+import { Platform } from '@symbiote-native/react';
 import { registerApp } from '@symbiote-native/react/bootstrap';
 import { dlog } from '@symbiote-native/engine';
 
 if (
   Platform.OS !== 'linux' ||
-  Platform.constants.reactNativeVersion.minor !== 87
+  Platform.constants?.reactNativeVersion.minor !== 87
 ) {
   throw new Error('The packaged app did not resolve the native Linux Platform');
 }
@@ -24,14 +24,17 @@ function App() {
     else dlog('Symbiote Linux React app updated');
   }, [width]);
   return createElement(
-    View,
+    'view',
     { style: { width, height: 80, backgroundColor: '#234567' } },
-    createElement(Text, null, 'Symbiote Linux'),
+    createElement('text', null, 'Symbiote Linux'),
   );
 }
 
 registerApp(App, { appName: 'SymbioteLinux', debug: true });
 NativeAppRegistry.runApplication('SymbioteLinux', {
   initialProps: {},
-  rootTag: 1,
+  // The native host creates numeric surface 1; RN's generated type is opaque.
+  rootTag: /** @type {import('react-native').RootTag} */ (
+    /** @type {unknown} */ (1)
+  ),
 });

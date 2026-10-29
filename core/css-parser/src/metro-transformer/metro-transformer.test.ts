@@ -13,7 +13,10 @@
 // re-enumerating every recognized extension a second time.
 
 import { describe, expect, it, vi } from 'vitest';
-import { createCssMetroTransformer } from './index';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createCssMetroTransformer, resolveUpstreamTransformer } from './index';
 
 function fakeUpstream() {
   return {
@@ -132,5 +135,48 @@ describe('createCssMetroTransformer', () => {
     const transformer = createCssMetroTransformer();
 
     expect(typeof transformer.getCacheKey).toBe('function');
+  });
+});
+
+describe('resolveUpstreamTransformer', () => {
+  it('loads the transformer owned by the app Metro config, including isolated installs', () => {
+    const app = mkdtempSync(join(tmpdir(), 'symbiote-metro-version-'));
+    try {
+      const config = join(app, 'node_modules/@react-native/metro-config');
+      const transformer = join(
+        config,
+        'node_modules/@react-native/metro-babel-transformer',
+      );
+      mkdirSync(transformer, { recursive: true });
+      writeFileSync(join(config, 'index.js'), 'module.exports = {};');
+      writeFileSync(
+        join(transformer, 'index.js'),
+        'module.exports = { transform: params => params, getCacheKey: () => "app-metro" };',
+      );
+      expect(resolveUpstreamTransformer(app).getCacheKey?.()).toBe('app-metro');
+    } finally {
+      rmSync(app, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the packaged default when the app has no React Native Metro config', () => {
+    const app = mkdtempSync(join(tmpdir(), 'symbiote-metro-default-'));
+    try {
+      expect(typeof resolveUpstreamTransformer(app).transform).toBe('function');
+    } finally {
+      rmSync(app, { recursive: true, force: true });
+    }
+  });
+
+  it('does not mask a broken app Metro config with a different transformer', () => {
+    const app = mkdtempSync(join(tmpdir(), 'symbiote-metro-broken-'));
+    try {
+      const config = join(app, 'node_modules/@react-native/metro-config');
+      mkdirSync(config, { recursive: true });
+      writeFileSync(join(config, 'package.json'), '{ invalid json');
+      expect(() => resolveUpstreamTransformer(app)).toThrow();
+    } finally {
+      rmSync(app, { recursive: true, force: true });
+    }
   });
 });

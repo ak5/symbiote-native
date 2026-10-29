@@ -17,6 +17,7 @@
 // runs at Metro build time, content-hash-cached, never a runtime hot path, so forking the
 // function to save one microtask isn't worth the duplication.
 import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
 import { compileCssFile } from '../metro-css-module/index.ts';
 import { isStyleFile } from '../preprocessors/index.ts';
 
@@ -33,15 +34,27 @@ export interface IMetroTransformer {
   getCacheKey?: (...args: unknown[]) => string;
 }
 
-// @react-native/metro-babel-transformer is a real `dependency` of this package, so it resolves
-// via css-parser's own node_modules under pnpm — no hoisting/`paths` trick needed, unlike the
-// app-local workaround this replaces (formerly duplicated in every adapter's example
-// metro-css-transformer.js). Exported so a per-framework transformer that also needs the
-// upstream RN transformer (e.g. the Vue SFC transformer's non-.vue passthrough branch) can reuse
-// this instead of its own fragile direct `require('@react-native/metro-babel-transformer')`.
-export function resolveUpstreamTransformer(): IMetroTransformer {
-  const require = createRequire(import.meta.url);
-  return require('@react-native/metro-babel-transformer');
+// Resolve through the app's Metro config so its transformer and Babel preset use the same
+// parser. Consumers without that config (including Expo) use our packaged default.
+export function resolveUpstreamTransformer(
+  projectRoot: string = process.cwd(),
+): IMetroTransformer {
+  const appRequire = createRequire(resolve(projectRoot, 'package.json'));
+  let metroConfig: string;
+  try {
+    metroConfig = appRequire.resolve('@react-native/metro-config');
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !('code' in error) ||
+      error.code !== 'MODULE_NOT_FOUND'
+    )
+      throw error;
+    return createRequire(import.meta.url)(
+      '@react-native/metro-babel-transformer',
+    );
+  }
+  return createRequire(metroConfig)('@react-native/metro-babel-transformer');
 }
 
 export function createCssMetroTransformer(

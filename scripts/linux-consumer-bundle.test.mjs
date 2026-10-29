@@ -14,6 +14,15 @@ test('accepts both flat and indexed Metro sourcemaps', () => {
   });
 });
 
+test('checks the selected adapter in a Svelte bundle', () => {
+  const svelte = [sources[0], sources[1].replace('/react/', '/svelte/')];
+  verifyLinuxConsumerBundle({ sources: svelte }, 'svelte');
+  assert.throws(
+    () => verifyLinuxConsumerBundle({ sources }, 'svelte'),
+    /svelte/,
+  );
+});
+
 test('rejects a bundle that resolves the fallback Platform or omits the adapter', () => {
   assert.throws(
     () =>
