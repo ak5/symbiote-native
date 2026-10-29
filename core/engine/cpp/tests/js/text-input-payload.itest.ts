@@ -72,6 +72,34 @@ const single = (props: Record<string, unknown>): ICommitted =>
 const multi = (props: Record<string, unknown>): ICommitted =>
   commit(MULTILINE, 'text-input-multiline', props);
 
+describe('WindowsTextInput payload through the native engine', () => {
+  for (const multiline of [false, true]) {
+    it(`folds controlled values and aliases with multiline=${multiline}`, () => {
+      const { payload } = commit(
+        'WindowsTextInput',
+        multiline ? 'text-input-multiline' : 'text-input',
+        { value: 'edited', defaultValue: 'initial', readOnly: true },
+      );
+      expect(payload.text).toBe('edited');
+      expect(payload.value).toBe(undefined);
+      expect(payload.defaultValue).toBe(undefined);
+      expect(payload.editable).toBe(false);
+      expect(payload.multiline).toBe(multiline);
+      expect(payload.submitBehavior).toBe(
+        multiline ? 'newline' : 'blurAndSubmit',
+      );
+      expect(payload.paddingTop).toBe(undefined);
+    });
+  }
+
+  it('preserves an uncontrolled initial value', () => {
+    const { payload } = commit('WindowsTextInput', 'text-input', {
+      defaultValue: 'initial',
+    });
+    expect(payload.text).toBe('initial');
+  });
+});
+
 describe('what a text input sends native, resolved by the engine', () => {
   // why: THE PRICE. Everything below would pass equally well with the rule still in a JS closure;
   // this is the assertion that says it moved.

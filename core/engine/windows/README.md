@@ -8,4 +8,6 @@ Install the dependencies in `vcpkg.json` with the `x64-windows-static-md` triple
 
 The production project and SDK application gate import `SymbioteEngine.props`. It compiles the shared engine sources and the consuming app's unchanged `JSIDynamic.cpp`. Only its conversion header is exposed through a generated include directory; the SDK owns JSI headers.
 
+Text inputs resolve to the SDK's `WindowsTextInput` component for both modes. The shared engine folds controlled and initial values and selects multiline from the intrinsic tag. Windows input event names are routed using the SDK's direct-event declarations. Native typing and focus verification remain required before claiming complete input support.
+
 The library scaffold derives from Microsoft's React Native Windows 0.85 cpp-lib template at commit `22f3d36d000a81ae3734a48c909a781a21a43511`. Its MIT license is retained in `REACT_NATIVE_WINDOWS_LICENSE.txt`.

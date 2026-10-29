@@ -77,6 +77,7 @@ const BUILTIN_COMPONENTS = new Set([
   'RCTScrollContentView',
   'RCTSinglelineTextInputView',
   'RCTMultilineTextInputView',
+  'WindowsTextInput',
   'Switch',
   'ActivityIndicatorView',
   'SafeAreaView',

@@ -111,6 +111,7 @@ const COMPONENT_EVENTS: Readonly<Record<string, readonly string[]>> = {
   RCTSinglelineTextInputView: TEXT_INPUT_EVENTS,
   RCTMultilineTextInputView: TEXT_INPUT_EVENTS,
   AndroidTextInput: TEXT_INPUT_EVENTS,
+  WindowsTextInput: [...TEXT_INPUT_EVENTS, 'scroll'],
   RCTText: TEXT_EVENTS,
   Switch: ['change'],
   AndroidSwitch: ['change'],

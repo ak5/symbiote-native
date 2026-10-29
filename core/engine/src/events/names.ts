@@ -19,6 +19,18 @@ export const BUBBLING_EVENTS: Readonly<Record<string, string>> = {
 };
 
 export const DIRECT_EVENTS: Readonly<Record<string, string>> = {
+  // RNW's WindowsTextInputNativeComponent declares these as direct events.
+  topTextInputFocus: 'focus',
+  topTextInputBlur: 'blur',
+  topTextInputChange: 'change',
+  topTextInputEndEditing: 'endEditing',
+  topTextInputSubmitEditing: 'submitEditing',
+  topTextInputKeyPress: 'keyPress',
+  topTextInputSelectionChange: 'selectionChange',
+  topTextInputContentSizeChange: 'contentSizeChange',
+  topTextInputPressIn: 'pressIn',
+  topTextInputPressOut: 'pressOut',
+  topTextInputScroll: 'scroll',
   topLayout: 'layout',
   topScroll: 'scroll',
   topScrollBeginDrag: 'scrollBeginDrag',

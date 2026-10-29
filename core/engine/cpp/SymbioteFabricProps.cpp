@@ -71,6 +71,7 @@ constexpr const char *kAndroidSwitchComponent = "AndroidSwitch";
 constexpr const char *kSinglelineTextInput = "RCTSinglelineTextInputView";
 constexpr const char *kMultilineTextInput = "RCTMultilineTextInputView";
 constexpr const char *kAndroidTextInput = "AndroidTextInput";
+constexpr const char *kWindowsTextInput = "WindowsTextInput";
 
 // Colour props must reach Fabric as platform ints. `fromRawValueShared.h` parses a CSS STRING only
 // when `enableNativeCSSParsing()` is on, and it defaults to FALSE — an unparsed string falls
@@ -2902,12 +2903,12 @@ dynamic fabricProps(
   }
 
   dynamic valueFolded;
-  // Android commits BOTH text-input tags as one `AndroidTextInput`, so there the TAG says which one
-  // it is; the iOS names say it themselves.
+  // Android and Windows share one component between modes; the tag selects multiline.
+  const bool sharedTextInput = component == kAndroidTextInput || component == kWindowsTextInput;
   const bool isTextInput = component == kSinglelineTextInput ||
-      component == kMultilineTextInput || component == kAndroidTextInput;
+      component == kMultilineTextInput || sharedTextInput;
   const bool isMultilineTextInput = component == kMultilineTextInput ||
-      (component == kAndroidTextInput && tagName == "text-input-multiline");
+      (sharedTextInput && tagName == "text-input-multiline");
   if (isTextInput &&
       (bag->get_ptr("value") != nullptr || bag->get_ptr("defaultValue") != nullptr)) {
     valueFolded = foldTextInputValue(*bag);
@@ -2920,6 +2921,7 @@ dynamic fabricProps(
   dynamic aliasResolved;
   if (isTextInput) {
     aliasResolved = foldTextInputAliases(*bag, isMultilineTextInput);
+    if (component == kWindowsTextInput) aliasResolved["multiline"] = isMultilineTextInput;
     // `TextInput.js:583` — `props.accessible !== false`, handed to both the singleline and the
     // multiline view (`:703`, `:772`). The same shape as the Text rule below, and found the same
     // way: diffing one bench row's committed payload against React Native's own.
@@ -3019,7 +3021,7 @@ dynamic fabricProps(
   if (isTextInput) applyTextStyleOverrides(out, false);
 #ifndef ANDROID
   // `TextInput.js:767`, under the app style: only a missing vertical padding gets it
-  if (isMultilineTextInput && !hasVerticalPadding(style)) out["paddingTop"] = 5;
+  if (component == kMultilineTextInput && !hasVerticalPadding(style)) out["paddingTop"] = 5;
 #endif
   return out;
 }
