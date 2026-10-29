@@ -41,6 +41,13 @@ Verified source constraints on 2026-10-30:
 version, separate RN/RNW version metadata, dev-gated testing and Windows/native/default selection.
 Its unit tests establish that JS contract only, not a functioning Windows engine or application.
 
+The sequential `fabric-runtime` job in `windows-engine.yml` builds a stock RNW Win32 app with
+`core/engine/windows/tests/FabricProbe.h`. It tests public Fabric JSI calls from the SDK's ABI runtime,
+NativeState ownership and a Hermes-allocated command buffer. Fabric must create, clone, commit and
+measure a view at 120 then 240 pixels wide. It includes no private Fabric headers and changes no RN
+source. This is a boundary experiment, not a second retained tree or a production Windows backend.
+Do not refactor the shared tree around this route until the actual native runtime gate passes.
+
 Next gates: resolve compiler/linker failures without modifying RN core; prove the runtime boundary in a real
 Windows host; establish a tested React Native version contract; then add Metro application targets and test
 the existing adapters' keyboard, clipboard, resize, persistence, scrolling and accessibility journeys.
