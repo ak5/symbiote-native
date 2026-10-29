@@ -140,3 +140,16 @@ characters. Use vcpkg's short `--x-buildtrees-root=C:/tbz-b`; this keeps that sa
 without changing dependency sources. Retain its build logs. Save partial binary caches even when
 an installation fails, using per-run keys and a dependency-hash restore prefix so later completed
 ports can extend the cache instead of being trapped behind an immutable partial entry.
+
+The package now has a prepared Windows x64 library project/solution and WinRT package provider,
+based on the pinned SDK cpp-lib template with its Microsoft MIT license retained. Its provider
+registers the actual C++ module. The normal Windows autolinker configuration names the project,
+WinRT header and provider explicitly. XML parsing, project input paths and autolink paths pass
+local structural checks; actual Windows compilation and autolink execution are still pending.
+
+`windows/SymbioteEngine.props` is the common engine/dependency build definition imported by both
+the production library and the SDK test configurator. It compiles the existing shared C++ sources,
+uses the SDK's JSI headers, prepares only JSIDynamic.h from the app's RN dependency, and diagnoses
+missing dependencies/platform mismatch. The SDK library gate retains an exported installation
+entry so the linker cannot discard an unused engine. Keep the new project local until the active
+Windows run completes; the peer-version and Windows runtime gates remain outstanding.

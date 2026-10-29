@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <SymbioteEngineCppDirectory>$(MSBuildThisFileDirectory)..\cpp\</SymbioteEngineCppDirectory>
+    <SymbioteReactNativeDirectory Condition="'$(SymbioteReactNativeDirectory)' == ''">$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), 'node_modules\react-native\package.json'))\node_modules\react-native\</SymbioteReactNativeDirectory>
+    <VcpkgRoot Condition="'$(VcpkgRoot)' == ''">$(VCPKG_ROOT)</VcpkgRoot>
+    <VcpkgEnabled>true</VcpkgEnabled>
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+    <VcpkgManifestRoot>$(MSBuildThisFileDirectory)</VcpkgManifestRoot>
+    <VcpkgInstalledDir Condition="'$(VcpkgInstalledDir)' == ''">$(MSBuildThisFileDirectory)vcpkg_installed\</VcpkgInstalledDir>
+    <VcpkgTriplet>x64-windows-static-md</VcpkgTriplet>
+  </PropertyGroup>
+  <Import Project="$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.props" Condition="Exists('$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.props')" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <PreprocessorDefinitions>SYMBIOTE_PUBLIC_FABRIC=1;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SymbioteEngineCppDirectory);$(MSBuildThisFileDirectory);$(IntDir)SymbioteEngineIncludes;$(SymbioteReactNativeDirectory)ReactCommon</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="$(SymbioteEngineCppDirectory)*.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="$(SymbioteReactNativeDirectory)ReactCommon\jsi\jsi\JSIDynamic.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <Target Name="SymbiotePrepareEngine" BeforeTargets="ClCompile">
+    <Error Condition="'$(Platform)' != 'x64'" Text="SymbioteEngine currently supports the Windows x64 dependency triplet." />
+    <Error Condition="!Exists('$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.props')" Text="Set VcpkgRoot to a vcpkg checkout before building SymbioteEngine." />
+    <Error Condition="!Exists('$(VcpkgInstalledDir)$(VcpkgTriplet)\include\folly\dynamic.h')" Text="Install the dependencies from SymbioteEngine's windows/vcpkg.json for x64-windows-static-md." />
+    <MakeDir Directories="$(IntDir)SymbioteEngineIncludes\jsi" />
+    <Copy SourceFiles="$(SymbioteReactNativeDirectory)ReactCommon\jsi\jsi\JSIDynamic.h" DestinationFiles="$(IntDir)SymbioteEngineIncludes\jsi\JSIDynamic.h" />
+  </Target>
+  <Import Project="$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.targets" Condition="Exists('$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.targets')" />
+</Project>

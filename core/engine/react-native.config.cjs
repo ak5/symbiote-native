@@ -13,9 +13,22 @@
 module.exports = {
   dependency: {
     platforms: {
+      windows: {
+        sourceDir: './windows',
+        solutionFile: 'SymbioteNativeEngine.sln',
+        projects: [
+          {
+            projectFile: 'SymbioteNativeEngine/SymbioteNativeEngine.vcxproj',
+            directDependency: true,
+            cppHeaders: ['winrt/SymbioteNativeEngine.h'],
+            cppPackageProviders: ['SymbioteNativeEngine::ReactPackageProvider'],
+          },
+        ],
+      },
       android: {
         sourceDir: './android',
-        packageImportPath: 'import dev.symbiotenative.engine.SymbioteEnginePackage;',
+        packageImportPath:
+          'import dev.symbiotenative.engine.SymbioteEnginePackage;',
         packageInstance: 'new SymbioteEnginePackage()',
       },
     },
