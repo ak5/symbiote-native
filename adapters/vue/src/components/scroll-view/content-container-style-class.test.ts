@@ -9,7 +9,7 @@
 // contentContainerStyle THROUGH that resolution onto the right node. No Negative group: an
 // unregistered class name resolves to no styles, it does not throw.
 
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';

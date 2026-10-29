@@ -1,5 +1,5 @@
 // `TextInput.js:736-743`: строка внутри `<text-input>` это его содержимое, а не ошибка
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../index';

@@ -19,7 +19,7 @@
 // route name, a swipe that misses every threshold, and swipeEnabled: false are all no-ops the
 // shared math already fails closed on, observed here as unchanged state, not a thrown error.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Animated, mount, unmount, Dimensions } from '@symbiote-native/vue';
 import {

@@ -1,9 +1,5 @@
 // RN hands a list's `innerViewRef` to its ScrollView through `...props`
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

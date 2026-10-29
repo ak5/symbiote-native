@@ -1,5 +1,5 @@
 import { mount, unmount } from '@symbiote-native/vue';
-import { h, nextTick, reactive } from '@vue/runtime-core';
+import { h, nextTick, reactive } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ReduceMotion } from 'react-native-reanimated/src/commonTypes';
 import { ReducedMotionManager } from 'react-native-reanimated/src/ReducedMotion';

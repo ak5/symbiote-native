@@ -81,7 +81,7 @@
     "@angular/core": ">=20",
     "@angular/forms": ">=20",
     "@symbiote-native/engine": "workspace:^",
-    "react-native": ">=0.86"
+    "react-native": ">=0.85.3"
   },
   "devDependencies": {
     "@angular/compiler": "catalog:",

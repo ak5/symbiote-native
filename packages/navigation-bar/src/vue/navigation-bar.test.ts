@@ -1,6 +1,6 @@
 // Vue twin of ../react's NavigationBar test (ADR 0025)
 
-import { h, ref, type Ref, type VNode } from '@vue/runtime-core';
+import { h, ref, type Ref, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

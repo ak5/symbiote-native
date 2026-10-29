@@ -8,7 +8,7 @@
 // ONE bare view with no children, so the subtree assertion fails on the registration alone — and
 // the payload assertions fail with it, which is the two-consequences-of-one-cause shape
 // (`.claude/rules/test-harness-false-greens.md` §14).
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,

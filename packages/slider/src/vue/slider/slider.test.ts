@@ -7,7 +7,7 @@
 // value/disabled/limits faithfully to the library, forwards + processes the tints, and maps the
 // native value/sliding events onto onValueChange / onSlidingStart / onSlidingComplete.
 
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,

@@ -3,8 +3,8 @@
 // instead of a plain value). All pub/sub logic lives in ../../core/navigation-events - this
 // composable only reads the injected navigation scope and binds identity.
 
-import { computed } from '@vue/runtime-core';
-import type { ComputedRef } from '@vue/runtime-core';
+import { computed } from 'vue';
+import type { ComputedRef } from 'vue';
 import type {
   INavigationEventListener,
   INavigationEventName,

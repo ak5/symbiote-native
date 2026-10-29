@@ -1,10 +1,6 @@
 // A list in a cell of a list with the same orientation shares the outer scroll, as RN's does
 // It renders a plain view, windows by the outer scroll, and gets the outer drag events
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Modal, VirtualizedList, mount, unmount } from '@symbiote-native/vue';
 import { parentOf } from '@symbiote-native/engine';

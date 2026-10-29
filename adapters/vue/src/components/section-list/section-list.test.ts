@@ -24,12 +24,7 @@
 // CREATE, so this is a fact about what the ops named, not about current residency. Everything
 // else that walks the current committed shape goes through the LIVE tree.
 
-import {
-  defineComponent,
-  h,
-  ref,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, ref, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   SectionList,

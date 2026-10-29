@@ -1,7 +1,7 @@
 // The screen markers of a navigator slot, flattened out of any `Fragment`
 
-import { Fragment, isVNode } from '@vue/runtime-core';
-import type { VNode } from '@vue/runtime-core';
+import { Fragment, isVNode } from 'vue';
+import type { VNode } from 'vue';
 
 // `v-for` in a slot yields a `Fragment` with the markers in its children, and a navigator that
 // only looked at the top level would register none of them

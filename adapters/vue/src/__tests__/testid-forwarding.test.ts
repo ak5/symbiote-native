@@ -11,7 +11,7 @@
 // the guard actually covers the full component barrel, not just the components someone remembered
 // to add a case for.
 
-import { defineComponent, h, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,

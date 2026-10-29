@@ -1,6 +1,6 @@
 # Windows engine
 
-This experimental target uses the released React Native Windows SDK, C++ TurboModules and the shared C++ retained tree through public Fabric JSI calls. Windows compile and application runtime verification are still in progress. The engine's React Native peer range must be resolved before a supported npm installation can be claimed.
+This experimental target uses the released React Native Windows SDK, C++ TurboModules and the shared C++ retained tree through public Fabric JSI calls. Windows compile and application runtime verification are still in progress. The candidate React Native 0.85.3 peer range is under compatibility validation. Applications must pin `@react-native/virtualized-lists` to their React Native version.
 
 `react-native.config.cjs` exposes the `SymbioteNativeEngine` library and its WinRT package provider to the Windows autolinker. The provider registers `SymbioteEngineModule`; its first synchronous version call installs the engine bindings.
 

@@ -23,6 +23,20 @@ jobs:
         with:
           node-version: 24
       - uses: microsoft/setup-msbuild@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - name: Build the installable engine package
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          pnpm install --frozen-lockfile --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm exec tsc --build core/engine
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory .windows-engine-packs | Out-Null
+          pnpm --dir core/engine pack --pack-destination "$PWD/.windows-engine-packs"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Create an isolated SDK compatibility fixture
         shell: pwsh
         run: |
@@ -112,6 +126,7 @@ jobs:
         run: |
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
           New-Item -ItemType Directory .windows-fabric-probe | Out-Null
+          $engineVersion = (Get-Content core/engine/package.json -Raw | ConvertFrom-Json).version
           @{
             name = 'symbiote-fabric-probe'
             version = '0.0.0'
@@ -120,6 +135,7 @@ jobs:
               react = '19.2.3'
               'react-native' = '0.85.3'
               'react-native-windows' = '0.85.0'
+              '@symbiote-native/engine' = "file:../.windows-engine-packs/symbiote-native-engine-$engineVersion.tgz"
             }
             devDependencies = @{
               '@react-native-community/cli' = '20.1.0'
@@ -156,14 +172,6 @@ jobs:
         run: |
           Copy-Item core/engine/windows/tests/index-engine.windows.js .windows-fabric-probe/index.windows.js
           Copy-Item core/engine/windows/tests/engine-smoke.js .windows-fabric-probe
-          @'
-          const path = require('node:path');
-          module.exports = {
-            dependencies: {
-              '@symbiote-native/engine': {root: path.resolve(__dirname, '../core/engine')},
-            },
-          };
-          '@ | Set-Content .windows-fabric-probe/react-native.config.js
           Push-Location .windows-fabric-probe
           npx --no-install react-native autolink-windows --logging
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -205,6 +213,45 @@ jobs:
           } finally {
             if (-not $app.HasExited) { Stop-Process -Id $app.Id }
           }
+      - name: Prepare installed framework consumers for Windows
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          node --test scripts/windows-app-fixtures.test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          pnpm run check:windows-consumers .windows-adapter-apps
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run each framework through native Windows layout events
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          $executables = @(Get-ChildItem .windows-fabric-probe/windows -Recurse -Filter SymbioteFabricProbe.exe)
+          if ($executables.Count -ne 1) { throw "Expected one native app, found $($executables.Count)" }
+          $executable = $executables[0]
+          $bundle = Join-Path $executable.DirectoryName 'Bundle/index.windows.bundle'
+          if (-not (Test-Path $bundle)) { throw "Missing packaged JavaScript bundle: $bundle" }
+          foreach ($framework in @('react', 'svelte', 'vue', 'solid', 'angular')) {
+            Copy-Item ".windows-adapter-apps/$framework/index.windows.bundle" $bundle -Force
+            $logPath = Join-Path $executable.DirectoryName 'windows-fabric-runtime.log'
+            Remove-Item $logPath -ErrorAction SilentlyContinue
+            $app = Start-Process $executable.FullName -WorkingDirectory $executable.DirectoryName -PassThru
+            try {
+              $deadline = (Get-Date).AddSeconds(90)
+              do {
+                Start-Sleep -Milliseconds 500
+                $app.Refresh()
+                $log = if (Test-Path $logPath) { Get-Content $logPath -Raw } else { '' }
+              } while (-not $app.HasExited -and $log -notmatch '(PASS|FAIL):' -and (Get-Date) -lt $deadline)
+              Write-Host $log
+              if (Test-Path $logPath) { Copy-Item $logPath "windows-$framework-runtime.log" }
+              $title = $framework.Substring(0, 1).ToUpperInvariant() + $framework.Substring(1)
+              if ($log -match 'FAIL:' -or -not $log.Contains("PASS: $title native layout 120->240")) {
+                throw "$title did not complete native layout and reactive update; exited=$($app.HasExited)"
+              }
+            } finally {
+              if (-not $app.HasExited) { Stop-Process -Id $app.Id }
+            }
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -213,6 +260,7 @@ jobs:
           path: |
             windows-engine.binlog
             windows-package.binlog
+            windows-*-runtime.log
             windows-fabric.binlog
             .windows-fabric-probe/windows/**/windows-fabric-runtime.log
           if-no-files-found: ignore

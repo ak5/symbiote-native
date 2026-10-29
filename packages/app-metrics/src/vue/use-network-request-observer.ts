@@ -1,4 +1,4 @@
-import { onUnmounted, watchEffect } from '@vue/runtime-core';
+import { onUnmounted, watchEffect } from 'vue';
 import { createNetworkRequestObserverLifecycle } from '../core/network-request-observer-lifecycle';
 import type { NetworkRequestObserver } from '../core';
 import type { IUseNetworkRequestObserverOptions } from '../core/network-request-observer-lifecycle';

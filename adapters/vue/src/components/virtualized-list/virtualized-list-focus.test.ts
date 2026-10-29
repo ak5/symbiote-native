@@ -1,10 +1,6 @@
 // RN keeps a viewport of cells around the last focused one mounted, so a focused input survives
 // the window moving away
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
 import {

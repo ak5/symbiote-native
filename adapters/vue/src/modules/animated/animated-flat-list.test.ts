@@ -28,7 +28,7 @@
 // once stays valid to compare against for the rest of the case.
 
 import '../../components/flat-list';
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/vue';
 import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';

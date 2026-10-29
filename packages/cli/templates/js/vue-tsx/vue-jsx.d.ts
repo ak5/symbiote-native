@@ -8,7 +8,7 @@
 // to the global `JSX` namespace below — which we DO control. Emit is unaffected (`"jsx": "preserve"`
 // never calls the factory; @vue/babel-plugin-jsx already does the real transform in babel.config.js
 // before React's own JSX plugin ever sees the file) — this is purely a type-checking concern.
-import type { VNode } from '@vue/runtime-core';
+import type { VNode } from 'vue';
 
 declare global {
   namespace VueJsx {

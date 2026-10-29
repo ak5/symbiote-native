@@ -10,8 +10,8 @@
 // non-React adapter); the native views are driven directly through the ViewConfig ../register
 // registers. See CLAUDE.md <third_party_rn_packages_are_react_only>.
 
-import { defineComponent, shallowRef, useId } from '@vue/runtime-core';
-import type { VNode } from '@vue/runtime-core';
+import { defineComponent, shallowRef, useId } from 'vue';
+import type { VNode } from 'vue';
 import { normalizeVueAttrs } from '@symbiote-native/vue';
 import {
   buildInitialState,

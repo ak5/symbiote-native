@@ -65,6 +65,26 @@ describe('scaffoldApp splash-screen option', () => {
     return root;
   }
 
+  it.each(['sfc', 'tsx'] as const)(
+    'Vue %s apps declare one application runtime',
+    flavor => {
+      const root = scaffold(false, 'vue', flavor);
+      const manifest: {
+        dependencies: Record<string, string>;
+        devDependencies: Record<string, string>;
+      } = JSON.parse(readText(root, 'package.json'));
+      expect(manifest.dependencies.vue).toMatch(/^\^3\.5\./);
+      expect(manifest.dependencies['@vue/runtime-core']).toBeUndefined();
+      expect(manifest.devDependencies.vue).toBeUndefined();
+      expect(fs.existsSync(path.join(root, 'vue-runtime-core.d.ts'))).toBe(
+        false,
+      );
+      expect(readText(root, 'metro.config.js')).not.toContain(
+        '@vue/runtime-core',
+      );
+    },
+  );
+
   it('is off by default: no splash-screen dependency, plain theme, no native wiring', () => {
     const root = scaffold(false);
     const nativeAppName = sanitizeNativeAppName(root);

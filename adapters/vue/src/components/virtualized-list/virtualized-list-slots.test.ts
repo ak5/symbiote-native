@@ -1,11 +1,7 @@
 // RN wraps the header, footer and empty slots with the list's counter-flip when inverted, and
 // header and footer take their own style on that wrapper
 
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
 import {

@@ -1,5 +1,5 @@
 // Нативный `change` должен дойти до `@valueChange` и записать текст обратно в `value` ноды
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listenerFor } from '@symbiote-native/engine';
 import type { ISymbioteEvent } from '@symbiote-native/engine';

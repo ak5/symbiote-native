@@ -71,15 +71,14 @@
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
-  "dependencies": {
-    "@react-native/virtualized-lists": "catalog:"
-  },
   "peerDependencies": {
     "@symbiote-native/engine": "workspace:^",
-    "react-native": ">=0.86"
+    "react-native": ">=0.85.3",
+    "@react-native/virtualized-lists": ">=0.85.3"
   },
   "devDependencies": {
     "@symbiote-native/engine": "workspace:*",
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "@react-native/virtualized-lists": "catalog:"
   }
 }

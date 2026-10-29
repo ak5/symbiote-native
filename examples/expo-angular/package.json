@@ -93,7 +93,8 @@
     "expo": "57.0.14",
     "expo-modules-core": "57.0.20",
     "react": "19.2.3",
-    "react-native": "0.86.0"
+    "react-native": "0.86.0",
+    "@react-native/virtualized-lists": "0.86.0"
   },
   "devDependencies": {
     "@angular/compiler-cli": "~22.0.8",
@@ -121,7 +122,8 @@
     "jest-circus": "^29.7.0",
     "prettier": "^3.9.1",
     "ts-jest": "^29.4.11",
-    "typescript": "~6.0.0"
+    "typescript": "~6.0.0",
+    "@react-native/metro-babel-transformer": "0.86.0"
   },
   "engines": {
     "node": ">= 22.11.0"

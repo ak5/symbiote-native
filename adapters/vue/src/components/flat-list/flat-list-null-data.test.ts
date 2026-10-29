@@ -1,9 +1,5 @@
 // RN's FlatList takes `null` or a non-list as an empty list, the scroll view still mounts
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

@@ -4,7 +4,7 @@ import {
   onUnmounted,
   watch,
   type VNode,
-} from '@vue/runtime-core';
+} from 'vue';
 import { useColorScheme } from '@symbiote-native/vue';
 import {
   popStackEntry,

@@ -15,7 +15,7 @@ import type {
   IAriaProps,
   ITextNativeOnlyProps,
 } from '@symbiote-native/components';
-import type { VNodeRef } from '@vue/runtime-core';
+import type { VNodeRef } from 'vue';
 
 export type ITextProps = IAccessibilityProps &
   IAriaProps &

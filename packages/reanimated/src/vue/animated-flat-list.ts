@@ -1,8 +1,4 @@
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import {
   FlatList,
   type IFlatListProps,

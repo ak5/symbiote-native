@@ -5,14 +5,7 @@
 // is no shared node/ref here at all — the two apps below never touch each other's Fabric
 // tree directly, only a plain shared reactive Map.
 
-import {
-  defineComponent,
-  h,
-  inject,
-  provide,
-  ref,
-  type Component,
-} from '@vue/runtime-core';
+import { defineComponent, h, inject, provide, ref, type Component } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createTunnel,

@@ -1,6 +1,6 @@
 import { createLiveTree } from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/vue';
-import { h, nextTick } from '@vue/runtime-core';
+import { h, nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkletEventHandler } from 'react-native-reanimated/src/WorkletEventHandler';
 import { installWrapperHost } from '../../test-support/wrapper-host';

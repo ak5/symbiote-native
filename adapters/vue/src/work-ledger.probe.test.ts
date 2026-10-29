@@ -20,7 +20,7 @@
 // compile time, and h() names the tag directly, which is the same thing arrived at by hand.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, ref, type VNode } from 'vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { readFileSync } from 'node:fs';
 

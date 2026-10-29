@@ -8,7 +8,7 @@ import {
   ref,
   toRaw,
   type VNode,
-} from '@vue/runtime-core';
+} from 'vue';
 import { descriptorToVue, normalizeVueAttrs } from '@symbiote-native/vue';
 import type { IViewProps } from '@symbiote-native/vue';
 import {

@@ -8,7 +8,7 @@
 // No Negative group: getParent() is a plain optional lookup (`parent?.navigation`), never a throw -
 // "no ambient navigator" is itself one of the two scenarios this file proves, not an error case.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,

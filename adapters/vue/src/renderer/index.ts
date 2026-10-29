@@ -10,7 +10,7 @@ import {
   markRaw,
   type ComponentInternalInstance,
   type RendererOptions,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   appendChild,
   createAnchor,

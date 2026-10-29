@@ -48,6 +48,8 @@ autolinking if you want it.
 the entry point all differ from a stock RN app. Bolting SymbioteNative onto an existing one is
 more work than moving your screens into a fresh project. It is not a path we support.
 
+Applications pin `@react-native/virtualized-lists` and `@react-native/metro-babel-transformer` to their `react-native` version so rendering and bundling use the host’s matching helpers. The CLI writes these pins.
+
 `react-native` stays **your app's own top-level dependency**. SymbioteNative never hides it, it only
 replaces the JS renderer driving it.
 
@@ -128,13 +130,13 @@ canary and how to run it live in each adapter's README:
 years, and Lynx is adding them fast. If all you want is Vue on a phone, those work, and they are
 older than we are.
 
-|                    | Whose native layer                   | Frameworks                                | What it costs you                                       |
-| ------------------ | ------------------------------------ | ----------------------------------------- | ------------------------------------------------------- |
-| **React Native**   | Meta's Fabric / Yoga / Hermes        | React only                                | React lock-in                                           |
-| **NativeScript**   | its own runtime and bindings         | JS/TS, Angular, Vue, Solid, Svelte, React | leaving RN's ecosystem for its own                      |
-| **Hippy**          | its own C++ DOM and layout engine    | React, Vue                                | leaving RN's ecosystem for Tencent's                    |
-| **Lynx**           | its own engine (PrimJS, dual-thread) | React, Vue                                | an 18-month-old ecosystem, mostly hand-written bridging |
-| **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid      | ecosystem packages are wrapped by hand, Angular is slower than stock                 |
+|                    | Whose native layer                   | Frameworks                                | What it costs you                                                    |
+| ------------------ | ------------------------------------ | ----------------------------------------- | -------------------------------------------------------------------- |
+| **React Native**   | Meta's Fabric / Yoga / Hermes        | React only                                | React lock-in                                                        |
+| **NativeScript**   | its own runtime and bindings         | JS/TS, Angular, Vue, Solid, Svelte, React | leaving RN's ecosystem for its own                                   |
+| **Hippy**          | its own C++ DOM and layout engine    | React, Vue                                | leaving RN's ecosystem for Tencent's                                 |
+| **Lynx**           | its own engine (PrimJS, dual-thread) | React, Vue                                | an 18-month-old ecosystem, mostly hand-written bridging              |
+| **SymbioteNative** | **stock, unforked React Native**     | React, Vue 3, Angular, Svelte, Solid      | ecosystem packages are wrapped by hand, Angular is slower than stock |
 
 The difference is the row you read first. All three alternatives wrote their own native layer, so
 picking one means adopting its ecosystem too. As far as we have verified, SymbioteNative is the only
@@ -217,16 +219,16 @@ mounts a container view of its own.
 iPhone 17 / iOS 26.5 simulator, Release, 2026-09-22. Best of three to five runs per column, minimum
 taken. Ratio is ours over stock.
 
-| 1 000 rows | stock RN |          React |           Vue |         Solid |        Svelte |       Angular |
-| ---------- | -------: | -------------: | ------------: | ------------: | ------------: | ------------: |
-| Create     |    278.1 |  228.1 / 0.82x | 231.4 / 0.83x | 201.3 / 0.72x | 200.8 / 0.72x | 320.3 / 1.15x |
-| Replace    |    289.0 |  252.6 / 0.87x | 254.6 / 0.88x | 218.7 / 0.76x | 268.5 / 0.93x | 351.5 / 1.22x |
-| Partial    |     33.2 |   20.2 / 0.61x |  15.5 / 0.47x |  10.7 / 0.32x |  14.2 / 0.43x |  23.5 / 0.71x |
-| Select     |     10.8 |    5.9 / 0.55x |   4.8 / 0.44x |   5.5 / 0.51x |   8.4 / 0.78x |  15.3 / 1.42x |
-| Swap       |     10.7 |   27.8 / 2.60x |   7.4 / 0.69x |   5.4 / 0.50x |   7.0 / 0.65x |  17.9 / 1.67x |
-| Remove     |    126.3 |   36.4 / 0.29x |   6.3 / 0.05x |   9.3 / 0.07x |   7.5 / 0.06x |  19.2 / 0.15x |
-| Append     |    398.0 |  292.8 / 0.74x | 252.4 / 0.63x | 203.7 / 0.51x | 197.6 / 0.50x | 336.8 / 0.85x |
-| Clear      |     10.8 |   13.9 / 1.29x |  11.7 / 1.08x |  11.8 / 1.09x |  10.6 / 0.98x |  39.9 / 3.69x |
+| 1 000 rows | stock RN |         React |           Vue |         Solid |        Svelte |       Angular |
+| ---------- | -------: | ------------: | ------------: | ------------: | ------------: | ------------: |
+| Create     |    278.1 | 228.1 / 0.82x | 231.4 / 0.83x | 201.3 / 0.72x | 200.8 / 0.72x | 320.3 / 1.15x |
+| Replace    |    289.0 | 252.6 / 0.87x | 254.6 / 0.88x | 218.7 / 0.76x | 268.5 / 0.93x | 351.5 / 1.22x |
+| Partial    |     33.2 |  20.2 / 0.61x |  15.5 / 0.47x |  10.7 / 0.32x |  14.2 / 0.43x |  23.5 / 0.71x |
+| Select     |     10.8 |   5.9 / 0.55x |   4.8 / 0.44x |   5.5 / 0.51x |   8.4 / 0.78x |  15.3 / 1.42x |
+| Swap       |     10.7 |  27.8 / 2.60x |   7.4 / 0.69x |   5.4 / 0.50x |   7.0 / 0.65x |  17.9 / 1.67x |
+| Remove     |    126.3 |  36.4 / 0.29x |   6.3 / 0.05x |   9.3 / 0.07x |   7.5 / 0.06x |  19.2 / 0.15x |
+| Append     |    398.0 | 292.8 / 0.74x | 252.4 / 0.63x | 203.7 / 0.51x | 197.6 / 0.50x | 336.8 / 0.85x |
+| Clear      |     10.8 |  13.9 / 1.29x |  11.7 / 1.08x |  11.8 / 1.09x |  10.6 / 0.98x |  39.9 / 3.69x |
 
 `Remove` is where the architecture is worth the most: one row out of a thousand costs stock 126.3 ms
 against 6.3-19.2 for an adapter. The reason is a node count, not a millisecond. A persistent renderer

@@ -16,6 +16,7 @@ const INTERNAL_PREFIX = '@symbiote-native/';
 interface IManifest {
   readonly name?: string;
   readonly version?: string;
+  readonly dependencies?: Readonly<Record<string, string>>;
   readonly peerDependencies?: Readonly<Record<string, string>>;
   readonly devDependencies?: Readonly<Record<string, string>>;
 }
@@ -86,4 +87,66 @@ describe('internal peer contracts', () => {
     }
     expect(problems.sort().join('\n')).toBe('');
   });
+});
+
+it('Vue packages share the application peer instead of installing a second renderer runtime', () => {
+  const vuePackages = [...WORKSPACE_PACKAGES.values()].filter(
+    ({ manifest }) => manifest.peerDependencies?.vue !== undefined,
+  );
+  expect(vuePackages.length).toBeGreaterThan(30);
+  for (const { file, manifest } of vuePackages) {
+    expect(manifest.dependencies?.['@vue/runtime-core'], file).toBeUndefined();
+    expect(
+      manifest.peerDependencies?.['@vue/runtime-core'],
+      file,
+    ).toBeUndefined();
+    expect(
+      manifest.devDependencies?.['@vue/runtime-core'],
+      file,
+    ).toBeUndefined();
+  }
+});
+
+it('applications pin native list helpers to their React Native host version', () => {
+  let checked = 0;
+  for (const [group, filename] of [
+    ['examples', 'package.json'],
+    ['packages/cli/templates/js', 'package.json.fragment.json'],
+  ]) {
+    for (const entry of fs.readdirSync(path.join(REPO_ROOT, group), {
+      withFileTypes: true,
+    })) {
+      if (!entry.isDirectory()) continue;
+      const file = path.join(REPO_ROOT, group, entry.name, filename);
+      if (!fs.existsSync(file)) continue;
+      const manifest: IManifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (
+        !Object.keys(manifest.dependencies ?? {}).some(name =>
+          name.startsWith(INTERNAL_PREFIX),
+        )
+      )
+        continue;
+      const hostVersion = manifest.dependencies?.['react-native'];
+      if (hostVersion === undefined) continue;
+      expect(
+        manifest.dependencies?.['@react-native/virtualized-lists'],
+        file,
+      ).toBe(hostVersion);
+      expect(
+        manifest.devDependencies?.['@react-native/metro-babel-transformer'],
+        file,
+      ).toBe(hostVersion);
+      checked++;
+    }
+  }
+  expect(checked).toBeGreaterThan(10);
+  const components = WORKSPACE_PACKAGES.get(
+    '@symbiote-native/components',
+  )?.manifest;
+  expect(
+    components?.dependencies?.['@react-native/virtualized-lists'],
+  ).toBeUndefined();
+  expect(
+    components?.peerDependencies?.['@react-native/virtualized-lists'],
+  ).toBeDefined();
 });

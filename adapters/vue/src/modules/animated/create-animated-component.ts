@@ -15,7 +15,7 @@ import {
   shallowRef,
   type Component,
   type SetupContext,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   createAnimatedLeafLifecycle,
   isNativeAnimatedAvailable,

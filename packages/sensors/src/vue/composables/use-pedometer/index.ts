@@ -3,7 +3,7 @@
 // onMounted/onUnmounted shape of useAccelerometer. Pedometer has no setUpdateInterval, so
 // unlike useAccelerometer there is no interval param to apply at subscribe time.
 
-import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted, ref, type Ref } from 'vue';
 import {
   watchStepCount,
   type EventSubscription,

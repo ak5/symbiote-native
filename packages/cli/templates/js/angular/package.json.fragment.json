@@ -9,12 +9,14 @@
     "@angular/forms": "^22",
     "rxjs": "^7.8.1",
     "react-native": "0.86.0",
-    "react": "19.2.3"
+    "react": "19.2.3",
+    "@react-native/virtualized-lists": "0.86.0"
   },
   "devDependencies": {
     "@angular/compiler-cli": "^22",
     "@react-native/babel-preset": "0.86.0",
-    "@react-native/metro-config": "0.86.0"
+    "@react-native/metro-config": "0.86.0",
+    "@react-native/metro-babel-transformer": "0.86.0"
   },
   "scripts": {
     "lint": "eslint .",

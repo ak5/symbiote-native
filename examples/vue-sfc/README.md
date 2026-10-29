@@ -21,16 +21,16 @@ navigation-lines.ts       the wayfinding palette (LINE_COLOR / ROUTE_LINE_INFO)
 navigation-linking.ts     the deep-link config, shared by the root wiring and the DeepLinking demo
 screens/                  29 screens — CanaryScreen plus the tour stops and their nested children
 components/               the canary's own demo components (Animated, NativeModules, Responder, …)
-metro-vue-transformer.js   compiles .vue on the way into the bundle (parse → compileScript → 'vue'→runtime-core)
-metro.config.js            sourceExts += 'vue', babelTransformerPath → the SFC transformer; pins one react + one runtime-core
+metro-vue-transformer.js   compiles .vue on the way into the bundle (parse → compileScript → 'vue'→native runtime helpers)
+metro.config.js            sourceExts += 'vue', babelTransformerPath → the SFC transformer; pins one React + one Vue runtime
 ```
 
 `App.vue` is an ordinary Vue SFC. Metro has no Vue plugin (unplugin-vue ships
 vite/webpack/esbuild/rollup adapters, not Metro), so `metro-vue-transformer.js` does the
 single-pass compile itself with `@vue/compiler-sfc` — `parse` → `compileScript` with
 `inlineTemplate`, then rewrites every `from 'vue'` to `@symbiote-native/vue/runtime-helpers` (the
-custom, non-DOM renderer needs the compiler helpers from `@vue/runtime-core`, not
-`vue/runtime-dom`; the shim also supplies `vShow`, since `v-show`
+custom, non-DOM renderer needs renderer-agnostic helpers from the application Vue peer;
+the shim also supplies native `vShow`, since `v-show`
 compiles to an import runtime-core alone doesn't export). The compiled module is handed to `@react-native/babel-preset` as `.tsx`
 so it strips the `lang="ts"` types.
 

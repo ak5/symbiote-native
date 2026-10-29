@@ -19,7 +19,7 @@
 // engine sends, and React Native's own `componentNameByReactViewName` maps it to plain `View`, so
 // the committed tree cannot tell a content node from any other view by name at all. Counting it on
 // the committed side was only ever possible because a stand-in kept the name we sent it.
-import { defineComponent, h, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, VirtualizedList } from '@symbiote-native/vue';
 import { childrenOf } from '@symbiote-native/engine';

@@ -27,13 +27,8 @@
 // screen nested inside e.g. a Stack-screen-renders-a-Tab composition reach the enclosing Stack via
 // useNavigation().getParent().
 
-import {
-  defineComponent,
-  inject,
-  provide,
-  shallowRef,
-} from '@vue/runtime-core';
-import type { InjectionKey, ShallowRef } from '@vue/runtime-core';
+import { defineComponent, inject, provide, shallowRef } from 'vue';
+import type { InjectionKey, ShallowRef } from 'vue';
 import type { INavigationEmitter, IRoute, IAnyNavigatorHandle } from '../core';
 export type { IAnyNavigatorHandle };
 

@@ -5,7 +5,7 @@ const projectRoot = __dirname;
 const defaultConfig = getDefaultConfig(projectRoot);
 
 /**
- * @symbiote-native/* and @vue/runtime-core resolve as ordinary npm packages from this app's
+ * @symbiote-native/* and vue resolve as ordinary npm packages from this app's
  * own node_modules (examples/* is a standalone npm install, decoupled from the monorepo's
  * pnpm workspace — see pnpm-workspace.yaml). @react-native/babel-preset strips the types.
  *
@@ -19,6 +19,16 @@ const config = {
       require.resolve('@symbiote-native/vue/metro-vue-transformer'),
   },
   resolver: {
+    // Babel-generated helpers can resolve Vue through require conditions; share the app's ESM runtime.
+    resolveRequest(context, moduleName, platform) {
+      if (moduleName === 'vue') {
+        return {
+          type: 'sourceFile',
+          filePath: require.resolve('vue/dist/vue.runtime.esm-bundler.js'),
+        };
+      }
+      return context.resolveRequest(context, moduleName, platform);
+    },
     // xcodebuild leaves transient module-cache lock files in expo-modules-jsi's .DerivedData,
     // and the file watcher crashes on their readlink
     blockList: [/\/\.DerivedData\/.*/],

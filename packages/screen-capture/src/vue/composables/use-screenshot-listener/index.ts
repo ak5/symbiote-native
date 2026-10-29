@@ -1,7 +1,7 @@
 // Vue lifecycle wiring over the framework-agnostic core (core/screen-capture.ts): subscribes on
 // mount, unsubscribes on unmount, mirroring React's `useScreenshotListener` hook
 
-import { onMounted, onUnmounted } from '@vue/runtime-core';
+import { onMounted, onUnmounted } from 'vue';
 import { addScreenshotListener } from '../../../core';
 import type { EventSubscription } from '../../../core';
 

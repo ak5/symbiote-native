@@ -18,7 +18,7 @@
 
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 import ts from 'typescript';
-import type { Component } from '@vue/runtime-core';
+import type { Component } from 'vue';
 import {
   clearGlobalStyles,
   registerRules,

@@ -60,8 +60,7 @@ module.exports = {
   presets: ['module:@react-native/babel-preset'],
   // The Vue JSX pair is listed FIRST so it runs before the RN preset's React-JSX
   // transform: babel applies `plugins` before `presets`, so the Vue plugin rewrites every
-  // JSXElement into a @vue/runtime-core createVNode call, leaving no JSX for the React
-  // transform to touch (it no-ops). The helper imports it injects come `from 'vue'`, which
-  // metro.config.js aliases to @vue/runtime-core, the one Vue runtime the adapter renders on.
+  // JSXElement into a Vue createVNode call, leaving no JSX for the React transform.
+  // Generated helpers and the native adapter use the application's Vue peer runtime.
   plugins: [...symbioteVueJsx(), stripReactJsxDevAttrs, inlineDebugFlag],
 };

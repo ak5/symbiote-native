@@ -1,6 +1,6 @@
 // A Vue component over a package's native view controller: attrs in, handle exposed
 
-import { defineComponent, h, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type VNode } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { el } from '@symbiote-native/components';
 import type { ICreateNativeViewController } from '@symbiote-native/components';

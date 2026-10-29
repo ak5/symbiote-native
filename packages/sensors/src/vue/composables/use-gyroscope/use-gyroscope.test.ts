@@ -8,7 +8,7 @@
 // DeviceSensor's async API are N/A here — the composable never calls them; they're core-level
 // surface covered by gyroscope.test.ts.
 
-import { defineComponent, h, type Ref } from '@vue/runtime-core';
+import { defineComponent, h, type Ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

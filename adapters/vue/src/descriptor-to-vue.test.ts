@@ -1,4 +1,4 @@
-import { h } from '@vue/runtime-core';
+import { h } from 'vue';
 import { describe, expect, it } from 'vitest';
 import { el } from '@symbiote-native/components';
 import { descriptorToVue } from './descriptor-to-vue';

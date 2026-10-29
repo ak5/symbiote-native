@@ -35,7 +35,7 @@
 //
 // RUN ON `build-release` (`pnpm run bench:itest`).
 
-import { nextTick, shallowRef } from '@vue/runtime-core';
+import { nextTick, shallowRef } from 'vue';
 
 import {
   readSurfaceTelemetry,

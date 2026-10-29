@@ -3,7 +3,7 @@
 // onMounted), getLocales() is a synchronous native call, so the ref is computed once, directly at
 // setup — onMounted only wires the change listener, mirroring use-network-state's
 // onMounted/onUnmounted subscription shape otherwise.
-import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted, ref, type Ref } from 'vue';
 import {
   addLocaleListener,
   getLocales,

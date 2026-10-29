@@ -89,7 +89,8 @@
     "expo": "57.0.14",
     "react": "19.2.3",
     "react-native": "0.86.0",
-    "svelte": "^5.56.0"
+    "svelte": "^5.56.0",
+    "@react-native/virtualized-lists": "0.86.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -119,7 +120,8 @@
     "prettier-plugin-svelte": "^4.1.1",
     "svelte-check": "^4.0.0",
     "ts-jest": "^29.4.11",
-    "typescript": "~6.0.0"
+    "typescript": "~6.0.0",
+    "@react-native/metro-babel-transformer": "0.86.0"
   },
   "engines": {
     "node": ">= 22.11.0"

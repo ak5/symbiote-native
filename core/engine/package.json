@@ -1,7 +1,7 @@
 {
   "name": "@symbiote-native/engine",
   "version": "1.7.0",
-  "description": "SymbioteNative's retained shadow-tree engine \u2014 clone-on-write commit path + event normalization over React Native Fabric, shared by every framework adapter.",
+  "description": "SymbioteNative's retained shadow-tree engine — clone-on-write commit path + event normalization over React Native Fabric, shared by every framework adapter.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -81,7 +81,7 @@
     "invariant": "catalog:"
   },
   "peerDependencies": {
-    "react-native": ">=0.86"
+    "react-native": ">=0.85.3"
   },
   "peerDependenciesMeta": {},
   "devDependencies": {

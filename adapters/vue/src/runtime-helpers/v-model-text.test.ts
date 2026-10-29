@@ -15,7 +15,7 @@
 // before this shim existed the compiled import resolved to `undefined`, and Vue's `withDirectives`
 // skips a falsy directive rather than throwing. No error, no warning — and native echoes keystrokes
 // on its own, so the field looks alive while every value derived from it is frozen.
-import { defineComponent, h, ref, withDirectives } from '@vue/runtime-core';
+import { defineComponent, h, ref, withDirectives } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import {

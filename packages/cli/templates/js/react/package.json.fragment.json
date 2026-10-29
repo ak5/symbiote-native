@@ -13,10 +13,12 @@
     "@symbiote-native/engine": "latest",
     "@symbiote-native/react": "latest",
     "react": "19.2.3",
-    "react-native": "0.86.0"
+    "react-native": "0.86.0",
+    "@react-native/virtualized-lists": "0.86.0"
   },
   "devDependencies": {
     "@react-native/babel-preset": "0.86.0",
-    "@react-native/metro-config": "0.86.0"
+    "@react-native/metro-config": "0.86.0",
+    "@react-native/metro-babel-transformer": "0.86.0"
   }
 }

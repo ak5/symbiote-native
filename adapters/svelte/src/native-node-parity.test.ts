@@ -26,7 +26,7 @@ import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { h } from '@vue/runtime-core';
+import { h } from 'vue';
 import {
   createLiveTree,
   installRecordingFabric,

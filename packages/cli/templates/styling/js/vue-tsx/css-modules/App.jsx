@@ -1,4 +1,4 @@
-import { ref } from '@vue/runtime-core';
+import { ref } from 'vue';
 import styles from './App.module.css';
 
 export default {
@@ -24,14 +24,19 @@ export default {
           />
         </view>
         <text class={styles['title']}>Welcome to SymbioteNative!</text>
-        <text class={styles['subtitle']}>Framework-agnostic React Native, driven by Vue.</text>
+        <text class={styles['subtitle']}>
+          Framework-agnostic React Native, driven by Vue.
+        </text>
 
         <view class={styles['counter-card']}>
           <text class={styles['counter-label']}>TAPS</text>
           <text class={styles['counter-value']}>{count.value}</text>
         </view>
 
-        <pressable class={styles['button-primary']} onPress={() => count.value++}>
+        <pressable
+          class={styles['button-primary']}
+          onPress={() => count.value++}
+        >
           <text class={styles['button-primary-text']}>Tap me</text>
         </pressable>
       </safe-area-view>

@@ -1,4 +1,4 @@
-import { ref } from '@vue/runtime-core';
+import { ref } from 'vue';
 import { StyleSheet } from '@symbiote-native/vue';
 
 export default {
@@ -12,7 +12,11 @@ export default {
             resizeMode="contain"
             source={require('./assets/react-native-logo.png')}
           />
-          <image style={styles.plusIcon} resizeMode="contain" source={require('./assets/plus-icon.png')} />
+          <image
+            style={styles.plusIcon}
+            resizeMode="contain"
+            source={require('./assets/plus-icon.png')}
+          />
           <image
             style={[styles.brandLogo, styles.brandLogoVue]}
             resizeMode="contain"
@@ -20,7 +24,9 @@ export default {
           />
         </view>
         <text style={styles.title}>Welcome to SymbioteNative!</text>
-        <text style={styles.subtitle}>Framework-agnostic React Native, driven by Vue.</text>
+        <text style={styles.subtitle}>
+          Framework-agnostic React Native, driven by Vue.
+        </text>
 
         <view style={styles.counterCard}>
           <text style={styles.counterLabel}>TAPS</text>
@@ -50,7 +56,12 @@ const styles = StyleSheet.create({
   brandLogoReact: { width: 70 },
   brandLogoVue: { width: 74 },
   plusIcon: { width: 48, height: 48 },
-  title: { color: '#ffffff', fontSize: 22, fontWeight: 'bold', textAlign: 'center' },
+  title: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
   subtitle: { color: '#cbd5e1', fontSize: 14, textAlign: 'center' },
   counterCard: {
     alignItems: 'center',

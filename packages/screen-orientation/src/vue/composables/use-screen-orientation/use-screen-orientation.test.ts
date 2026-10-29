@@ -1,7 +1,7 @@
 // Co-located Vue-driven test (ADR 0025) for useScreenOrientation. See network's
 // use-network-state.test.ts for the shared rationale.
 
-import { defineComponent, h, type Ref } from '@vue/runtime-core';
+import { defineComponent, h, type Ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

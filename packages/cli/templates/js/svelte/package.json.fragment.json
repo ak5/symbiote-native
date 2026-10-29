@@ -14,13 +14,15 @@
     "@symbiote-native/engine": "latest",
     "react": "19.2.3",
     "react-native": "0.86.0",
-    "svelte": "^5.56.0"
+    "svelte": "^5.56.0",
+    "@react-native/virtualized-lists": "0.86.0"
   },
   "devDependencies": {
     "@react-native/babel-preset": "0.86.0",
     "@react-native/metro-config": "0.86.0",
     "eslint-plugin-svelte": "^3.23.0",
     "@typescript-eslint/parser": "^8.70.0",
-    "prettier-plugin-svelte": "^4.1.1"
+    "prettier-plugin-svelte": "^4.1.1",
+    "@react-native/metro-babel-transformer": "0.86.0"
   }
 }

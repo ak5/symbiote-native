@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted, ref, type Ref } from 'vue';
 import type { EventSubscription } from 'expo-modules-core';
 import { addVisibilityListener, getVisibilityAsync } from '../core';
 import type { INavigationBarVisibility } from '../core';

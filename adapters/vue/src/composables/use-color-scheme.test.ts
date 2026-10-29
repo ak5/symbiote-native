@@ -1,6 +1,6 @@
 // `useColorScheme` of Vue: the scheme read at setup, re-read on mount, replaced on every change
 
-import { defineComponent, h, type Ref, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type Ref, type VNode } from 'vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Appearance, type IColorSchemeName } from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/vue';

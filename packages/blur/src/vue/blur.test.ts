@@ -1,5 +1,5 @@
 // Vue `BlurView` и `BlurTargetView` через recording fabric с подставленным view config
-import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, ref, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getNativeTag } from '@symbiote-native/engine';
 import {

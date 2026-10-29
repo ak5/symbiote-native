@@ -1,6 +1,6 @@
 import { createLiveTree } from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/vue';
-import { h, nextTick } from '@vue/runtime-core';
+import { h, nextTick } from 'vue';
 import { afterEach, describe, expect, it } from 'vitest';
 import { installWrapperHost } from '../../test-support/wrapper-host';
 import { View } from './animated';

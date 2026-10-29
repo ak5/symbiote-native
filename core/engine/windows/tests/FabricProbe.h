@@ -44,11 +44,12 @@ struct FabricProbe final : facebook::react::TurboModule {
 
   jsi::Value create(jsi::Runtime &runtime, const jsi::PropNameID &name) override {
     const auto method = name.utf8(runtime);
-    if (method == "reportFailure") {
+    if (method == "reportFailure" || method == "reportResult") {
+      const std::string prefix = method == "reportFailure" ? "FAIL: " : "PASS: ";
       return jsi::Function::createFromHostFunction(
           runtime, name, 1,
-          [](jsi::Runtime &rt, const jsi::Value &, const jsi::Value *args, size_t count) {
-            report(count == 1 ? "FAIL: " + args[0].asString(rt).utf8(rt) : "FAIL: missing error");
+          [prefix](jsi::Runtime &rt, const jsi::Value &, const jsi::Value *args, size_t count) {
+            report(count == 1 ? prefix + args[0].asString(rt).utf8(rt) : "FAIL: missing message");
             return jsi::Value::undefined();
           });
     }

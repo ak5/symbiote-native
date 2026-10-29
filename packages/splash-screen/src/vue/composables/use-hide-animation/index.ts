@@ -9,7 +9,7 @@
 // it would only add an unnecessary reactive Proxy — same identity discipline as
 // `use-color-scheme.ts`'s subscription handle. It also carries the native constants, read once in
 // its constructor — so a missing RNBootSplash throws straight out of setup, on purpose.
-import { computed, watchEffect, type ComputedRef } from '@vue/runtime-core';
+import { computed, watchEffect, type ComputedRef } from 'vue';
 import {
   computeHideAnimationStyles,
   HideAnimationController,

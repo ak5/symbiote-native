@@ -1,5 +1,5 @@
 import { mount, unmount } from '@symbiote-native/vue';
-import { h, nextTick } from '@vue/runtime-core';
+import { h, nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { updateProps } from 'react-native-reanimated/src/updateProps';
 import { stubCancelAnimationFrame } from '../../test-support/cancel-animation-frame';

@@ -1,6 +1,6 @@
 // RN's `useAnimatedValue`, `useAnimatedValueXY` and `useAnimatedColor` as composables: `setup()`
 // runs once, so each call builds one instance for that component
-import { defineComponent, h, reactive, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, reactive, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   AnimatedColor,

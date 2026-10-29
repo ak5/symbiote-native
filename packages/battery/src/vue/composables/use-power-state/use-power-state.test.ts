@@ -1,7 +1,7 @@
 // Vue-driven test for `usePowerState`; the merge and seed logic is covered in
 // core/power-state.test.ts, this file proves only the composable's own lifecycle wiring
 
-import { defineComponent, h, type Ref } from '@vue/runtime-core';
+import { defineComponent, h, type Ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

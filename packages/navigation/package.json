@@ -193,7 +193,6 @@
     "@symbiote-native/solid": "workspace:^",
     "@symbiote-native/svelte": "workspace:^",
     "@symbiote-native/vue": "workspace:^",
-    "@vue/runtime-core": "^3.5.13",
     "react": ">=19.0.0",
     "react-native": ">=0.86",
     "solid-js": ">=1.9.0",
@@ -220,9 +219,6 @@
       "optional": true
     },
     "@symbiote-native/vue": {
-      "optional": true
-    },
-    "@vue/runtime-core": {
       "optional": true
     },
     "react": {
@@ -252,10 +248,10 @@
     "@symbiote-native/vue": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "@vue/runtime-core": "catalog:",
     "react": "catalog:",
     "solid-js": "catalog:",
     "svelte": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vue": "catalog:"
   }
 }

@@ -1,4 +1,4 @@
-import { defineComponent, watch } from '@vue/runtime-core';
+import { defineComponent, watch } from 'vue';
 import type { ReduceMotion } from 'react-native-reanimated/src/commonTypes';
 import { overrideReducedMotion } from '../core/reduced-motion';
 

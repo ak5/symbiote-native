@@ -14,20 +14,19 @@ Every file below would be identical (or safely near-identical) in any new Symbio
 Vue-SFC app, regardless of what screens the app author writes — that's the bar for "part of the
 scaffold seam" vs. "the example's own demo content."
 
-| File | Why it's part of the seam |
-|---|---|
-| `index.js` | The entry point: `createApp(App).mount(appName)` via `@symbiote-native/vue/bootstrap`. Only `App` and `appName` are app-specific, and both are already externalized as imports — the file itself doesn't change per app. |
-| `metro.config.js` | Wires the `.vue` SFC transformer (see the dedicated section below) and registers `vue`/`css`/`scss`/`sass`/`less`/`styl` as Metro source extensions. The one genuinely SFC-specific piece of tooling in this list. |
-| `babel.config.js` | `@react-native/babel-preset` + an `inline-debug-flag` plugin that bakes `process.env.DEBUG` into the bundle at build time (the project-wide `dlog`/`isDebug` gate). Framework-agnostic, identical across all three adapters' examples. |
-| `tsconfig.json` | Extends `@react-native/typescript-config`, registers the `@symbiote-native/css-parser/typescript-plugin` language-service plugin, and includes `**/*.vue` in the type-checked file set. |
-| `tsconfig.typecheck.json` | The `vue-tsc --noEmit` entry point used by the `typecheck` script — widens `types` back to `["node"]` (the app tsconfig strips it) and excludes `e2e/` (type-checked separately via `ts-jest`/jest globals). |
-| `app.json` | `{ name, displayName }` — RN's own app manifest. **Not parameterized in this pass** (see below). |
-| `css.d.ts` | Ambient `declare module '*.css'` / a generic `*.module.css` fallback type, for a `.module.css` import that has no generated per-file `.d.ts` yet (see `css-dts` below). Mirrors `examples/react/css.d.ts` and `examples/angular/css.d.ts` verbatim in spirit. |
-| `vue-runtime-core.d.ts` | Re-exports `'vue'` from `'@vue/runtime-core'` — the app's actual runtime dependency is `@vue/runtime-core` (lighter, no `runtime-dom`), but SFC `<script>` blocks idiomatically `import { ref } from 'vue'`; this ambient module bridges the two without a real `vue` runtime dependency. |
-| `.eslintrc.js` | `{ root: true, extends: '@react-native' }` — the stock RN lint config, no SFC/Vue-specific rule. |
-| `.prettierrc.js` | Formatting only (`arrowParens`, `singleQuote`, `trailingComma`) — project-wide convention, not app content. |
-| `.watchmanconfig` | Empty `{}` — Metro/Watchman boilerplate every RN app ships. |
-| `.gitignore` | Stock RN app gitignore (Xcode/Gradle build artifacts, `node_modules`, CocoaPods, Metro health-check files, etc.). |
+| File                      | Why it's part of the seam                                                                                                                                                                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `index.js`                | The entry point: `createApp(App).mount(appName)` via `@symbiote-native/vue/bootstrap`. Only `App` and `appName` are app-specific, and both are already externalized as imports — the file itself doesn't change per app.                                            |
+| `metro.config.js`         | Routes Vue imports to one app-owned ESM runtime, wires the `.vue` SFC transformer (see the dedicated section below) and registers `vue`/`css`/`scss`/`sass`/`less`/`styl` as Metro source extensions. The one genuinely SFC-specific piece of tooling in this list. |
+| `babel.config.js`         | `@react-native/babel-preset` + an `inline-debug-flag` plugin that bakes `process.env.DEBUG` into the bundle at build time (the project-wide `dlog`/`isDebug` gate). Framework-agnostic, identical across all three adapters' examples.                              |
+| `tsconfig.json`           | Extends `@react-native/typescript-config`, registers the `@symbiote-native/css-parser/typescript-plugin` language-service plugin, and includes `**/*.vue` in the type-checked file set.                                                                             |
+| `tsconfig.typecheck.json` | The `vue-tsc --noEmit` entry point used by the `typecheck` script — widens `types` back to `["node"]` (the app tsconfig strips it) and excludes `e2e/` (type-checked separately via `ts-jest`/jest globals).                                                        |
+| `app.json`                | `{ name, displayName }` — RN's own app manifest. **Not parameterized in this pass** (see below).                                                                                                                                                                    |
+| `css.d.ts`                | Ambient `declare module '*.css'` / a generic `*.module.css` fallback type, for a `.module.css` import that has no generated per-file `.d.ts` yet (see `css-dts` below). Mirrors `examples/react/css.d.ts` and `examples/angular/css.d.ts` verbatim in spirit.       |
+| `.eslintrc.js`            | `{ root: true, extends: '@react-native' }` — the stock RN lint config, no SFC/Vue-specific rule.                                                                                                                                                                    |
+| `.prettierrc.js`          | Formatting only (`arrowParens`, `singleQuote`, `trailingComma`) — project-wide convention, not app content.                                                                                                                                                         |
+| `.watchmanconfig`         | Empty `{}` — Metro/Watchman boilerplate every RN app ships.                                                                                                                                                                                                         |
+| `.gitignore`              | Stock RN app gitignore (Xcode/Gradle build artifacts, `node_modules`, CocoaPods, Metro health-check files, etc.).                                                                                                                                                   |
 
 ## The `.vue` Metro transformer — the one SFC-specific piece
 
@@ -73,7 +72,7 @@ statements in `metro.config.js` and the adapter's own `package.json`, not guesse
   in `templates/native/ios/` — a directory this pass was explicitly told not to touch.
   `templates/native/ios/` currently has no `Gemfile` either; that's a native-template gap outside
   this pass's scope, not something to route around by stashing it here.
-  <br>*(judgment call — the task listed this as one of the borderline files to decide.)*
+  <br>_(judgment call — the task listed this as one of the borderline files to decide.)_
 - **`detox.config.js`** — its `testRunner.args.config` points at `e2e/jest.config.js`, and
   `e2e/` is explicitly excluded app content, so copying it verbatim would ship a config that
   points at a folder that doesn't exist in the scaffold. It also hardcodes the demo app's Xcode
@@ -82,7 +81,7 @@ statements in `metro.config.js` and the adapter's own `package.json`, not guesse
   JSON field), so it can't be "left literal for now" the same low-risk way `app.json` can. Real
   e2e scaffolding for generated apps is follow-up work, once `e2e/`'s own template shape is
   decided.
-  <br>*(judgment call — the task listed this as one of the borderline files to decide.)*
+  <br>_(judgment call — the task listed this as one of the borderline files to decide.)_
 
 ## `package.json.fragment.json`
 
@@ -91,15 +90,14 @@ A dependency **fragment**, not a full `package.json` (this folder is not itself 
 implemented). Versions pulled verbatim from `examples/vue-sfc/package.json`, the real working
 app:
 
-- **`dependencies`**: `@symbiote-native/vue`, `@symbiote-native/engine`, `@vue/runtime-core`,
+- **`dependencies`**: `@symbiote-native/vue`, `@symbiote-native/engine`, `vue`,
   `react`, `react-native`. `@symbiote-native/engine` is included beyond the task's literal
   starter list because it's a real `peerDependency` of `@symbiote-native/vue`
   (`adapters/vue/package.json`) — omitting it would ship a scaffold with an unmet peer dep.
-  `@vue/runtime-core` and `react`/`react-native` are the runtime-singleton pins (same class as
+  `vue` and `react`/`react-native` are the runtime-singleton pins (same class as
   the root `CLAUDE.md`'s `react_native_is_an_explicit_top_level_peer` invariant — one copy,
   declared at the app root, Metro's version anchor).
-- **`devDependencies`**: `vue` (types/tooling only — `vue-tsc` and the `vue-runtime-core.d.ts`
-  bridge; the actual runtime import is `@vue/runtime-core`), `vue-tsc` (the `typecheck` script),
+- **`devDependencies`**: `vue-tsc` (the `typecheck` script),
   `@symbiote-native/css-parser` (the TS plugin + `css-dts`, see above).
 
 Deliberately **not** included, despite appearing in `examples/vue-sfc/package.json`:

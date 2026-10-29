@@ -1,12 +1,7 @@
 // Every `useReleasingSharedObject`-style composable (`useAudioPlayer`, `useImageManipulator`, ...)
 // binds this to its own `createXController()` instead of repeating the computed/watch wiring
 
-import {
-  computed,
-  onUnmounted,
-  watch,
-  type ComputedRef,
-} from '@vue/runtime-core';
+import { computed, onUnmounted, watch, type ComputedRef } from 'vue';
 
 export type IResourceHookController<TArgs extends unknown[], TResource> = {
   resolve: (...args: TArgs) => TResource;

@@ -12,15 +12,16 @@
     "@symbiote-native/android": "latest",
     "@symbiote-native/vue": "latest",
     "@symbiote-native/engine": "latest",
-    "@vue/runtime-core": "^3.5.13",
     "react": "19.2.3",
-    "react-native": "0.86.0"
+    "react-native": "0.86.0",
+    "@react-native/virtualized-lists": "0.86.0",
+    "vue": "^3.5.38"
   },
   "devDependencies": {
-    "vue": "^3.5.38",
     "eslint-plugin-vue": "^10.11.0",
     "@typescript-eslint/parser": "^8.70.0",
     "@react-native/babel-preset": "0.86.0",
-    "@react-native/metro-config": "0.86.0"
+    "@react-native/metro-config": "0.86.0",
+    "@react-native/metro-babel-transformer": "0.86.0"
   }
 }

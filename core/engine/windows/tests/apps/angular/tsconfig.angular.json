@@ -1,0 +1,5 @@
+{
+  "extends": "@symbiote-native/angular/tsconfig.angular.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "build" },
+  "files": ["src/App.ts"]
+}

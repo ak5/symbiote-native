@@ -15,7 +15,7 @@
 // runtime a string tag is an element on both Vue paths, so nothing about element-vs-component is
 // being dodged here (`intrinsic-tags.cjs` is what answers that at COMPILE time, and it derives the
 // answer from the same spec entry this tag now has).
-import { defineComponent, h, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,

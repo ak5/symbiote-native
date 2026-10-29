@@ -1,6 +1,6 @@
 // Vue twin of ../react/app-metrics-root.test.tsx (ADR 0025)
 
-import { defineComponent, h, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import {

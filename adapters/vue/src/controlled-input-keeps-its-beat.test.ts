@@ -17,7 +17,7 @@
 // node.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, ref, type VNode } from 'vue';
 import { registerTextInputBehavior } from '@symbiote-native/components';
 import {
   createLiveTree,

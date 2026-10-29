@@ -1,7 +1,7 @@
 // Vue lifecycle wiring over core/screen-capture.ts. The mount fetch has nobody to reject to,
 // so its failure lands in `error` instead of escaping as an unhandled rejection
 
-import { onMounted, ref, type Ref } from '@vue/runtime-core';
+import { onMounted, ref, type Ref } from 'vue';
 import { getPermissionsAsync, requestPermissionsAsync } from '../../../core';
 import type { PermissionResponse } from '../../../core';
 import { createPermissionsApi } from '../../../core/permissions-runtime';

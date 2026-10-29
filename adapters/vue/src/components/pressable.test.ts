@@ -5,7 +5,7 @@
 // It used to prove the wrapper's `onUnmounted(disposePressRuntime)`. The wrapper is gone —
 // `<pressable>` is a tag and the machine lives on the engine node — so the same assertion now
 // covers the engine's own behavior sweep, which is the layer that has to hold it for every adapter.
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 // A RECORDING host: the node is found over the AUTHORED nodes and the touch is aimed at the

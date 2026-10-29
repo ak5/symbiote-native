@@ -2,7 +2,7 @@
 // authored props: the fade is a setNativeProps clone on top of the render's own
 // commit, same as this adapter's vShow test precedent.
 
-import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, ref, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   mount,

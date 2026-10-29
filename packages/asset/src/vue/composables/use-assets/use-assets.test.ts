@@ -1,7 +1,7 @@
 // Co-located Vue-driven test (ADR 0025) for useAssets, the Vue twin of
 // react/hooks/use-assets. Mocks `core` wholesale — Asset.loadAsync's own logic is covered by
 // core/asset.test.ts; what's unique to THIS layer is Vue's onMounted lifecycle.
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

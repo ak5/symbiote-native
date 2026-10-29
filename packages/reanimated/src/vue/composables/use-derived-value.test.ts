@@ -1,5 +1,5 @@
 import { installRecordingFabric } from '@symbiote-native/test-utils';
-import { nextTick, reactive } from '@vue/runtime-core';
+import { nextTick, reactive } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startMapper } from 'react-native-reanimated/src/core';
 import { renderComposable } from '../../../test-support/render-composable';

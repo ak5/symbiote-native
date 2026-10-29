@@ -1,4 +1,4 @@
-import { computed, type ComputedRef, type ShallowRef } from '@vue/runtime-core';
+import { computed, type ComputedRef, type ShallowRef } from 'vue';
 import { createEventValueHook } from '@symbiote-native/vue';
 import { createIncomingShareHook } from '../core/incoming-share-hook';
 import type {

@@ -33,7 +33,7 @@ export interface IMetroTransformer {
   getCacheKey?: (...args: unknown[]) => string;
 }
 
-// @react-native/metro-babel-transformer is a real `dependency` of this package, so it resolves
+// @react-native/metro-babel-transformer is supplied by the app at its React Native version, so it resolves
 // via css-parser's own node_modules under pnpm — no hoisting/`paths` trick needed, unlike the
 // app-local workaround this replaces (formerly duplicated in every adapter's example
 // metro-css-transformer.js). Exported so a per-framework transformer that also needs the

@@ -1,9 +1,4 @@
-import {
-  defineComponent,
-  h,
-  onScopeDispose,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, h, onScopeDispose, type VNode } from 'vue';
 import {
   createCircularDoublesBuffer,
   DEFAULT_BUFFER_SIZE,

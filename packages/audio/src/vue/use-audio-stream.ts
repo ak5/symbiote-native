@@ -5,7 +5,7 @@ import {
   watchEffect,
   type ComputedRef,
   type MaybeRefOrGetter,
-} from '@vue/runtime-core';
+} from 'vue';
 import { createResourceHook, createEventValueHook } from '@symbiote-native/vue';
 import { createAudioStreamHooks } from '../core/audio-stream-hooks';
 import { toAudioStreamKey } from '../core/audio-stream-subscription';

@@ -77,7 +77,7 @@
   "peerDependencies": {
     "@symbiote-native/engine": "workspace:^",
     "react": ">=19.0.0",
-    "react-native": ">=0.86"
+    "react-native": ">=0.85.3"
   },
   "devDependencies": {
     "@symbiote-native/engine": "workspace:*",

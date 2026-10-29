@@ -1,6 +1,6 @@
 // The Vue Tab's untyped `attrs` and screen markers, narrowed at the one edge they enter
 
-import type { VNode } from '@vue/runtime-core';
+import type { VNode } from 'vue';
 import { isRecord } from '../../core';
 import type { ITabOptions } from '../../core';
 import { collectScreenRegistry } from '../collect-registry';

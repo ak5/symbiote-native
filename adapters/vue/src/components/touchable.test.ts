@@ -23,7 +23,7 @@
 // of "removed", and the real op stream deletes the key instead (see the mirror-elimination doc's
 // "RESOLVED: the onLayout === null decision").
 
-import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, ref, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import type { IMeasureOnSuccess } from '@symbiote-native/engine';

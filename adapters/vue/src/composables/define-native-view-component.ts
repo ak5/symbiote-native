@@ -1,4 +1,4 @@
-import { defineComponent, onUnmounted, type VNode } from '@vue/runtime-core';
+import { defineComponent, onUnmounted, type VNode } from 'vue';
 import { createHostNodeHolder } from '@symbiote-native/components';
 import type { ICreateNativeViewController } from '@symbiote-native/components';
 import { descriptorToVue } from '../descriptor-to-vue';

@@ -16,8 +16,8 @@
 // (children before parents), giving the same "already populated" guarantee React's layout-effect
 // ordering does.
 
-import { onMounted, onUnmounted } from '@vue/runtime-core';
-import type { Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted } from 'vue';
+import type { Ref } from 'vue';
 import { Linking, dlog } from '@symbiote-native/engine';
 import type { IEventSubscription, IUrlEvent } from '@symbiote-native/engine';
 import { resolveRouteFromUrl } from '../core';

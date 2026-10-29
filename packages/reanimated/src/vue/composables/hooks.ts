@@ -1,4 +1,4 @@
-import { onScopeDispose } from '@vue/runtime-core';
+import { onScopeDispose } from 'vue';
 import { createSetupOnceHooks } from '../../core/setup-once';
 import { followInScope } from '../track';
 

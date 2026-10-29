@@ -1,10 +1,6 @@
 // RN's `CellRendererComponent` replaces the view around each cell and gets its key, index, item,
 // style and the layout and focus handlers, with the item and its separator in its default slot
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
 import {

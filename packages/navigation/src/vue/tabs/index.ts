@@ -2,13 +2,7 @@
 // The router and the bar's descriptor live in core, shared with every other adapter
 // Slot vnodes are not reactive state, so only the render can see a screen appear or disappear
 
-import {
-  defineComponent,
-  nextTick,
-  onUnmounted,
-  shallowRef,
-  useId,
-} from '@vue/runtime-core';
+import { defineComponent, nextTick, onUnmounted, shallowRef, useId } from 'vue';
 import { normalizeVueAttrs } from '@symbiote-native/vue';
 import { dlog } from '@symbiote-native/engine';
 import {

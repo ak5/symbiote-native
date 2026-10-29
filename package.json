@@ -20,7 +20,7 @@
     "clean:build": "node scripts/clean-build-outputs.mjs",
     "clean:examples": "node scripts/clean-examples.mjs",
     "clean": "pnpm run clean:build && pnpm run clean:examples",
-    "prepublish-build": "pnpm run clean:build && pnpm run typecheck && pnpm run fix-esm-extensions && pnpm run copy-svelte-sources && pnpm run emit-svelte-declarations && pnpm --filter './{core,adapters,packages}/*' --if-present run ng:build && pnpm --filter './{core,adapters,packages}/*' --if-present run build",
+    "prepublish-build": "pnpm run clean:build && pnpm run typecheck && pnpm run fix-esm-extensions && pnpm run copy-svelte-sources && pnpm run emit-svelte-declarations && pnpm --workspace-concurrency=1 --filter './{core,adapters,packages}/*' --if-present run ng:build && pnpm --workspace-concurrency=1 --filter './{core,adapters,packages}/*' --if-present run build",
     "build": "pnpm run prepublish-build && pnpm run docs:build",
     "fix-esm-extensions": "node scripts/fix-esm-extensions.mjs",
     "copy-svelte-sources": "node scripts/copy-svelte-sources.mjs",
@@ -49,7 +49,8 @@
     "test:itest": "pnpm run test:cpp && node scripts/run-itests.mjs",
     "bench:itest": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build-release -DCMAKE_BUILD_TYPE=Release -DRN_ENABLE_DEBUG_STRING_CONVERTIBLE=ON -DSYMBIOTE_JS_ENGINE=hermes && cmake --build core/engine/cpp/tests/build-release -j 8 && SYMBIOTE_ITEST_BUILD=build-release node scripts/run-itests.mjs",
     "bench:itest:jsc": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build-release-jsc -DCMAKE_BUILD_TYPE=Release -DRN_ENABLE_DEBUG_STRING_CONVERTIBLE=ON -DSYMBIOTE_JS_ENGINE=jsc && cmake --build core/engine/cpp/tests/build-release-jsc -j 8 && SYMBIOTE_ITEST_BUILD=build-release-jsc node scripts/run-itests.mjs",
-    "test:android": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build-android -DSYMBIOTE_PLATFORM_ANDROID=ON -DSYMBIOTE_JS_ENGINE=hermes && cmake --build core/engine/cpp/tests/build-android -j 8 --target symbiote_tester && SYMBIOTE_ITEST_BUILD=build-android node scripts/run-itests.mjs"
+    "test:android": "cmake -S core/engine/cpp/tests -B core/engine/cpp/tests/build-android -DSYMBIOTE_PLATFORM_ANDROID=ON -DSYMBIOTE_JS_ENGINE=hermes && cmake --build core/engine/cpp/tests/build-android -j 8 --target symbiote_tester && SYMBIOTE_ITEST_BUILD=build-android node scripts/run-itests.mjs",
+    "check:windows-consumers": "pnpm run prepublish-build && node scripts/prepare-windows-consumers.mjs"
   },
   "devDependencies": {
     "@babel/core": "catalog:",

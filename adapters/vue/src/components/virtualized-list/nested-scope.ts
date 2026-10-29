@@ -1,7 +1,7 @@
 // The scope a list hands down to the lists nested in its cells, Vue's way to carry it
 // What it holds and how it behaves is `createListNesting` in the shared components package
 
-import { inject, provide, type InjectionKey } from '@vue/runtime-core';
+import { inject, provide, type InjectionKey } from 'vue';
 import type { IListScope } from '@symbiote-native/components';
 
 const SCOPE_KEY: InjectionKey<IListScope | null> = Symbol(

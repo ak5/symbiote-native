@@ -18,7 +18,7 @@
 // text reached the raw-text nodes" — both answerable off the CREATION log, residency-agnostic and
 // matching what the old mirror's `.find`/`.created` gave.
 
-import { defineComponent, h, type SetupContext } from '@vue/runtime-core';
+import { defineComponent, h, type SetupContext } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   AppRegistry,

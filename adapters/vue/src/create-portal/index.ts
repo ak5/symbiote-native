@@ -16,7 +16,7 @@
 // that owns them ever commits them. Content whose target lives in a second, independently
 // mount()ed surface needs createTunnel instead, which copies rather than moves.
 
-import { defineComponent, h, Teleport as VueTeleport } from '@vue/runtime-core';
+import { defineComponent, h, Teleport as VueTeleport } from 'vue';
 import {
   isSymbioteNode,
   SymbioteSurface,

@@ -1,6 +1,6 @@
 // `layout-conformance` as a tag: the committed payload carries `mode` and keeps the children,
 // `display: contents` is a C++ rule asserted in `layout-conformance-payload.itest.ts`
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,

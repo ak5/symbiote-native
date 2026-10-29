@@ -1,4 +1,4 @@
-import { ref } from '@vue/runtime-core';
+import { ref } from 'vue';
 import './App.css';
 
 export default {
@@ -24,7 +24,9 @@ export default {
           />
         </view>
         <text class="title">Welcome to SymbioteNative!</text>
-        <text class="subtitle">Framework-agnostic React Native, driven by Vue.</text>
+        <text class="subtitle">
+          Framework-agnostic React Native, driven by Vue.
+        </text>
 
         <view class="counter-card">
           <text class="counter-label">TAPS</text>

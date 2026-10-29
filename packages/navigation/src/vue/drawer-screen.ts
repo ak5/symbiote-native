@@ -6,8 +6,8 @@
 // CLAUDE.md <third_party_rn_packages_are_react_only> - this and Drawer import nothing from
 // react-native.
 
-import { defineComponent } from '@vue/runtime-core';
-import type { Component } from '@vue/runtime-core';
+import { defineComponent } from 'vue';
+import type { Component } from 'vue';
 import type {
   IDrawerScreenOptions,
   IRoute,

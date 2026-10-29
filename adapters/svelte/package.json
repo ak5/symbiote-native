@@ -129,15 +129,15 @@
   "peerDependencies": {
     "@symbiote-native/engine": "workspace:^",
     "svelte": ">=5.56.0",
-    "react-native": ">=0.86"
+    "react-native": ">=0.85.3"
   },
   "devDependencies": {
     "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/react": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*",
     "@symbiote-native/vue": "workspace:*",
-    "@vue/runtime-core": "catalog:",
     "react": "catalog:",
-    "svelte": "catalog:"
+    "svelte": "catalog:",
+    "vue": "catalog:"
   }
 }

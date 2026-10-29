@@ -1,5 +1,5 @@
 // Vue `GlassView` и `GlassContainer` через recording fabric с подставленным view config
-import { h, type VNode } from '@vue/runtime-core';
+import { h, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DynamicColorIOS, PlatformColor } from '@symbiote-native/engine';
 import {

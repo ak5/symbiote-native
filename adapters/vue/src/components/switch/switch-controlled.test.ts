@@ -1,5 +1,5 @@
 // Vue пишет состояние на микротаске, а откат `Switch` читает ноду на следующей
-import { defineComponent, h, nextTick, ref } from '@vue/runtime-core';
+import { defineComponent, h, nextTick, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { listenerFor } from '@symbiote-native/engine';
 import type { ISymbioteEvent } from '@symbiote-native/engine';

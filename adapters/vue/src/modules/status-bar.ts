@@ -6,7 +6,7 @@ import {
   onUnmounted,
   watchEffect,
   type SetupContext,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   createStatusBarEntry,
   statusBarImperative,

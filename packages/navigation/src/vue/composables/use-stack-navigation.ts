@@ -3,8 +3,8 @@
 // Stack, this composable narrows that union ONCE, here, so call sites never write their own
 // 'push' in navigation check. Vue twin of react/hooks/use-stack-navigation.ts.
 
-import { computed } from '@vue/runtime-core';
-import type { ComputedRef } from '@vue/runtime-core';
+import { computed } from 'vue';
+import type { ComputedRef } from 'vue';
 import type { INavigatorHandle } from '../../core';
 import { isStackNavigatorHandle } from '../../core';
 import { useNavigation } from './use-navigation';

@@ -5,7 +5,7 @@ import {
 } from '../core/calendar';
 import type { PermissionResponse } from 'expo-modules-core';
 import type { IPermissionHookBehavior } from '@symbiote-native/engine';
-import type { Ref } from '@vue/runtime-core';
+import type { Ref } from 'vue';
 
 export type IUseRemindersPermissionsResult = [
   Ref<PermissionResponse | null>,

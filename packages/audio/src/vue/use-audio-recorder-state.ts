@@ -1,4 +1,4 @@
-import { onUnmounted, shallowRef, type ShallowRef } from '@vue/runtime-core';
+import { onUnmounted, shallowRef, type ShallowRef } from 'vue';
 import { pollRecorderState } from '../core/audio-recorder-polling';
 import type { AudioRecorder } from '../core';
 import type { IRecorderState } from '../core';

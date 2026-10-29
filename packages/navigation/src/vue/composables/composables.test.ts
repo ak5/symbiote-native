@@ -9,7 +9,7 @@
 // (onMounted/onUnmounted subscribe/unsubscribe timing, what value it surfaces) against a real
 // mounted Stack.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   mount,

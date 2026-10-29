@@ -8,7 +8,7 @@
 // event, and clean up onUnmounted. No Negative group — the composable has no guard clause of
 // its own to reject on.
 
-import { defineComponent, h, type Ref } from '@vue/runtime-core';
+import { defineComponent, h, type Ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

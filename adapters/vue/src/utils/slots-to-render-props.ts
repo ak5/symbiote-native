@@ -6,7 +6,7 @@
 // own body reads a single source (its slots), never a renderItem prop. This is Vue-only lifecycle
 // glue, so it belongs in the adapter, not the shared layer: the windowing math itself is untouched.
 
-import { type Component, type VNode } from '@vue/runtime-core';
+import { type Component, type VNode } from 'vue';
 
 // A scoped slot may return one root or many (the natural Vue idiom: `#item` can be a single
 // element or a fragment). The list cell renderer accepts the same union, and Vue flattens a

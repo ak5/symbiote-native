@@ -1,7 +1,7 @@
 // Vue wiring of the focus/blur events: watchers feed the focused route key to the shared tracker
 
-import { onMounted, onUnmounted, watch } from '@vue/runtime-core';
-import type { ShallowRef } from '@vue/runtime-core';
+import { onMounted, onUnmounted, watch } from 'vue';
+import type { ShallowRef } from 'vue';
 import { createFocusTracker } from '../core';
 import type { INavigationEmitter } from '../core';
 

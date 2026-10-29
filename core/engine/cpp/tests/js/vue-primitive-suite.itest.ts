@@ -2,7 +2,7 @@
 //
 // RUN ON `build-release` with `SYMBIOTE_ITEST_BYTECODE=1`, one arm per process.
 
-import { nextTick, shallowRef } from '@vue/runtime-core';
+import { nextTick, shallowRef } from 'vue';
 import { h, mount } from '@symbiote-native/vue';
 
 import {

@@ -6,7 +6,7 @@ import {
   type IMediaLibraryPermissionMethodOptions,
 } from '../core/media-library-permission-api';
 import type { IPermissionHookOptions } from '@symbiote-native/engine';
-import type { Ref } from '@vue/runtime-core';
+import type { Ref } from 'vue';
 
 export type IUseMediaLibraryPermissionsOptions =
   IMediaLibraryPermissionMethodOptions;

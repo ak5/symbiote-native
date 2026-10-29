@@ -11,7 +11,7 @@ import {
   withDirectives,
   type ObjectDirective,
   type VNode,
-} from '@vue/runtime-core';
+} from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, setAppConfigurator, unmount } from '@symbiote-native/vue';
 import {

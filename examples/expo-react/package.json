@@ -92,7 +92,8 @@
     "react": "19.2.3",
     "react-native": "0.86.0",
     "react-native-safe-area-context": "^5.5.2",
-    "react-reconciler": "^0.33.0"
+    "react-reconciler": "^0.33.0",
+    "@react-native/virtualized-lists": "0.86.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -119,7 +120,8 @@
     "prettier": "^3.9.1",
     "ts-jest": "^29.4.11",
     "typescript": "~6.0.0",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "@react-native/metro-babel-transformer": "0.86.0"
   },
   "engines": {
     "node": ">= 22.11.0"

@@ -56,6 +56,7 @@ describe('applySplashScreenAppHide', () => {
     applySplashScreenAppHide(root, { framework: 'vue' });
     const source = fs.readFileSync(appPath, 'utf8');
     expect(source).toContain('onMounted(() => hide())');
+    expect(source).toContain("import { onMounted } from 'vue'");
   });
 
   // why: Svelte's own App.svelte hides with a bare top-level `hide()` (no lifecycle wrapper) —

@@ -19,7 +19,7 @@ import {
   watch,
   watchEffect,
   type Ref,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   createInitialModalState,
   isModalVisible,

@@ -1,10 +1,5 @@
 // RN `extraData`: a cell that reads state outside the props shows the new value after it changes
-import {
-  defineComponent,
-  h,
-  ref,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, ref, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
 import {

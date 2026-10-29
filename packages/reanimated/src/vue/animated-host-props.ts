@@ -1,4 +1,4 @@
-import type { DefineComponent, Ref } from '@vue/runtime-core';
+import type { DefineComponent, Ref } from 'vue';
 import type {
   IHostInstance,
   IImageProps,

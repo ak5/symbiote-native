@@ -19,7 +19,7 @@ import {
   shallowRef,
   type FunctionalComponent,
   type VNode,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   cellGapsFor,
   createSeparatorBoard,

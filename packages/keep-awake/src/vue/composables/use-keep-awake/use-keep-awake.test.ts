@@ -7,7 +7,7 @@
 // and is exhaustively covered by core/keep-awake.test.ts; re-asserting it here would just
 // duplicate that coverage under a different mount path.
 
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

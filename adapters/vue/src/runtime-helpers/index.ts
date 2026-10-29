@@ -9,7 +9,166 @@
 // Scope: Vue's own template directives (v-show, Teleport) and `v-model` on an ELEMENT — see
 // vModelText below for why that is in scope.
 
-export * from '@vue/runtime-core';
+// Re-export the renderer-agnostic API from the app's peer, sharing its component/ref ownership.
+export type * from 'vue';
+export {
+  BaseTransition,
+  BaseTransitionPropsValidators,
+  Comment,
+  DeprecationTypes,
+  EffectScope,
+  ErrorCodes,
+  Fragment,
+  KeepAlive,
+  ReactiveEffect,
+  Static,
+  Suspense,
+  Teleport,
+  Text,
+  TrackOpTypes,
+  TriggerOpTypes,
+  callWithAsyncErrorHandling,
+  callWithErrorHandling,
+  camelize,
+  capitalize,
+  cloneVNode,
+  computed,
+  createBlock,
+  createCommentVNode,
+  createElementBlock,
+  createElementVNode,
+  createHydrationRenderer,
+  createRenderer,
+  createSlots,
+  createStaticVNode,
+  createTextVNode,
+  createVNode,
+  customRef,
+  defineAsyncComponent,
+  defineComponent,
+  defineEmits,
+  defineExpose,
+  defineModel,
+  defineOptions,
+  defineProps,
+  defineSlots,
+  devtools,
+  effect,
+  effectScope,
+  getCurrentInstance,
+  getCurrentScope,
+  getCurrentWatcher,
+  getTransitionRawChildren,
+  guardReactiveProps,
+  h,
+  handleError,
+  hasInjectionContext,
+  hydrateOnIdle,
+  hydrateOnInteraction,
+  hydrateOnMediaQuery,
+  hydrateOnVisible,
+  initCustomFormatter,
+  inject,
+  isMemoSame,
+  isProxy,
+  isReactive,
+  isReadonly,
+  isRef,
+  isRuntimeOnly,
+  isShallow,
+  isVNode,
+  markRaw,
+  nextTick,
+  normalizeClass,
+  onActivated,
+  onBeforeMount,
+  onBeforeUnmount,
+  onBeforeUpdate,
+  onDeactivated,
+  onErrorCaptured,
+  onMounted,
+  onRenderTracked,
+  onRenderTriggered,
+  onScopeDispose,
+  onServerPrefetch,
+  onUnmounted,
+  onUpdated,
+  onWatcherCleanup,
+  openBlock,
+  popScopeId,
+  provide,
+  proxyRefs,
+  pushScopeId,
+  queuePostFlushCb,
+  reactive,
+  readonly,
+  ref,
+  registerRuntimeCompiler,
+  renderList,
+  renderSlot,
+  resolveComponent,
+  resolveDirective,
+  resolveDynamicComponent,
+  resolveTransitionHooks,
+  setBlockTracking,
+  setDevtoolsHook,
+  setTransitionHooks,
+  shallowReactive,
+  shallowReadonly,
+  shallowRef,
+  ssrContextKey,
+  stop,
+  toDisplayString,
+  toHandlerKey,
+  toHandlers,
+  toRaw,
+  toRef,
+  toRefs,
+  toValue,
+  transformVNodeArgs,
+  triggerRef,
+  unref,
+  useAttrs,
+  useId,
+  useModel,
+  useSSRContext,
+  useSlots,
+  useTemplateRef,
+  useTransitionState,
+  version,
+  warn,
+  watch,
+  watchEffect,
+  watchPostEffect,
+  watchSyncEffect,
+  withCtx,
+  withDefaults,
+  withDirectives,
+  withMemo,
+  withScopeId,
+} from 'vue';
+import * as VuePeer from 'vue';
+
+// Vue exposes these compiler helpers at runtime but omits them from its public declarations.
+export const ErrorTypeStrings: unknown = Reflect.get(
+  VuePeer,
+  'ErrorTypeStrings',
+);
+export const assertNumber: unknown = Reflect.get(VuePeer, 'assertNumber');
+export const compatUtils: unknown = Reflect.get(VuePeer, 'compatUtils');
+export const createPropsRestProxy: unknown = Reflect.get(
+  VuePeer,
+  'createPropsRestProxy',
+);
+export const mergeDefaults: unknown = Reflect.get(VuePeer, 'mergeDefaults');
+export const mergeModels: unknown = Reflect.get(VuePeer, 'mergeModels');
+export const resolveFilter: unknown = Reflect.get(VuePeer, 'resolveFilter');
+export const ssrUtils: unknown = Reflect.get(VuePeer, 'ssrUtils');
+export const withAsyncContext: unknown = Reflect.get(
+  VuePeer,
+  'withAsyncContext',
+);
+
 export { Transition, TransitionGroup } from '../create-transition';
 
 import {
@@ -19,7 +178,7 @@ import {
   normalizeStyle as baseNormalizeStyle,
   warn,
   type ObjectDirective,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   componentOf,
   propOf,
@@ -43,8 +202,8 @@ import { descriptorFor, SWITCH_TAG } from '@symbiote-native/components';
 // `dynamicProps` and never re-renders on a children/slot change at all. Confirmed by reproducing
 // through the real compiler (compileSfc) + a live mount: the wrapper's render() fires once at
 // mount and never again, so a Teleport whose content is gated by v-if (the ordinary "toast"/
-// "modal" shape) silently stops updating the moment `to` itself stays the same. `export *` above
-// already re-exports the real, unwrapped Teleport for this path — leave it there. The guarded
+// "modal" shape) silently stops updating the moment `to` itself stays the same. The peer exports above
+// already include the real, unwrapped Teleport for this path — leave it there. The guarded
 // wrapper (../create-portal) is still exported from the adapter's main barrel for anyone who
 // constructs the vnode by hand (`h(Teleport, ...)`, e.g. in TSX), where no such codegen applies.
 

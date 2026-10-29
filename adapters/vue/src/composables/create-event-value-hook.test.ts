@@ -1,7 +1,7 @@
 // Every `useXStatus`-style composable (`useAudioPlayerStatus`, `useAudioPlaylistStatus`, ...)
 // binds this to its own event name + initial-value getter instead of repeating the watch wiring
 
-import { defineComponent, h, shallowRef, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, shallowRef, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

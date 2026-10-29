@@ -1,4 +1,4 @@
-import { defineComponent, type VNode } from '@vue/runtime-core';
+import { defineComponent, type VNode } from 'vue';
 import { descriptorToVue, normalizeVueAttrs } from '@symbiote-native/vue';
 import { renderImageBackground } from '../core';
 

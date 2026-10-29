@@ -1,5 +1,5 @@
 // Vue lifecycle wiring over the framework-agnostic core — mirrors use-locales' shape exactly.
-import { onMounted, onUnmounted, ref, type Ref } from '@vue/runtime-core';
+import { onMounted, onUnmounted, ref, type Ref } from 'vue';
 import {
   addCalendarListener,
   getCalendars,

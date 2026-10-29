@@ -10,7 +10,7 @@
 // node in the commit mirror); this only unwraps the Vue-shaped inputs (a Ref or a bare node)
 // onto it. An uncommitted or unknown input has no tag yet and surfaces as null.
 
-import { isRef, toRaw } from '@vue/runtime-core';
+import { isRef, toRaw } from 'vue';
 import {
   componentOf,
   getNativeTag,

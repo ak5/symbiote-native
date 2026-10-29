@@ -7,7 +7,7 @@
 // createText to an anchor (skipped at commit) or the mount throws
 //   Text string "" must be rendered inside a <Text>
 
-import { defineComponent, Fragment, h, ref } from '@vue/runtime-core';
+import { defineComponent, Fragment, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

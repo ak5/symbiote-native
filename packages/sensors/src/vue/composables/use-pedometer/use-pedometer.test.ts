@@ -10,7 +10,7 @@
 // package, Pedometer has no `setUpdateInterval` (core/pedometer.ts's own header comment: it
 // isn't a DeviceSensor subclass), so there is no interval-boundary group to cover here.
 
-import { defineComponent, h, type Ref } from '@vue/runtime-core';
+import { defineComponent, h, type Ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

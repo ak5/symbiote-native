@@ -14,8 +14,8 @@
 // `runtime-test`/`runtime-dom` packages) drives the exact same setup/watch/onUnmounted/provide
 // lifecycle with no native dependency at all.
 
-import { createRenderer, defineComponent, h } from '@vue/runtime-core';
-import type { App, Component, RendererOptions } from '@vue/runtime-core';
+import { createRenderer, defineComponent, h } from 'vue';
+import type { App, Component, RendererOptions } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SQLiteProvider, useSQLiteContext } from './sqlite-context';
 

@@ -18,7 +18,7 @@ import {
   type Component,
   type FunctionalComponent,
   type VNode,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   SINGLE_COLUMN,
   arrayLikeLength,

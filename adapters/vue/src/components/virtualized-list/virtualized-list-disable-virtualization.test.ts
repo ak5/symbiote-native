@@ -1,10 +1,6 @@
 // `disableVirtualization` mounts every cell from the top down to the end of the window, with no
 // spacer standing in for the rows left out
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
 import {

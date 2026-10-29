@@ -1,5 +1,5 @@
 import { installRecordingFabric } from '@symbiote-native/test-utils';
-import { nextTick, reactive } from '@vue/runtime-core';
+import { nextTick, reactive } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderComposable } from '../../../test-support/render-composable';
 import { settle, workletOf } from '../../../test-support/worklet';

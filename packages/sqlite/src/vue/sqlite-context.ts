@@ -15,8 +15,8 @@ import {
   provide,
   shallowRef,
   watch,
-} from '@vue/runtime-core';
-import type { InjectionKey, ShallowRef } from '@vue/runtime-core';
+} from 'vue';
+import type { InjectionKey, ShallowRef } from 'vue';
 import { openDatabaseAsync } from '../core';
 import type { ISQLiteOpenOptions, SQLiteDatabase } from '../core';
 

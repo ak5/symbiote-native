@@ -13,7 +13,7 @@
 // other adapter, so nothing repo-wide can check them. This asserts the PAYLOAD instead.
 
 import { describe, expect, it } from 'vitest';
-import { defineComponent, h, type VNodeProps } from '@vue/runtime-core';
+import { defineComponent, h, type VNodeProps } from 'vue';
 import { mount, unmount } from '@symbiote-native/vue';
 import {
   createLiveTree,

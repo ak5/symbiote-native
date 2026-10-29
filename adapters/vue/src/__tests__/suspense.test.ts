@@ -1,7 +1,7 @@
 // Ground-truth check: Vue's docs claim Suspense needs no host-config hooks, works over
 // ordinary node ops. Verify against this engine's nodeOps rather than trust it unread.
 
-import { defineComponent, h, Suspense, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, Suspense, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import {

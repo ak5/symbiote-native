@@ -1,4 +1,4 @@
-import { reactive } from '@vue/runtime-core';
+import { reactive } from 'vue';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { createSerializable } from 'react-native-worklets/src/memory/serializable.native';
 import { workletOf } from '../../test-support/worklet';

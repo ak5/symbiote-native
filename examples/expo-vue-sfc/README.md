@@ -16,16 +16,16 @@ same components, only the template-vs-JSX authoring differs.
 index.js                  registers a RUNNABLE with RN's AppRegistry → mounts the Vue app via @symbiote-native/vue
 App.vue                    the native stack navigator over the Menu + 22 wrapper-package demo screens
 screens/                   MenuScreen plus one <Name>Screen.vue per wrapper package
-metro-vue-transformer.js   compiles .vue on the way into the bundle (parse → compileScript → 'vue'→runtime-core)
-metro.config.js            sourceExts += 'vue', babelTransformerPath → the SFC transformer; pins one react + one runtime-core
+metro-vue-transformer.js   compiles .vue on the way into the bundle (parse → compileScript → 'vue'→native runtime helpers)
+metro.config.js            sourceExts += 'vue', babelTransformerPath → the SFC transformer; pins one React + one Vue runtime
 ```
 
 Every screen is an ordinary Vue SFC. Metro has no Vue plugin (unplugin-vue ships
 vite/webpack/esbuild/rollup adapters, not Metro), so `metro-vue-transformer.js` does the
 single-pass compile itself with `@vue/compiler-sfc` — `parse` → `compileScript` with
 `inlineTemplate`, then rewrites every `from 'vue'` to `@symbiote-native/vue/runtime-helpers` (the
-custom, non-DOM renderer needs the compiler helpers from `@vue/runtime-core`, not
-`vue/runtime-dom`; the shim also supplies `vShow`, since `v-show`
+custom, non-DOM renderer needs renderer-agnostic helpers from the application Vue peer;
+the shim also supplies native `vShow`, since `v-show`
 compiles to an import runtime-core alone doesn't export). The compiled module is handed to `@react-native/babel-preset` as `.tsx`
 so it strips the `lang="ts"` types.
 
