@@ -107,19 +107,7 @@ for (const framework of ['react', 'svelte']) {
   if (framework === 'react') {
     run(
       join(app, 'node_modules/.bin/tsc'),
-      [
-        '--allowJs',
-        '--checkJs',
-        '--noEmit',
-        '--moduleResolution',
-        'Bundler',
-        '--module',
-        'ESNext',
-        '--target',
-        'ES2022',
-        '--skipLibCheck',
-        'index.js',
-      ],
+      ['--project', 'tsconfig.json'],
       app,
     );
   }
