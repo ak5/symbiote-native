@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { verifyLinuxPersistence } from './lib/linux-persistence-probe.mjs';
 
@@ -38,9 +39,8 @@ mkdirSync(join(host, 'build/e2e'), { recursive: true });
 mkdirSync(artifacts); // Refuse to overwrite an earlier verification.
 const failures = [];
 for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
-  const runtimeDirectory = mkdtempSync(
-    join(artifacts, `${framework}-runtime-`),
-  );
+  // Wayland socket paths must fit sockaddr_un; workspace paths can exceed its limit.
+  const runtimeDirectory = mkdtempSync(join(tmpdir(), 'rnl-persist-'));
   try {
     for (const phase of ['write', 'read']) {
       const name = `${framework}-${phase}`;
@@ -86,6 +86,9 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
           `${name} did not render a native window`,
         );
         console.log(`PASS ${name}: native application persistence`);
+      } catch (error) {
+        process.stderr.write(trace.text);
+        throw error;
       } finally {
         if (!trace.isClosed) await stopCompositor(compositor);
         writeFileSync(join(artifacts, `${name}.log`), trace.text);
