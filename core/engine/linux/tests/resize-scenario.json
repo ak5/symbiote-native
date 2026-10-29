@@ -1,11 +1,11 @@
 {
-  "frames": 600,
+  "frames": 900,
   "windowFlags": [
     "--no-decorations",
     "--inject-window-sequence",
-    "{800x600}{Drag:800x600:1000x600:10}"
+    "{Drag:800x600:800x600:50}{Drag:800x600:1000x600:10}"
   ],
-  "steps": ["sleep 4000"],
+  "steps": ["sleep 7000"],
   "expect": [
     "Symbiote Linux window: 800x600",
     "Symbiote Linux window: 1000x600"

@@ -22,6 +22,7 @@ mkdirSync(directory); // Refuse to replace a host package.
 mkdirSync(join(directory, 'e2e'));
 mkdirSync(join(directory, 'test-bundles'));
 
+const failures = [];
 for (const framework of ['react', 'svelte']) {
   const bundle = `${framework}.js`;
   copyFileSync(
@@ -56,11 +57,16 @@ for (const framework of ['react', 'svelte']) {
     } catch (error) {
       const trace = join(host, 'build/e2e', name, 'trace.log');
       if (existsSync(trace)) process.stderr.write(readFileSync(trace, 'utf8'));
-      throw error;
+      failures.push(error);
+      continue;
     }
     assert(
       readFileSync(join(host, 'build/e2e', name, 'screenshot.png')).length > 0,
       `${framework} ${journey} window must produce a screenshot`,
     );
   }
+}
+
+if (failures.length > 0) {
+  throw new AggregateError(failures, 'Native window scenarios failed');
 }

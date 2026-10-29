@@ -60,6 +60,14 @@ therefore tabs through the heading to the field and requires both focus markers.
 confirmed this in the native screenshot: one Tab left the focus ring on the heading while key events
 arrived normally. Keep the heading accessible; do not remove accessibility to make the test pass.
 
+Run `40934052197` passed the React native input journey (heading/input focus and `HiHi`). Its
+resize trace showed the full injected drag finishing before the Metro app mounted. The scenario
+now holds 800x600 for five seconds using the host's 100ms configure intervals before dragging;
+both hook-reported sizes remain required. This is a bounded startup allowance: a slower app still
+fails instead of silently passing a resize it never observed. These are host-injected native
+configure events under Cage, which cannot resize its kiosk window, not a compositor-driven drag.
+The runner collects failures and attempts all framework journeys before failing the gate.
+
 The host's input driver requires global C++20, supplied by its normal CMake preset. Our custom
 build directory must set `CMAKE_CXX_STANDARD=20` too; target-specific engine settings do not reach
 the standalone input driver. Compiler cache is saved after the window build to retain those objects.
