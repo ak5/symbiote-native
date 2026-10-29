@@ -14,6 +14,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <PreprocessorDefinitions>SYMBIOTE_PUBLIC_FABRIC=1;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SymbioteEngineCppDirectory);$(MSBuildThisFileDirectory);$(IntDir)SymbioteEngineIncludes;$(SymbioteReactNativeDirectory)ReactCommon</AdditionalIncludeDirectories>
