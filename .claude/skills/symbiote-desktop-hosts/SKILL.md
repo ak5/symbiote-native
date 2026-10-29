@@ -50,9 +50,14 @@ host checkout's tsconfig and fail with TS5112 on TypeScript 6.
 The window gate builds the same host with Skia/Wayland and runs both packed Metro apps through
 the host's existing `scripts/e2e.ts` harness. `scripts/run-linux-window-consumers.mjs` installs
 disposable scenarios, types into the adapter's controlled text input and copies/pastes through
-the OS clipboard. Each app must report `HiHi` and produce a window screenshot. This gate is still
-being brought up; do not claim a pass until its CI result is verified. Other adapters, persistence,
-scrolling, resize and accessibility journeys remain to be verified.
+the OS clipboard. Each app must report `HiHi` and produce a window screenshot. A separate resize
+scenario drives the native window from 800x600 to 1000x600; each framework's `useWindowDimensions`
+must receive both sizes. This gate is still being brought up; do not claim a pass until its CI result
+is verified. Other adapters, persistence, scrolling and accessibility journeys remain to be verified.
+
+The host's input driver requires global C++20, supplied by its normal CMake preset. Our custom
+build directory must set `CMAKE_CXX_STANDARD=20` too; target-specific engine settings do not reach
+the standalone input driver. Compiler cache is saved after the window build to retain those objects.
 
 The Svelte consumer composes the existing example's Metro settings with the Linux host resolver.
 The shared CSS transformer resolves Babel through the app's React Native Metro config to keep parser

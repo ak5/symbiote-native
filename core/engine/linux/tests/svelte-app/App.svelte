@@ -1,6 +1,8 @@
 <script>
   import { dlog } from '@symbiote-native/engine';
+  import { useWindowDimensions } from '@symbiote-native/svelte';
 
+  const metrics = useWindowDimensions();
   let width = $state(120);
   let value = $state('');
   $effect(() => {
@@ -9,6 +11,11 @@
     }
     if (width === 120) width = 240;
     else dlog('Symbiote Linux Svelte app updated');
+  });
+  $effect(() => {
+    dlog(
+      `Symbiote Linux window: ${metrics.current.width}x${metrics.current.height}`,
+    );
   });
 </script>
 
@@ -23,4 +30,5 @@
       dlog(`Symbiote Linux input: ${event.text}`);
     }}
   />
+  <text>{metrics.current.width}x{metrics.current.height}</text>
 </view>

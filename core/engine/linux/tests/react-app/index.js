@@ -1,6 +1,6 @@
 import { createElement, useEffect, useState } from 'react';
 import { AppRegistry as NativeAppRegistry } from 'react-native';
-import { Platform } from '@symbiote-native/react';
+import { Platform, useWindowDimensions } from '@symbiote-native/react';
 import { registerApp } from '@symbiote-native/react/bootstrap';
 import { dlog } from '@symbiote-native/engine';
 
@@ -15,6 +15,7 @@ if (Platform.select({ linux: 'linux', native: 'native' }) !== 'linux') {
 }
 
 function App() {
+  const metrics = useWindowDimensions();
   const [width, setWidth] = useState(120);
   const [value, setValue] = useState('');
   /** @type {import('@symbiote-native/react').ITextInputProps} */
@@ -34,11 +35,15 @@ function App() {
     if (width === 120) setWidth(240);
     else dlog('Symbiote Linux React app updated');
   }, [width]);
+  useEffect(() => {
+    dlog(`Symbiote Linux window: ${metrics.width}x${metrics.height}`);
+  }, [metrics.width, metrics.height]);
   return createElement(
     'view',
     { style: { width, height: 80, backgroundColor: '#234567' } },
     createElement('text', null, 'Symbiote Linux'),
     createElement('text-input', inputProps),
+    createElement('text', null, `${metrics.width}x${metrics.height}`),
   );
 }
 

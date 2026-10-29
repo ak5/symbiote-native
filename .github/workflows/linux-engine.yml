@@ -100,7 +100,7 @@ jobs:
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_window rnl_inject --parallel 2
           # The host's existing e2e harness locates its executables under build/dev.
           ln -s symbiote .linux-host/build/dev
-      - name: Exercise native keyboard and clipboard in each application
+      - name: Exercise native keyboard, clipboard and resize in each application
         run: nice -n 10 node scripts/run-linux-window-consumers.mjs .linux-host .linux-host/symbiote-app
       - uses: actions/cache/save@v4
         if: always() && steps.native-build.outcome == 'success'
