@@ -1,10 +1,11 @@
 import { createElement, useMemo, useState } from 'react';
 import { TurboModuleRegistry } from 'react-native';
-import { Platform } from '@symbiote-native/react';
+import { Platform, useWindowDimensions } from '@symbiote-native/react';
 import { registerApp } from '@symbiote-native/react/bootstrap';
-import { createLayoutProbe } from './common';
+import { createLayoutProbe, viewportLabel } from './common';
 const probe = TurboModuleRegistry.getEnforcing('SymbioteFabricProbe');
 function App() {
+  const metrics = useWindowDimensions();
   const [width, setWidth] = useState(120);
   const [value, setValue] = useState('seed');
   const onLayout = useMemo(
@@ -25,6 +26,15 @@ function App() {
       onChange: event => setValue(event.nativeEvent.text.toUpperCase()),
       style: { width: 240, height: 40 },
     }),
+    createElement(
+      'text',
+      {
+        testID: 'windows-metrics',
+        accessibilityLabel: viewportLabel(metrics),
+        style: { color: '#111111', backgroundColor: '#ffffff' },
+      },
+      viewportLabel(metrics),
+    ),
   );
 }
 registerApp(App, { appName: 'SymbioteFabricProbe', debug: true });

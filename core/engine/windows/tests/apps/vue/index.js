@@ -1,11 +1,12 @@
 import { h, ref } from 'vue';
 import { TurboModuleRegistry } from 'react-native';
-import { Platform } from '@symbiote-native/vue';
+import { Platform, useWindowDimensions } from '@symbiote-native/vue';
 import { createApp } from '@symbiote-native/vue/bootstrap';
-import { createLayoutProbe } from './common';
+import { createLayoutProbe, viewportLabel } from './common';
 const probe = TurboModuleRegistry.getEnforcing('SymbioteFabricProbe');
 const App = {
   setup() {
+    const metrics = useWindowDimensions();
     const width = ref(120);
     const value = ref('seed');
     const onLayout = createLayoutProbe(
@@ -38,6 +39,15 @@ const App = {
           },
           style: { width: 240, height: 40 },
         }),
+        h(
+          'text',
+          {
+            testID: 'windows-metrics',
+            accessibilityLabel: viewportLabel(metrics.value),
+            style: { color: '#111111', backgroundColor: '#ffffff' },
+          },
+          viewportLabel(metrics.value),
+        ),
       ]);
   },
 };

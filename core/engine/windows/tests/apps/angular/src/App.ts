@@ -1,8 +1,12 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import type { ISymbioteEvent } from '@symbiote-native/engine';
 import { TurboModuleRegistry } from 'react-native';
-import { Platform, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
-import { createLayoutProbe, type IProbe } from '../common';
+import {
+  Platform,
+  SYMBIOTE_ELEMENTS,
+  WindowDimensionsService,
+} from '@symbiote-native/angular';
+import { createLayoutProbe, viewportLabel, type IProbe } from '../common';
 @Component({
   selector: 'symbiote-windows-app',
   standalone: true,
@@ -17,9 +21,17 @@ import { createLayoutProbe, type IProbe } from '../common';
       [value]="value()"
       [onChangeText]="onChange"
       [style]="{ width: 240, height: 40 }"
-  /></safe-area-view>`,
+    /><text
+      testID="windows-metrics"
+      [accessibilityLabel]="viewportLabel(metrics())"
+      [style]="{ color: '#111111', backgroundColor: '#ffffff' }"
+      >{{ viewportLabel(metrics()) }}</text
+    ></safe-area-view
+  >`,
 })
 export class App {
+  readonly metrics = inject(WindowDimensionsService).dimensions;
+  readonly viewportLabel = viewportLabel;
   readonly width = signal(120);
   readonly value = signal('seed');
   readonly onChange = (event: ISymbioteEvent) => {

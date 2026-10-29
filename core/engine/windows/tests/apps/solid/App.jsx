@@ -1,8 +1,9 @@
 import { createSignal } from 'solid-js';
 import { TurboModuleRegistry } from 'react-native';
-import { Platform } from '@symbiote-native/solid';
-import { createLayoutProbe } from './common';
+import { Platform, createWindowDimensions } from '@symbiote-native/solid';
+import { createLayoutProbe, viewportLabel } from './common';
 export default function App() {
+  const metrics = createWindowDimensions();
   const [width, setWidth] = createSignal(120);
   const [value, setValue] = createSignal('seed');
   const probe = TurboModuleRegistry.getEnforcing('SymbioteFabricProbe');
@@ -26,6 +27,13 @@ export default function App() {
         onChange={event => setValue(event.nativeEvent.text.toUpperCase())}
         style={{ width: 240, height: 40 }}
       />
+      <text
+        testID="windows-metrics"
+        accessibilityLabel={viewportLabel(metrics())}
+        style={{ color: '#111111', backgroundColor: '#ffffff' }}
+      >
+        {viewportLabel(metrics())}
+      </text>
     </safe-area-view>
   );
 }

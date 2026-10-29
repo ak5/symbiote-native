@@ -6,6 +6,11 @@ export interface IProbe extends TurboModule {
   reportFailure(message: string): void;
 }
 
+export function viewportLabel(metrics: {
+  width: number;
+  height: number;
+}): string;
+
 export function createLayoutProbe(
   framework: string,
   platform: {

@@ -1,6 +1,22 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createLayoutProbe } from '../core/engine/windows/tests/apps/common.js';
+import {
+  createLayoutProbe,
+  viewportLabel,
+} from '../core/engine/windows/tests/apps/common.js';
+
+test('viewport labels retain fractional metrics and allow initialization before layout', () => {
+  assert.equal(
+    viewportLabel({ width: 640.5, height: 480.25 }),
+    'Viewport: 640.50x480.25',
+  );
+  assert.equal(viewportLabel({ width: 0, height: 0 }), 'Viewport: 0.00x0.00');
+  for (const width of [NaN, Infinity, -1, undefined])
+    assert.throws(
+      () => viewportLabel({ width, height: 480 }),
+      /Invalid native window dimensions/,
+    );
+});
 
 const platform = {
   OS: 'windows',

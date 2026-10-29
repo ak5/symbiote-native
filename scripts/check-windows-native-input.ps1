@@ -10,6 +10,8 @@ using System;
 using System.Runtime.InteropServices;
 public static class InputWindow {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
+  [DllImport("user32.dll", SetLastError=true)] public static extern bool SetWindowPos(
+    IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
 }
 '@
 
@@ -58,3 +60,45 @@ $externalText = 'from outside ' + [char]0x96EA
 [System.Windows.Forms.SendKeys]::SendWait('^a^v')
 Wait-InputValue ($externalText.ToUpperInvariant())
 Write-Host 'PASS: system clipboard native copy and external Unicode paste'
+
+$metricsCondition = [System.Windows.Automation.PropertyCondition]::new(
+  [System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'windows-metrics')
+$deadline = (Get-Date).AddSeconds(30)
+do {
+  $metricsElement = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $metricsCondition)
+  if ($null -ne $metricsElement) { break }
+  Start-Sleep -Milliseconds 100
+} while ((Get-Date) -lt $deadline)
+if ($null -eq $metricsElement) { throw 'The native viewport label is missing' }
+
+function Read-ViewportWidth {
+  if ($metricsElement.Current.Name -cmatch '^Viewport: ([0-9]+\.[0-9]{2})x([0-9]+\.[0-9]{2})$') {
+    $width = [double]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture)
+    $height = [double]::Parse($Matches[2], [Globalization.CultureInfo]::InvariantCulture)
+    if ($width -gt 0 -and $height -gt 0) { return $width }
+  }
+  return $null
+}
+$deadline = (Get-Date).AddSeconds(15)
+do {
+  $initialWidth = Read-ViewportWidth
+  if ($null -ne $initialWidth) { break }
+  Start-Sleep -Milliseconds 100
+} while ((Get-Date) -lt $deadline)
+if ($null -eq $initialWidth) { throw "Invalid initial viewport: $($metricsElement.Current.Name)" }
+$bounds = $root.Current.BoundingRectangle
+# Keep position, z-order and activation unchanged while changing the real OS window size.
+if (-not [InputWindow]::SetWindowPos($app.MainWindowHandle, [IntPtr]::Zero, 0, 0,
+    ([int][Math]::Ceiling($bounds.Width) + 160), [int][Math]::Ceiling($bounds.Height), 0x16)) {
+  throw 'The native window could not be resized'
+}
+$deadline = (Get-Date).AddSeconds(15)
+do {
+  $resizedWidth = Read-ViewportWidth
+  if ($null -ne $resizedWidth -and $resizedWidth -gt $initialWidth + 1) { break }
+  Start-Sleep -Milliseconds 100
+} while ((Get-Date) -lt $deadline)
+if ($null -eq $resizedWidth -or $resizedWidth -le $initialWidth + 1) {
+  throw "The framework window-dimensions hook did not react to OS resizing: $initialWidth -> $resizedWidth"
+}
+Write-Host "PASS: native OS resize updated framework viewport $initialWidth -> $resizedWidth"

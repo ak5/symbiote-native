@@ -1,7 +1,8 @@
 <script>
   import { TurboModuleRegistry } from 'react-native';
-  import { Platform } from '@symbiote-native/svelte';
-  import { createLayoutProbe } from './common';
+  import { Platform, useWindowDimensions } from '@symbiote-native/svelte';
+  import { createLayoutProbe, viewportLabel } from './common';
+  const metrics = useWindowDimensions();
   let width = $state(120);
   let value = $state('seed');
   const probe = TurboModuleRegistry.getEnforcing('SymbioteFabricProbe');
@@ -27,4 +28,11 @@
     }}
     style={{ width: 240, height: 40 }}
   />
+  <text
+    testID="windows-metrics"
+    accessibilityLabel={viewportLabel(metrics.current)}
+    style={{ color: '#111111', backgroundColor: '#ffffff' }}
+  >
+    {viewportLabel(metrics.current)}
+  </text>
 </safe-area-view>

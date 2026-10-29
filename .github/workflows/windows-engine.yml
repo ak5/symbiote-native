@@ -223,7 +223,7 @@ jobs:
           } finally {
             if (-not $app.HasExited) { Stop-Process -Id $app.Id }
           }
-      - name: Run each framework through native Windows layout and typing
+      - name: Run each framework through native Windows layout, typing, clipboard and resize
         shell: pwsh
         run: |
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
