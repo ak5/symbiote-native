@@ -1,0 +1,108 @@
+name: Windows engine compatibility
+
+on:
+  push:
+    branches: [feat/windows]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-engine-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    if: github.repository == 'ak5/symbiote-native'
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: microsoft/setup-msbuild@v2
+      - name: Create an isolated SDK compatibility fixture
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory .windows-engine-probe | Out-Null
+          @{
+            name = 'symbiote-engine-probe'
+            version = '0.0.0'
+            private = $true
+            dependencies = @{
+              react = '19.2.3'
+              'react-native' = '0.85.3'
+              'react-native-windows' = '0.85.0'
+            }
+            devDependencies = @{
+              '@react-native-community/cli' = '20.1.0'
+              '@react-native/jest-preset' = '0.85.3'
+              '@types/react' = '19.2.0'
+            }
+          } | ConvertTo-Json -Depth 5 | Set-Content .windows-engine-probe/package.json
+      - name: Install the Windows SDK and create its standard native library
+        working-directory: .windows-engine-probe
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          npm install --ignore-scripts --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install react-native init-windows --template cpp-lib --name SymbioteEngineProbe --namespace SymbioteEngineProbe --overwrite
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Add the actual engine sources to the fixture
+        shell: pwsh
+        run: |
+          $projectDir = Join-Path $PWD '.windows-engine-probe/windows/SymbioteEngineProbe'
+          $projectPath = Join-Path $projectDir 'SymbioteEngineProbe.vcxproj'
+          $engineDir = (Resolve-Path core/engine/cpp).Path
+          $rnDir = (Resolve-Path .windows-engine-probe/node_modules/react-native).Path
+          [xml]$project = Get-Content $projectPath
+          $ns = $project.DocumentElement.NamespaceURI
+          $group = $project.CreateElement('ItemGroup', $ns)
+          # Exporting this function forces the linker to retain the engine and resolve its Fabric calls.
+          @'
+          #include "SymbioteEngineBindings.h"
+          extern "C" __declspec(dllexport) void InstallSymbioteEngine(facebook::jsi::Runtime &runtime) {
+            symbiote::installBindings(runtime);
+          }
+          '@ | Set-Content (Join-Path $projectDir 'EngineLinkProbe.cpp')
+          $sources = @(Get-ChildItem $engineDir -Filter '*.cpp')
+          if ($sources.Count -eq 0) { throw 'No engine sources found' }
+          $paths = @($sources | ForEach-Object FullName) + @((Join-Path $projectDir 'EngineLinkProbe.cpp'))
+          foreach ($source in $paths) {
+            $item = $project.CreateElement('ClCompile', $ns)
+            $item.SetAttribute('Include', $source)
+            $pch = $project.CreateElement('PrecompiledHeader', $ns)
+            $pch.InnerText = 'NotUsing'
+            [void]$item.AppendChild($pch)
+            [void]$group.AppendChild($item)
+          }
+          [void]$project.DocumentElement.AppendChild($group)
+          $definitions = $project.CreateElement('ItemDefinitionGroup', $ns)
+          $compile = $project.CreateElement('ClCompile', $ns)
+          $includes = $project.CreateElement('AdditionalIncludeDirectories', $ns)
+          $includes.InnerText = "$engineDir;$rnDir\ReactCommon;$rnDir\ReactCommon\jsi;%(AdditionalIncludeDirectories)"
+          [void]$compile.AppendChild($includes)
+          $standard = $project.CreateElement('LanguageStandard', $ns)
+          $standard.InnerText = 'stdcpp20'
+          [void]$compile.AppendChild($standard)
+          $parallel = $project.CreateElement('MultiProcessorCompilation', $ns)
+          $parallel.InnerText = 'false'
+          [void]$compile.AppendChild($parallel)
+          [void]$definitions.AppendChild($compile)
+          [void]$project.DocumentElement.AppendChild($definitions)
+          $project.Save($projectPath)
+      - name: Compile and link against the released Windows SDK
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          msbuild .windows-engine-probe/windows/SymbioteEngineProbe.sln /restore /m:1 /p:Configuration=Debug /p:Platform=x64 /bl:windows-engine.binlog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-engine-build-log
+          path: windows-engine.binlog
+          if-no-files-found: ignore
