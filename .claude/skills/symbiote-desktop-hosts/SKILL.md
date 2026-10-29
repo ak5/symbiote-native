@@ -117,3 +117,8 @@ Hermes with real Fabric. Actual Windows execution remains pending.
 both consume identical engine sources, dependencies and SDK-owned JSI headers. Run40937466948
 stopped before compilation because the vcpkg binary-cache setting used `files;path` instead of
 `files,path`; the corrected configuration still needs its Windows build result.
+
+The standalone SDK-only job is folded into the production-engine app gate: the same C++ boundary
+assertions still run after the real engine smoke passes, using the same installed dependencies.
+There is one sequential Windows job, avoiding duplicate SDK installations and a superseded probe
+holding the workflow concurrency slot after a failed production build.
