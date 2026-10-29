@@ -57,13 +57,42 @@ const template = JSON.parse(
 const reactExample = JSON.parse(
   readFileSync(join(repository, 'examples/react/package.json'), 'utf8'),
 );
-for (const framework of ['react', 'svelte', 'vue', 'solid']) {
+for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
   const app = join(matrix, framework);
   mkdirSync(app);
   const appDependencies = {
     ...dependencies,
     ...pack(join(repository, 'adapters', framework)),
   };
+  if (framework === 'angular') {
+    const angularVersion = JSON.parse(
+      readFileSync(
+        join(
+          repository,
+          'adapters/angular/node_modules/@angular/core/package.json',
+        ),
+        'utf8',
+      ),
+    ).version;
+    for (const name of [
+      'core',
+      'common',
+      'forms',
+      'compiler',
+      'compiler-cli',
+    ]) {
+      appDependencies[`@angular/${name}`] = angularVersion;
+    }
+    const example = JSON.parse(
+      readFileSync(join(repository, 'examples/angular/package.json'), 'utf8'),
+    );
+    appDependencies.rxjs = example.dependencies.rxjs;
+    appDependencies['@babel/plugin-transform-class-static-block'] =
+      example.devDependencies['@babel/plugin-transform-class-static-block'];
+    appDependencies['@types/node'] = example.devDependencies['@types/node'];
+    appDependencies['@react-native/typescript-config'] =
+      template.dependencies['react-native'];
+  }
   if (framework === 'solid') {
     appDependencies['solid-js'] = JSON.parse(
       readFileSync(
@@ -120,6 +149,13 @@ for (const framework of ['react', 'svelte', 'vue', 'solid']) {
   });
   run('npm', ['install', '--no-audit', '--no-fund'], app);
 
+  if (framework === 'angular') {
+    run(
+      join(app, 'node_modules/.bin/ngc'),
+      ['-p', 'tsconfig.angular.json'],
+      app,
+    );
+  }
   if (framework === 'react') {
     run(
       join(app, 'node_modules/.bin/tsc'),

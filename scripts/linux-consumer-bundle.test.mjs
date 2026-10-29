@@ -46,3 +46,24 @@ test('rejects source aliases even when the packed entry is also present', () => 
     /workspace source/,
   );
 });
+
+test('requires Angular native AOT renderer output', () => {
+  const angular = [
+    sources[0],
+    '/app/node_modules/@symbiote-native/angular/build/angular/render/index.js',
+  ];
+  verifyLinuxConsumerBundle({ sources: angular }, 'angular');
+  assert.throws(
+    () =>
+      verifyLinuxConsumerBundle(
+        {
+          sources: [
+            sources[0],
+            '/app/node_modules/@symbiote-native/angular/build/render.js',
+          ],
+        },
+        'angular',
+      ),
+    /angular\/render\/index/,
+  );
+});

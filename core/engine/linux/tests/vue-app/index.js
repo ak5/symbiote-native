@@ -13,6 +13,7 @@ if (
 }
 const App = {
   setup() {
+    let view;
     const width = ref(120);
     const value = ref('');
     const metrics = useWindowDimensions();
@@ -26,12 +27,20 @@ const App = {
         throw new Error('The packaged app did not initialize the C++ engine');
       width.value = 240;
       await nextTick();
-      dlog('Symbiote Linux Vue app updated');
+      if (!view) throw new Error('The native view ref was not attached');
+      view.measure((_x, _y, measuredWidth, height) => {
+        if (measuredWidth !== 240 || height !== 80)
+          throw new Error('Vue update did not reach native layout');
+        dlog('Symbiote Linux Vue app updated');
+      });
     });
     return () =>
       h(
         'view',
         {
+          ref: instance => {
+            view = instance;
+          },
           style: { width: width.value, height: 80, backgroundColor: '#234567' },
         },
         [

@@ -19,7 +19,10 @@ import type {
   ISwitchProps,
   ITextInputProps,
 } from '@symbiote-native/components';
-import type { IStickyHeaderElementProps } from './element-props';
+import type {
+  IStickyHeaderElementProps,
+  ITextElementProps,
+} from './element-props';
 import type { IAngularRefreshControlProps } from './components/refresh-control-props';
 import { TextInputNativeInputs } from './element-text-input-native';
 import {
@@ -30,6 +33,8 @@ import {
 
 @Directive({ selector: 'text-input', standalone: true })
 export class TextInputElement extends TextInputNativeInputs {
+  @Input() override style?: ITextElementProps['style'] = undefined;
+  @Input() override styleProp?: ITextElementProps['styleProp'] = undefined;
   @Input() value?: ITextInputProps['value'];
   @Input() defaultValue?: ITextInputProps['defaultValue'];
   @Input() placeholder?: ITextInputProps['placeholder'];

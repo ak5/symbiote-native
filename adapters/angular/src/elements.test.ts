@@ -73,6 +73,20 @@ type ICase = {
 };
 
 const CASES: Record<string, ICase> = {
+  TextInput_text_styles: {
+    source: fixture(
+      'TextInputStyles',
+      `<text-input [style]="{color: '#fff', fontSize: 18}" [styleProp]="[{fontWeight: 'bold'}]"></text-input>`,
+    ),
+    expect: undefined,
+  },
+  TextInput_invalid_text_style: {
+    source: fixture(
+      'InvalidTextInputStyle',
+      `<text-input [style]="{fontSize: false}"></text-input>`,
+    ),
+    expect: 'not assignable',
+  },
   // The whole point of the route, in one template: no schema anywhere, props bound by name.
   P_no_schema_bound_props: {
     source: fixture(

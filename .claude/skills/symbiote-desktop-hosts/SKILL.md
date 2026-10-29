@@ -116,3 +116,18 @@ Solid is prepared in the same Linux consumer/window matrix. Its fixture uses the
 packed production Metro build and Linux/adapter source-map contract pass locally. The runner test
 checks all eight framework journeys are attempted after a failure. Solid's actual Linux runtime
 checks remain pending; do not replace the existing Vue run merely to add this fixture.
+
+Angular completes the prepared five-adapter Linux matrix. The standalone app uses the adapter's
+partial-AOT config, `ngc`, shipped Babel registration/linker plugins and normal intrinsic templates.
+Its isolated packed AOT+production Metro build passed; the sourcemap must include the native AOT
+renderer at `build/angular/render/index.js`. The runner regression covers all ten journeys.
+
+That build exposed a real Angular intrinsic typing gap: `TextInputElement` inherited View-only
+style inputs. It now narrows `style` and `styleProp` to the same text styles as `TextElement`.
+All72 element tests pass, including strict-AOT acceptance of text colors/fonts and rejection of
+invalid font-size types. The native fixture keeps its text color; it does not cast around the type.
+
+Vue run40941029337 mounted the real app but failed its width-update assertion: the headless tree
+still held120 while the app logged updated. Its marker now follows a public native-view measurement
+requiring240x80 after Vue's nextTick. The original headless240 assertion remains. This strengthened
+fixture bundles successfully; actual native verification is pending the next run.
