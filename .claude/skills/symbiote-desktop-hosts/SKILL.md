@@ -29,6 +29,17 @@ Verified source constraints on 2026-10-30:
   but must not be exposed as working on Windows without a safe implementation and a runtime test.
 - Symbiote calls `UIManagerBinding::getBinding` and Fabric C++ methods directly. Native module registration
   alone does not prove that these symbols link or that host objects survive the Windows ABI boundary.
+- The SDK probe reached the engine compiler in fork run `40917284480`; it stopped on private Fabric/Folly
+  headers. Adding include directories alone cannot establish runtime compatibility.
+- At the pinned RNW revision, `Microsoft.ReactNative.Cxx/JSI/JsiApiContext.cpp` constructs a per-DLL
+  `JsiAbiRuntime`, including the runtime supplied through C++ TurboModule CallInvokers. It is not the raw
+  Hermes runtime. `Microsoft.ReactNative/JsiApi.cpp`'s `GetHostObject` assumes its own ABI wrapper, while
+  the engine retrieves Fabric's C++ `UIManagerBinding` host object. This boundary needs a real native
+  probe before any shared-tree refactor; do not bypass it with private property-bag pointer casts.
+
+`core/engine/src/platform/index.windows.ts` follows RNW's Platform API: numeric Windows API contract
+version, separate RN/RNW version metadata, dev-gated testing and Windows/native/default selection.
+Its unit tests establish that JS contract only, not a functioning Windows engine or application.
 
 Next gates: resolve compiler/linker failures without modifying RN core; prove the runtime boundary in a real
 Windows host; establish a tested React Native version contract; then add Metro application targets and test
