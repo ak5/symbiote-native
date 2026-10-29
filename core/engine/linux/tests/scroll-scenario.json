@@ -1,0 +1,11 @@
+{
+  "frames": 900,
+  "steps": [
+    "sleep 500",
+    "move 100 150",
+    "sleep 100",
+    "wheel down 20",
+    "sleep 500"
+  ],
+  "expect": ["Symbiote Linux scroll: passed 200"]
+}

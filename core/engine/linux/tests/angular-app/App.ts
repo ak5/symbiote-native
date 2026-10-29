@@ -10,26 +10,42 @@ import {
   WindowDimensionsService,
 } from '@symbiote-native/angular';
 import { dlog } from '@symbiote-native/engine';
+import { reportScroll } from './scroll-probe';
 
 @Component({
   selector: 'symbiote-linux-app',
   standalone: true,
   imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <view [style]="{ width: width(), height: 80, backgroundColor: '#234567' }">
-      <text [onFocus]="headingFocus">Symbiote Linux</text>
-      <text-input
-        [value]="value()"
-        accessibilityLabel="Desktop input"
-        [style]="{ width: 220, height: 40, color: '#ffffff' }"
-        [onFocus]="inputFocus"
-        [onValueChange]="inputChange"
-      />
-      <text>{{ dimensions().width }}x{{ dimensions().height }}</text>
+    <view [style]="{ width: 240 }">
+      <view
+        [style]="{ width: width(), height: 80, backgroundColor: '#234567' }"
+      >
+        <text [onFocus]="headingFocus">Symbiote Linux</text>
+        <text-input
+          [value]="value()"
+          accessibilityLabel="Desktop input"
+          [style]="{ width: 220, height: 40, color: '#ffffff' }"
+          [onFocus]="inputFocus"
+          [onValueChange]="inputChange"
+        />
+        <text>{{ dimensions().width }}x{{ dimensions().height }}</text>
+      </view>
+      <scroll-view
+        [onScroll]="onScroll"
+        [scrollEventThrottle]="16"
+        [style]="{ width: 240, height: 200 }"
+      >
+        @for (row of rows; track row) {
+          <text [style]="{ height: 30 }">Scroll row {{ row }}</text>
+        }
+      </scroll-view>
     </view>
   `,
 })
 export class App implements AfterViewInit {
+  readonly rows = Array.from({ length: 40 }, (_, row) => row);
+  readonly onScroll = reportScroll;
   readonly width = signal(120);
   readonly value = signal('');
   readonly dimensions = inject(WindowDimensionsService).dimensions;

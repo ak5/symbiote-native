@@ -147,6 +147,11 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
   cpSync(join(repository, `core/engine/linux/tests/${framework}-app`), app, {
     recursive: true,
   });
+  for (const file of ['scroll-probe.js', 'scroll-probe.d.ts'])
+    copyFileSync(
+      join(repository, 'core/engine/linux/tests', file),
+      join(app, file),
+    );
   run('npm', ['install', '--no-audit', '--no-fund'], app);
 
   if (framework === 'angular') {
@@ -154,6 +159,10 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
       join(app, 'node_modules/.bin/ngc'),
       ['-p', 'tsconfig.angular.json'],
       app,
+    );
+    copyFileSync(
+      join(app, 'scroll-probe.js'),
+      join(app, 'build/scroll-probe.js'),
     );
   }
   if (framework === 'react') {

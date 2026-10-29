@@ -3,6 +3,7 @@ import { AppRegistry as NativeAppRegistry } from 'react-native';
 import { Platform, useWindowDimensions } from '@symbiote-native/react';
 import { registerApp } from '@symbiote-native/react/bootstrap';
 import { dlog } from '@symbiote-native/engine';
+import { reportScroll } from './scroll-probe';
 
 if (
   Platform.OS !== 'linux' ||
@@ -41,14 +42,33 @@ function App() {
   }, [metrics.width, metrics.height]);
   return createElement(
     'view',
-    { style: { width, height: 80, backgroundColor: '#234567' } },
+    { style: { width: 240 } },
     createElement(
-      'text',
-      { onFocus: () => dlog('Symbiote Linux focus: heading') },
-      'Symbiote Linux',
+      'view',
+      { style: { width, height: 80, backgroundColor: '#234567' } },
+      createElement(
+        'text',
+        { onFocus: () => dlog('Symbiote Linux focus: heading') },
+        'Symbiote Linux',
+      ),
+      createElement('text-input', inputProps),
+      createElement('text', null, `${metrics.width}x${metrics.height}`),
     ),
-    createElement('text-input', inputProps),
-    createElement('text', null, `${metrics.width}x${metrics.height}`),
+    createElement(
+      'scroll-view',
+      {
+        onScroll: reportScroll,
+        scrollEventThrottle: 16,
+        style: { width: 240, height: 200 },
+      },
+      Array.from({ length: 40 }, (_, row) =>
+        createElement(
+          'text',
+          { key: row, style: { height: 30 } },
+          `Scroll row ${row}`,
+        ),
+      ),
+    ),
   );
 }
 

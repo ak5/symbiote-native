@@ -3,6 +3,7 @@ import { AppRegistry } from 'react-native';
 import { Platform, useWindowDimensions } from '@symbiote-native/vue';
 import { createApp } from '@symbiote-native/vue/bootstrap';
 import { dlog } from '@symbiote-native/engine';
+import { reportScroll } from './scroll-probe';
 
 if (
   Platform.OS !== 'linux' ||
@@ -35,33 +36,50 @@ const App = {
       });
     });
     return () =>
-      h(
-        'view',
-        {
-          ref: instance => {
-            view = instance;
-          },
-          style: { width: width.value, height: 80, backgroundColor: '#234567' },
-        },
-        [
-          h(
-            'text',
-            { onFocus: () => dlog('Symbiote Linux focus: heading') },
-            'Symbiote Linux',
-          ),
-          h('text-input', {
-            value: value.value,
-            accessibilityLabel: 'Desktop input',
-            style: { width: 220, height: 40, color: '#ffffff' },
-            onFocus: () => dlog('Symbiote Linux focus: input'),
-            onValueChange: event => {
-              value.value = event.text;
-              dlog(`Symbiote Linux input: ${event.text}`);
+      h('view', { style: { width: 240 } }, [
+        h(
+          'view',
+          {
+            ref: instance => {
+              view = instance;
             },
-          }),
-          h('text', null, `${metrics.value.width}x${metrics.value.height}`),
-        ],
-      );
+            style: {
+              width: width.value,
+              height: 80,
+              backgroundColor: '#234567',
+            },
+          },
+          [
+            h(
+              'text',
+              { onFocus: () => dlog('Symbiote Linux focus: heading') },
+              'Symbiote Linux',
+            ),
+            h('text-input', {
+              value: value.value,
+              accessibilityLabel: 'Desktop input',
+              style: { width: 220, height: 40, color: '#ffffff' },
+              onFocus: () => dlog('Symbiote Linux focus: input'),
+              onValueChange: event => {
+                value.value = event.text;
+                dlog(`Symbiote Linux input: ${event.text}`);
+              },
+            }),
+            h('text', null, `${metrics.value.width}x${metrics.value.height}`),
+          ],
+        ),
+        h(
+          'scroll-view',
+          {
+            onScroll: reportScroll,
+            scrollEventThrottle: 16,
+            style: { width: 240, height: 200 },
+          },
+          Array.from({ length: 40 }, (_, row) =>
+            h('text', { key: row, style: { height: 30 } }, `Scroll row ${row}`),
+          ),
+        ),
+      ]);
   },
 };
 createApp(App, { debug: true }).mount('SymbioteLinux');

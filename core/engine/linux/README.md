@@ -17,6 +17,10 @@ copy/paste and dimension updates. Run `40953438090` passed all five applications
 and their ten input/resize journeys. Resize uses the host's injected configure
 events under Cage.
 
+The scroll gate adds a forty-row ScrollView to each application and injects wheel
+input inside its viewport. It requires the native scroll event to report at least
+200 pixels of vertical movement; startup alone cannot satisfy the assertion.
+
 The persistence gate launches each bundled application twice with the same
 isolated data directory. It writes a library through the host's `RNAsyncStorage`
 module, exits, then verifies the library in a new native process. Logs and window
@@ -37,7 +41,7 @@ Cage, Lavapipe and the host's compiled `rnl_window` and `rnl_inject` executables
 The persistence runner reuses the pinned host's compositor launcher and refuses
 to overwrite an earlier result directory.
 
-System clipboard exchange with other applications, scrolling and accessibility
-journeys remain unverified. The pinned host's clipboard is explicitly
+System clipboard exchange with other applications and accessibility journeys
+remain unverified. The scroll gate also requires a passing native run. The pinned host's clipboard is explicitly
 process-local. Expo-backed companion modules require their own Linux ports;
 their presence in the workspace does not make their native APIs available.
