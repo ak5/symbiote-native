@@ -50,7 +50,7 @@ host checkout's tsconfig and fail with TS5112 on TypeScript 6.
 The window gate builds the same host with Skia/Wayland and runs both packed Metro apps through
 the host's existing `scripts/e2e.ts` harness. `scripts/run-linux-window-consumers.mjs` installs
 disposable scenarios, types into the adapter's controlled text input and copies/pastes through
-the OS clipboard. Each app must report `HiHi` and produce a window screenshot. A separate resize
+the host's in-process clipboard. Each app must report `HiHi` and produce a window screenshot. A separate resize
 scenario drives the native window from 800x600 to 1000x600; each framework's `useWindowDimensions`
 must receive both sizes. This gate is still being brought up; do not claim a pass until its CI result
 is verified. Other adapters, persistence, scrolling and accessibility journeys remain to be verified.
@@ -75,6 +75,10 @@ This is engine bring-up, not a completed Linux application target. Before claimi
 - Add Metro-backed example hosts and run the same journeys across the existing adapters.
 - Verify keyboard input, clipboard, resize, persistence, scrolling and accessibility on a real Linux host.
 - Audit companion native packages and state any unavailable capabilities explicitly.
+
+The pinned host's `Clipboard.h` explicitly limits copy/paste to its own process; it does not
+implement Wayland clipboard exchange with other applications. The text-input journey therefore
+does not prove system clipboard support, which still needs a real backend and a second-client test.
 
 The text-input clipboard journey does not establish `@symbiote-native/clipboard` support: that
 package resolves `ExpoClipboard` through `expo-modules-core`, while the pinned Linux host provides
