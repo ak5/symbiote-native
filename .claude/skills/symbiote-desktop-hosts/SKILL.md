@@ -104,3 +104,9 @@ and native verification.
 Windows remains a separate host integration. Resolve the React Native version contract before adding
 a consumer: this engine declares RN >=0.86, while the inspected published RNW stable requires RN 0.85.
 Do not force mismatched peer dependencies or label an empty branch as platform support.
+
+The Linux consumer/window matrix also includes Vue, using its ordinary `h`/`ref` lifecycle and
+existing bootstrap over the same intrinsic tags. Its packed production Metro bundle and source-map
+contract passed locally; the Vue native startup, keyboard and resize journeys still require CI.
+The runner regression now checks all six journeys are attempted when one fails. React/Svelte's
+four native journeys remain verified by run40936472812.

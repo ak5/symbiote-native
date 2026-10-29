@@ -82,7 +82,7 @@ jobs:
       - name: Run the packaged application in the native host
         run: |
           set -o pipefail
-          for framework in react svelte; do
+          for framework in react svelte vue; do
             log=".linux-host/symbiote-$framework.log"
             nice -n 10 .linux-host/build/symbiote/bin/hello_react --fabric ".linux-host/symbiote-app/$framework/index.linux.bundle.js" 2>&1 | tee "$log"
             grep -F "Symbiote Linux ${framework^} app updated" "$log"

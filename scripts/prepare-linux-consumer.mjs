@@ -57,13 +57,21 @@ const template = JSON.parse(
 const reactExample = JSON.parse(
   readFileSync(join(repository, 'examples/react/package.json'), 'utf8'),
 );
-for (const framework of ['react', 'svelte']) {
+for (const framework of ['react', 'svelte', 'vue']) {
   const app = join(matrix, framework);
   mkdirSync(app);
   const appDependencies = {
     ...dependencies,
     ...pack(join(repository, 'adapters', framework)),
   };
+  if (framework === 'vue') {
+    appDependencies.vue = JSON.parse(
+      readFileSync(
+        join(repository, 'adapters/vue/node_modules/vue/package.json'),
+        'utf8',
+      ),
+    ).version;
+  }
   if (framework === 'svelte') {
     appDependencies.svelte = JSON.parse(
       readFileSync(

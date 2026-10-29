@@ -23,7 +23,7 @@ mkdirSync(join(directory, 'e2e'));
 mkdirSync(join(directory, 'test-bundles'));
 
 const failures = [];
-for (const framework of ['react', 'svelte']) {
+for (const framework of ['react', 'svelte', 'vue']) {
   const bundle = `${framework}.js`;
   copyFileSync(
     join(matrix, framework, 'index.linux.bundle.js'),
@@ -46,7 +46,7 @@ for (const framework of ['react', 'svelte']) {
         ...fixture,
         name,
         bundle,
-        ready: `Symbiote Linux ${framework === 'react' ? 'React' : 'Svelte'} app updated`,
+        ready: `Symbiote Linux ${framework[0].toUpperCase() + framework.slice(1)} app updated`,
       }),
     );
     try {
