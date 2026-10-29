@@ -55,6 +55,11 @@ scenario drives the native window from 800x600 to 1000x600; each framework's `us
 must receive both sizes. This gate is still being brought up; do not claim a pass until its CI result
 is verified. Other adapters, persistence, scrolling and accessibility journeys remain to be verified.
 
+The pinned host uses `accessible` for Tab traversal, including the heading. The input scenario
+therefore tabs through the heading to the field and requires both focus markers. Run `40931012846`
+confirmed this in the native screenshot: one Tab left the focus ring on the heading while key events
+arrived normally. Keep the heading accessible; do not remove accessibility to make the test pass.
+
 The host's input driver requires global C++20, supplied by its normal CMake preset. Our custom
 build directory must set `CMAKE_CXX_STANDARD=20` too; target-specific engine settings do not reach
 the standalone input driver. Compiler cache is saved after the window build to retain those objects.

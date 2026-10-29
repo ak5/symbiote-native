@@ -20,10 +20,13 @@
 </script>
 
 <view style={{ width, height: 80, backgroundColor: '#234567' }}>
-  <text>Symbiote Linux</text>
+  <text onFocus={() => dlog('Symbiote Linux focus: heading')}>
+    Symbiote Linux
+  </text>
   <text-input
     {value}
     accessibilityLabel="Desktop input"
+    onFocus={() => dlog('Symbiote Linux focus: input')}
     style={{ width: 220, height: 40, color: '#ffffff' }}
     onValueChange={event => {
       value = event.text;

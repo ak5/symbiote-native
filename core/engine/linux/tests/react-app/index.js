@@ -22,6 +22,7 @@ function App() {
   const inputProps = {
     value,
     accessibilityLabel: 'Desktop input',
+    onFocus: () => dlog('Symbiote Linux focus: input'),
     style: { width: 220, height: 40, color: '#ffffff' },
     onValueChange: event => {
       setValue(event.text);
@@ -41,7 +42,11 @@ function App() {
   return createElement(
     'view',
     { style: { width, height: 80, backgroundColor: '#234567' } },
-    createElement('text', null, 'Symbiote Linux'),
+    createElement(
+      'text',
+      { onFocus: () => dlog('Symbiote Linux focus: heading') },
+      'Symbiote Linux',
+    ),
     createElement('text-input', inputProps),
     createElement('text', null, `${metrics.width}x${metrics.height}`),
   );

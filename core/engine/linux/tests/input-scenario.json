@@ -5,6 +5,9 @@
     "key Tab press",
     "key Tab release",
     "sleep 200",
+    "key Tab press",
+    "key Tab release",
+    "sleep 200",
     "type Hi",
     "sleep 200",
     "key Control_L press",
@@ -23,5 +26,10 @@
     "key Control_L release",
     "sleep 500"
   ],
-  "expect": ["Symbiote Linux input: Hi", "Symbiote Linux input: HiHi"]
+  "expect": [
+    "Symbiote Linux focus: heading",
+    "Symbiote Linux focus: input",
+    "Symbiote Linux input: Hi",
+    "Symbiote Linux input: HiHi"
+  ]
 }
