@@ -28,6 +28,7 @@ project(symbiote_tree_tests CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+option(SYMBIOTE_PUBLIC_FABRIC "Exercise the SDK-safe public JSI Fabric backend" OFF)
 
 # Asserts are the point of this build. `react_native_assert` compiles to nothing under NDEBUG, which
 # is exactly how a Release device build turned a hard abort into a silently mis-attached child.
@@ -456,4 +457,9 @@ else()
     folly_runtime
     ${REACT_TARGETS}
     "-framework JavaScriptCore")
+endif()
+
+if(SYMBIOTE_PUBLIC_FABRIC)
+  target_compile_definitions(symbiote_tree_tests PRIVATE SYMBIOTE_PUBLIC_FABRIC=1)
+  target_compile_definitions(symbiote_tester PRIVATE SYMBIOTE_PUBLIC_FABRIC=1)
 endif()

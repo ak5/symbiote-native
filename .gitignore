@@ -8,6 +8,7 @@ build-android/
 # and the JavaScriptCore twin — the second ruler, kept because a JIT inverts conclusions rather than
 # scaling them (`pnpm run bench:itest:jsc`). Hermes is what the other three build.
 build-release-jsc/
+build-public/
 build-hermes/
 build-os/
 # the hermes-engine destroot `scripts/fetch-hermes.mjs` unpacks — the same Maven tarball CocoaPods

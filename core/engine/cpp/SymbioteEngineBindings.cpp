@@ -4,9 +4,11 @@
 #include "SymbioteDebug.h"
 #include "SymbioteTree.h"
 
+#ifndef SYMBIOTE_PUBLIC_FABRIC
 #include <react/renderer/mounting/ShadowTreeRegistry.h>
 #include <react/renderer/uimanager/UIManager.h>
 #include <react/renderer/uimanager/UIManagerBinding.h>
+#endif
 
 #include <cstdlib>
 #include <memory>
@@ -28,6 +30,9 @@ jsi::Value probeUIManager(
     const jsi::Value & /*thisValue*/,
     const jsi::Value * /*arguments*/,
     size_t /*count*/) {
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+  throw jsi::JSError(runtime, "symbiote engine: the public Fabric API does not expose surface counts");
+#else
   auto binding = react::UIManagerBinding::getBinding(runtime);
   if (binding == nullptr) {
     return jsi::Value(-1.0);
@@ -37,6 +42,7 @@ jsi::Value probeUIManager(
   binding->getUIManager().getShadowTreeRegistry().enumerate(
       [&surfaces](const react::ShadowTree & /*shadowTree*/, bool & /*stop*/) { surfaces += 1; });
   return jsi::Value(static_cast<double>(surfaces));
+#endif
 }
 
 } // namespace
@@ -157,7 +163,10 @@ void installBindings(jsi::Runtime &runtime) {
   install("setIsJSResponder", 3, &Tree::setIsJSResponder);
 
   // Diagnostic, read on demand rather than per op. See `Tree::readSurfaceTelemetry`.
+// The public API cannot provide RN transaction telemetry; omit the optional diagnostic.
+#ifndef SYMBIOTE_PUBLIC_FABRIC
   install("readSurfaceTelemetry", 1, &Tree::readSurfaceTelemetry);
+#endif
 
   runtime.global().setProperty(runtime, "__symbioteEngineNative", std::move(bindings));
 }

@@ -4,6 +4,9 @@
 
 #include <folly/dynamic.h>
 #include <jsi/JSIDynamic.h>
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+#include "SymbiotePublicFabric.h"
+#else
 #include <react/featureflags/ReactNativeFeatureFlags.h>
 #include <react/renderer/core/InstanceHandle.h>
 #include <react/renderer/core/RawProps.h>
@@ -31,6 +34,7 @@
 #include <react/renderer/dom/DOM.h>
 #include <react/renderer/uimanager/consistency/ShadowTreeRevisionProvider.h>
 #endif
+#endif // SYMBIOTE_PUBLIC_FABRIC
 
 #include <algorithm>
 #include <atomic>
@@ -152,7 +156,14 @@ folly::dynamic boundedDynamicFrom(
 
 struct Node;
 using NodePtr = std::shared_ptr<Node>;
-using ChildSet = std::vector<std::shared_ptr<const react::ShadowNode>>;
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+using FabricNode = std::shared_ptr<const jsi::Object>;
+using FabricManager = PublicFabric;
+#else
+using FabricNode = std::shared_ptr<const react::ShadowNode>;
+using FabricManager = react::UIManager;
+#endif
+using ChildSet = std::vector<FabricNode>;
 
 /**
  * A node in OUR tree, which is not Fabric's tree.
@@ -191,9 +202,13 @@ struct Node : jsi::NativeState {
   // from `viewName`: a pressable commits as `RCTView` like any other view. Arrives once, at
   // `attachHostBehavior`, and never changes — a tag is what the node IS.
   std::string tagName;
-  react::Tag tag = 0;
+  int32_t tag = 0;
   folly::dynamic props = folly::dynamic::object();
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+  std::optional<jsi::WeakObject> instanceHandle;
+#else
   std::shared_ptr<const react::InstanceHandle> instanceHandle;
+#endif
 
   // MAY CONTAIN NULL HOLES between a detach and the next read — see `compactChildren`. Every reader
   // of this vector calls it first; the destructor below is the one place that tolerates a hole
@@ -230,7 +245,7 @@ struct Node : jsi::NativeState {
   std::optional<jsi::Object> attachedHandle;
 
   // ── Commit state ───────────────────────────────────────────────────────────────────────────────
-  std::shared_ptr<const react::ShadowNode> committed;
+  FabricNode committed;
   // What the last commit actually sent, so the next payload can be a minimal diff.
   // `cloneNodeWithNewProps` MERGES rather than replaces (`commit.ts:222-230`), so re-sending an
   // unchanged key re-invokes its native setter — and some ViewManagers rebuild the view on any set.
@@ -254,7 +269,7 @@ struct Node : jsi::NativeState {
   // beneath IT can go out virtual; and a top-level node moving between two surfaces has
   // `committedParent == nullptr` on both sides, so the surface id is the only thing separating them.
   bool committedTextAncestor = false;
-  react::SurfaceId committedSurfaceId = 0;
+  int32_t committedSurfaceId = 0;
   // The Fabric children last handed over, so a rebuild with the same list can decline to clone
   // An op naming a node is not a change: a re-render writes a fresh object for an unchanged style
   ChildSet committedChildren;
@@ -359,6 +374,7 @@ void holdHandle(jsi::Runtime &runtime, Node &node) {
  * It bought nothing anyway: both caches together moved an empty drain 4.46 -> 4.38 us, against the
  * 4.38 -> 1.54 that dropping the checked JSI casts gave.
  */
+#ifndef SYMBIOTE_PUBLIC_FABRIC
 react::UIManager &uiManagerFor(jsi::Runtime &runtime, const char *what) {
   auto binding = react::UIManagerBinding::getBinding(runtime);
   if (binding == nullptr) {
@@ -368,6 +384,8 @@ react::UIManager &uiManagerFor(jsi::Runtime &runtime, const char *what) {
   }
   return binding->getUIManager();
 }
+
+#endif
 
 /**
  * A zero-copy view over a JS `Int32Array`.
@@ -489,6 +507,7 @@ struct IOwnerTally {
  * shape. Nothing does — but the shape is READABLE from our own tree, which is strictly better than a
  * bound that turns away work it did not have to.
  */
+#ifndef SYMBIOTE_PUBLIC_FABRIC
 bool childIndicesAlign(const IOwnerTally &owners, const ChildSet &next) {
   if (owners.nodes.size() != next.size()) return false;
   // A COUNT, not a scan. This walked the owners vector a second time to recover kinds the loop that
@@ -565,9 +584,13 @@ const ChildSet &liveChildrenOf(const Node &node) {
   return node.committed == nullptr ? kNone : node.committed->getChildren();
 }
 
+#endif
+
 // How many parents took the targeted path since the last read, to show the path still runs
 // Process-wide and zeroed on read, like the counters of `readCommitProfile` in JS
+#ifndef SYMBIOTE_PUBLIC_FABRIC
 size_t targetedReplaces_ = 0;
+#endif
 
 // The stopwatch of `materialize`, which runs before `completeSurface` and so sits in no RN clock
 // Nanoseconds, accumulated across the whole walk and zeroed when read
@@ -635,6 +658,7 @@ double nanosSince(const ISteadyClock::time_point &startedAt) {
   return std::chrono::duration<double, std::nano>(ISteadyClock::now() - startedAt).count();
 }
 
+#ifndef SYMBIOTE_PUBLIC_FABRIC
 bool canReplaceInPlace(
     const Node &node,
     const ChildSet &standing,
@@ -698,6 +722,8 @@ void dirtyLayoutOf(react::ShadowNode &node) {
   }
 }
 
+#endif
+
 /**
  * The family generation a child attached under `parent` should be carrying.
  *
@@ -729,12 +755,12 @@ folly::dynamic diffProps(const folly::dynamic &previous, const folly::dynamic &n
   return out;
 }
 
-std::shared_ptr<const react::ShadowNode> materialize(
+FabricNode materialize(
     jsi::Runtime &runtime,
-    react::UIManager &uiManager,
+    FabricManager &uiManager,
     Node &node,
     bool hasTextAncestor,
-    react::SurfaceId surfaceId,
+    int32_t surfaceId,
     const Node *fabricParent);
 
 // The parent as `IOwner`: its props, its tag and its press bit, so a rule can be a descendant rule
@@ -829,7 +855,7 @@ IPayloadFold foldFor(jsi::Runtime &runtime, Node &node) {
  */
 void appendRenderable(
     jsi::Runtime &runtime,
-    react::UIManager &uiManager,
+    FabricManager &uiManager,
     ChildSet &out,
     // Which of OUR nodes contributed `out[i]`, parallel and always the same length. It exists so a
     // parent can adopt back what Fabric actually kept — see `adoptLandedChildren`. It cannot be
@@ -841,7 +867,7 @@ void appendRenderable(
     IOwnerTally &owners,
     Node &node,
     bool hasTextAncestor,
-    react::SurfaceId surfaceId,
+    int32_t surfaceId,
     const Node *fabricParent) {
   if (node.kind == kKindAnchor) {
     // The anchor is transparent, so its children's Fabric parent is the anchor's, not the anchor.
@@ -875,6 +901,7 @@ void appendRenderable(
 
 // Take back the children Fabric kept, as `adoptYogaChild` swaps in clones behind our `committed`
 // An orphan would make every child differ on the next commit, so the walks descend the whole tree
+#ifndef SYMBIOTE_PUBLIC_FABRIC
 void adoptLandedChildren(Node &node, const std::vector<Node *> &owners) {
   // The generation every owner is attached under, for all of them as clone paths never append
   for (Node *owner : owners) owner->committedUnderGeneration = node.familyGeneration;
@@ -925,12 +952,14 @@ void adoptCommitted(Node &node, const std::shared_ptr<const react::ShadowNode> &
   node.committedChildren = children;
 }
 
-std::shared_ptr<const react::ShadowNode> materialize(
+#endif
+
+FabricNode materialize(
     jsi::Runtime &runtime,
-    react::UIManager &uiManager,
+    FabricManager &uiManager,
     Node &node,
     bool hasTextAncestor,
-    react::SurfaceId surfaceId,
+    int32_t surfaceId,
     const Node *fabricParent) {
   // A REFERENCE, and the `&` is the whole point. This ran before the reuse fast path below and
   // constructed a `std::string` on every call — including the ~all of them that are about to return
@@ -1031,16 +1060,31 @@ std::shared_ptr<const react::ShadowNode> materialize(
     walkCost_.rawPropsNs += nanosSince(startedAt);
 
     startedAt = ISteadyClock::now();
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+    auto instance = node.instanceHandle ? node.instanceHandle->lock(runtime) : jsi::Value::undefined();
+    // Raw text has no event target, but the public createNode contract still requires an object.
+    if (!instance.isObject()) instance = jsi::Object(runtime);
+    auto created = std::make_shared<jsi::Object>(uiManager.call(
+        "createNode", node.tag, jsi::String::createFromUtf8(runtime, viewName), surfaceId,
+        jsi::valueFromDynamic(runtime, forFabric), instance).asObject(runtime));
+#else
     auto created = uiManager.createNode(
         node.tag,
         viewName,
         surfaceId,
         react::RawProps(std::move(forFabric)),
         node.instanceHandle);
+#endif
     walkCost_.createNs += nanosSince(startedAt);
 
     startedAt = ISteadyClock::now();
-    for (const auto &child : *children) uiManager.appendChild(created, child);
+    for (const auto &child : *children) {
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+      uiManager.call("appendChild", *created, *child);
+#else
+      uiManager.appendChild(created, child);
+#endif
+    }
     walkCost_.appendNs += nanosSince(startedAt);
     walkCost_.created += 1;
     node.committed = created;
@@ -1083,6 +1127,20 @@ std::shared_ptr<const react::ShadowNode> materialize(
     const bool childrenHeld = changedPositions == 0;
     const bool sendsNothing = payload.empty() && childrenHeld;
     if (!sendsNothing) {
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+      // The public boundary cannot inspect landed clones; rebuild changed child sets like RN's renderer.
+      auto cloned = childrenHeld
+          ? uiManager.call("cloneNodeWithNewProps", *node.committed, jsi::valueFromDynamic(runtime, payload))
+          : payload.empty()
+              ? uiManager.call("cloneNodeWithNewChildren", *node.committed)
+              : uiManager.call("cloneNodeWithNewChildrenAndProps", *node.committed,
+                               jsi::valueFromDynamic(runtime, payload));
+      auto object = cloned.asObject(runtime);
+      if (!childrenHeld) {
+        for (const auto &child : *children) uiManager.call("appendChild", object, *child);
+      }
+      node.committed = std::make_shared<jsi::Object>(std::move(object));
+#else
       // A child list is not a free argument: handing it over re-adopts and re-clones every child
       // An empty object is not an empty `RawProps`, it re-parses props and makes the differ emit
       // an `Update`
@@ -1121,11 +1179,17 @@ std::shared_ptr<const react::ShadowNode> materialize(
         if (hasReorderedChildren(node.committedChildren, *children)) dirtyLayoutOf(*cloned);
         node.committed = std::move(cloned);
       }
+#endif
     }
     if (node.selfDirty) node.committedProps = std::move(next);
   }
 
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+  for (Node *owner : owners.nodes) owner->committedUnderGeneration = node.familyGeneration;
+  node.committedChildren = *children;
+#else
   adoptLandedChildren(node, owners.nodes);
+#endif
   node.committedViewName = viewName;
   node.committedParent = fabricParent;
   node.committedTextAncestor = hasTextAncestor;
@@ -1139,6 +1203,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
 // `steady_clock` (`react/utils/Telemetry.h`), so no conversion is involved — but an unstamped point
 // is `TimePoint::max()`, and subtracting it yields a plausible-looking enormous number rather than
 // an error. A commit that skipped layout must read 0, not centuries.
+#ifndef SYMBIOTE_PUBLIC_FABRIC
 double millisBetween(
     react::TelemetryTimePoint started,
     react::TelemetryTimePoint ended) {
@@ -1148,6 +1213,8 @@ double millisBetween(
   }
   return std::chrono::duration<double, std::milli>(ended - started).count();
 }
+
+#endif
 
 } // namespace
 
@@ -1160,7 +1227,11 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
 
   const auto applyStartedAt = ISteadyClock::now();
   walkCost_.applyCalls += 1;
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+  PublicFabric uiManager(runtime);
+#else
   auto &uiManager = uiManagerFor(runtime, "applyOps");
+#endif
 
   size_t opsLength = 0;
   const int32_t *ops = int32ArrayData(runtime, arguments[0], opsLength);
@@ -1276,10 +1347,15 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         node->isText = ops[at + 3] != 0;
         node->tag = allocateTag();
         const auto handleStartedAt = ISteadyClock::now();
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+        node->instanceHandle.emplace(runtime,
+            instanceHandles.getValueAtIndex(runtime, static_cast<size_t>(ops[at + 4])).asObject(runtime));
+#else
         node->instanceHandle = std::make_shared<const react::InstanceHandle>(
             runtime,
             instanceHandles.getValueAtIndex(runtime, static_cast<size_t>(ops[at + 4])),
             node->tag);
+#endif
         walkCost_.instanceHandleNs += nanosSince(handleStartedAt);
         publish(ops[at + 1], std::move(node));
         walkCost_.decodeNs += nanosSince(decodeStartedAt);
@@ -1468,7 +1544,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         break;
       }
       case kOpCommit: {
-        const auto surfaceId = static_cast<react::SurfaceId>(ops[at + 1]);
+        const auto surfaceId = static_cast<int32_t>(ops[at + 1]);
         const auto &surface = nodeAt(ops[at + 2]);
         auto childSet = std::make_shared<ChildSet>();
         // The surface NODE is contributed, not its children, and `nullptr` stands for the root
@@ -1490,6 +1566,11 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         surface->hasCommittedRenderable = true;
         // `completeSurface` runs `ShadowTree::commit` with a lambda that REPLACES the root's
         // children, so this needs neither a commit hook nor a retained pending root
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+        auto set = uiManager.call("createChildSet", surfaceId);
+        for (const auto &child : *childSet) uiManager.call("appendChildToSet", set, *child);
+        uiManager.call("completeRoot", surfaceId, set);
+#else
         uiManager.completeSurface(
             surfaceId,
             childSet,
@@ -1508,6 +1589,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
                 adoptCommitted(*rootOwners.nodes[index], landedRoot[index]);
               }
             });
+#endif
         break;
       }
       default:
@@ -1824,7 +1906,11 @@ jsi::Value Tree::shadowNodeOf(
   }
   const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "shadowNodeOf");
   if (node->committed == nullptr) return jsi::Value::undefined();
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+  return jsi::Value(runtime, *node->committed);
+#else
   return react::valueFromShadowNode(runtime, node->committed);
+#endif
 }
 
 jsi::Value Tree::committedPayloadOf(
@@ -1856,11 +1942,15 @@ jsi::Value Tree::dispatchCommand(
   }
   const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "dispatchCommand");
   if (node->committed == nullptr) return jsi::Value::undefined();
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+  PublicFabric(runtime).call("dispatchCommand", *node->committed, arguments[1], arguments[2]);
+#else
   uiManagerFor(runtime, "dispatchCommand")
       .dispatchCommand(
           node->committed,
           arguments[1].asString(runtime).utf8(runtime),
           react::commandArgsFromValue(runtime, arguments[2]));
+#endif
   return jsi::Value::undefined();
 }
 
@@ -1874,8 +1964,12 @@ jsi::Value Tree::sendAccessibilityEvent(
   }
   const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "sendAccessibilityEvent");
   if (node->committed == nullptr) return jsi::Value::undefined();
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+  PublicFabric(runtime).call("sendAccessibilityEvent", *node->committed, arguments[1]);
+#else
   uiManagerFor(runtime, "sendAccessibilityEvent")
       .sendAccessibilityEvent(node->committed, arguments[1].asString(runtime).utf8(runtime));
+#endif
   return jsi::Value::undefined();
 }
 
@@ -1892,12 +1986,56 @@ jsi::Value Tree::setIsJSResponder(
   }
   const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "setIsJSResponder");
   if (node->committed == nullptr) return jsi::Value::undefined();
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+  PublicFabric(runtime).call("setIsJSResponder", *node->committed, arguments[1], arguments[2]);
+#else
   uiManagerFor(runtime, "setIsJSResponder")
       .setIsJSResponder(node->committed, arguments[1].getBool(), arguments[2].getBool());
+#endif
   return jsi::Value::undefined();
 }
 
-#ifndef SYMBIOTE_HAS_DOM_MEASURE
+#if defined(SYMBIOTE_PUBLIC_FABRIC)
+
+jsi::Value Tree::measure(jsi::Runtime &runtime, const jsi::Value *args, size_t count) {
+  if (count < 2) throw jsi::JSError(runtime, "symbiote engine: expected measure(handle, callback)");
+  const auto node = nodeFrom(runtime, args[0].asObject(runtime), "measure");
+  if (!node->committed) args[1].asObject(runtime).asFunction(runtime).call(runtime, {0, 0, 0, 0, 0, 0});
+  else PublicFabric(runtime).call("measure", *node->committed, args[1]);
+  return jsi::Value::undefined();
+}
+
+jsi::Value Tree::measureInWindow(jsi::Runtime &runtime, const jsi::Value *args, size_t count) {
+  if (count < 2) throw jsi::JSError(runtime, "symbiote engine: expected measureInWindow(handle, callback)");
+  const auto node = nodeFrom(runtime, args[0].asObject(runtime), "measureInWindow");
+  if (!node->committed) args[1].asObject(runtime).asFunction(runtime).call(runtime, {0, 0, 0, 0});
+  else PublicFabric(runtime).call("measureInWindow", *node->committed, args[1]);
+  return jsi::Value::undefined();
+}
+
+jsi::Value Tree::measureLayout(jsi::Runtime &runtime, const jsi::Value *args, size_t count) {
+  if (count < 4) throw jsi::JSError(runtime, "symbiote engine: expected measureLayout(handle, relativeTo, onFail, onSuccess)");
+  const auto node = nodeFrom(runtime, args[0].asObject(runtime), "measureLayout");
+  const auto relative = nodeFrom(runtime, args[1].asObject(runtime), "measureLayout");
+  if (!node->committed || !relative->committed) args[2].asObject(runtime).asFunction(runtime).call(runtime);
+  else PublicFabric(runtime).call("measureLayout", *node->committed, *relative->committed, args[2], args[3]);
+  return jsi::Value::undefined();
+}
+
+jsi::Value Tree::getBoundingClientRect(jsi::Runtime &runtime, const jsi::Value *args, size_t count) {
+  if (count < 2) throw jsi::JSError(runtime, "symbiote engine: expected getBoundingClientRect(handle, includeTransform)");
+  const auto node = nodeFrom(runtime, args[0].asObject(runtime), "getBoundingClientRect");
+  if (!node->committed) return jsi::Value::undefined();
+  auto value = PublicFabric(runtime).call("getBoundingClientRect", *node->committed, args[1]);
+  if (value.isUndefined()) return value;
+  auto rect = value.asObject(runtime).asArray(runtime);
+  jsi::Object result(runtime);
+  const char *keys[] = {"x", "y", "width", "height"};
+  for (size_t index = 0; index < 4; ++index) result.setProperty(runtime, keys[index], rect.getValueAtIndex(runtime, index));
+  return result;
+}
+
+#elif !defined(SYMBIOTE_HAS_DOM_MEASURE)
 
 // The header is absent on this toolchain (Android's prefab does not export `react/renderer/dom/`).
 // Throwing is the only honest answer: returning zeroes would be indistinguishable from a node with
@@ -2061,7 +2199,10 @@ jsi::Value Tree::readSurfaceTelemetry(
   if (count < 1) {
     throw jsi::JSError(runtime, "symbiote engine: expected readSurfaceTelemetry(surfaceId)");
   }
-  const auto surfaceId = static_cast<react::SurfaceId>(arguments[0].asNumber());
+#ifdef SYMBIOTE_PUBLIC_FABRIC
+  throw jsi::JSError(runtime, "symbiote engine: the public Fabric API does not expose transaction telemetry");
+#else
+  const auto surfaceId = static_cast<int32_t>(arguments[0].asNumber());
   auto result = jsi::Object(runtime);
   double layoutMs = 0;
   double textMs = 0;
@@ -2167,6 +2308,7 @@ jsi::Value Tree::readSurfaceTelemetry(
       runtime, "applyCalls", jsi::Value(static_cast<double>(walkCost_.applyCalls)));
   walkCost_ = IWalkCost{};
   return result;
+#endif
 }
 
 } // namespace symbiote

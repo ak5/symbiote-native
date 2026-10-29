@@ -55,3 +55,34 @@ Next gates: resolve compiler/linker failures without modifying RN core; prove th
 Windows host; establish a tested React Native version contract; then add Metro application targets and test
 the existing adapters' keyboard, clipboard, resize, persistence, scrolling and accessibility journeys.
 Do not describe a compile-only probe as Windows application support.
+
+## Shared public Fabric backend
+
+`SYMBIOTE_PUBLIC_FABRIC` selects a JSI-only Fabric boundary in the existing `SymbioteTree.cpp`.
+The retained tree, mutation decoding, tag rules, dirty propagation, prop diffs and handle ownership
+stay shared. `SymbiotePublicFabric.h` holds only a per-call runtime/binding pair; it has no retained
+nodes or global runtime cache. Opaque Fabric objects cross the SDK boundary without host-object casts.
+
+The public path clones changed child sets and appends children through Fabric's published methods.
+It cannot inspect Fabric's landed clones, so it does not use the direct backend's targeted replacement
+optimization. The direct path remains unchanged. Raw text still gets an object instance handle because
+public `createNode` requires one, even when the node has no event handlers. Instance handles on
+interactive elements remain weak, preserving the existing ownership rules.
+
+The optional `readSurfaceTelemetry` binding is absent on this backend because public Fabric exposes
+no transaction telemetry. `probeUIManager` throws an explicit unsupported diagnostic instead of
+inventing a surface count. App-facing measurement, commands, responder and accessibility calls use
+the corresponding public methods; bounding rectangles are converted from Fabric's tuple to the
+engine's object shape.
+
+Local verification: both public and direct backends passed all 317 real Fabric C++ tests, including
+300 mutation programs. Under Hermes, 26 existing native adapter checks passed across React, Svelte,
+Vue, Solid and Angular, including actual reorder frames/mount commands, repeated state updates,
+controlled-input behavior and public host handles. The React reorder fixture fails identically on
+both backends under JavaScriptCore; use the project's normal Hermes runtime for adapter tests.
+This is not yet wired into the Windows SDK application: Folly/CSS dependencies, RN 0.85 compatibility,
+module registration and actual Windows app journeys still need integration and verification.
+
+Configure the existing harness with `-DSYMBIOTE_PUBLIC_FABRIC=ON` and build the same targets in
+`core/engine/cpp/tests/build-public`. Use `SYMBIOTE_ITEST_BUILD=build-public` for `scripts/run-itests.mjs`.
+Pass files individually for sequential execution; the script otherwise uses all available workers.
