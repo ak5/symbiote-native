@@ -18,7 +18,7 @@
 // sentinel, which would make a `getNativeTag(...) === getNativeTag(...)` comparison a tautology.
 
 import '../../components/section-list';
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount, Animated } from '@symbiote-native/vue';
 import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';

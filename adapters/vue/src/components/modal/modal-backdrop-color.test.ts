@@ -1,6 +1,6 @@
 // RN types `backdropColor` as `ColorValue`, so a `PlatformColor` tints the backdrop too
 
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Modal, mount, unmount } from '@symbiote-native/vue';
 import {

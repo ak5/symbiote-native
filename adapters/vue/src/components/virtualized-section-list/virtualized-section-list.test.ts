@@ -19,12 +19,7 @@
 // A RECORDING host, read through the LIVE tree for the committed text stream — the claim is about
 // the CURRENT committed order.
 
-import {
-  defineComponent,
-  h,
-  ref,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, ref, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   VirtualizedSectionList,

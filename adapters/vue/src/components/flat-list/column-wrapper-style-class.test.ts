@@ -12,11 +12,7 @@
 // No Negative group: columnWrapperStyle has no throwing path — an invalid value (not a string,
 // not a record/array) silently degrades to `undefined` in the row style array, it never rejects.
 
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
 import { clearGlobalStyles, registerRules } from '@symbiote-native/engine';

@@ -26,12 +26,7 @@
 // spacer placement, separator geometry) is about the CURRENT committed shape. `fabric.commands`
 // carries the engine's own dispatchCommand calls, so no local recording override is needed.
 
-import {
-  defineComponent,
-  h,
-  ref,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, ref, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   FlatList,

@@ -1,7 +1,7 @@
 // Every Expo-wrapper package's own permission composable (`useCameraPermissions`,
 // `useCalendarPermissions`, `useRemindersPermissions`, ...) binds this factory to its `methods`
 
-import { onMounted, shallowRef, type Ref } from '@vue/runtime-core';
+import { onMounted, shallowRef, type Ref } from 'vue';
 import {
   createPermissionApi,
   fetchInitialPermission,

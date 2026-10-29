@@ -11,13 +11,7 @@
 // SFCs in Metro, not in Vitest.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  defineComponent,
-  Fragment,
-  h,
-  ref,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, Fragment, h, ref, type VNode } from 'vue';
 import { setTreeHost, treeHost } from '@symbiote-native/engine';
 import {
   OP_APPEND_CHILD,

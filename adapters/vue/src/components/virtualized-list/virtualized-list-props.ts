@@ -1,6 +1,6 @@
 // The public prop, slot and emit contract of the Vue VirtualizedList
 
-import type { Component, VNode } from '@vue/runtime-core';
+import type { Component, VNode } from 'vue';
 import type {
   IInnerViewRef,
   IViewabilityConfig,

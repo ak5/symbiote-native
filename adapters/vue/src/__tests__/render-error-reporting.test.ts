@@ -7,13 +7,7 @@
 // Asserted through a real mount rather than by calling the handler directly: the claim is that
 // the app created inside mount() is WIRED to it, which is exactly what was missing.
 
-import {
-  defineComponent,
-  h,
-  onErrorCaptured,
-  ref,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, h, onErrorCaptured, ref, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, setAppConfigurator, unmount } from '@symbiote-native/vue';
 import {

@@ -23,7 +23,7 @@ import type {
   IPressableAndroidRippleConfig,
   IRectOffset,
 } from '@symbiote-native/components';
-import type { VNodeRef } from '@vue/runtime-core';
+import type { VNodeRef } from 'vue';
 
 export type {
   IPressState,

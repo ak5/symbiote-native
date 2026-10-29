@@ -18,7 +18,7 @@
 // it at runtime. TypeScript still requires the module path to exist under `<jsxImportSource>/jsx-
 // runtime` (`jsx: "preserve"` included — see `adapters/solid/src/jsx-runtime.ts`'s own measurement),
 // which is the whole reason this file exists.
-import type { VNode } from '@vue/runtime-core';
+import type { VNode } from 'vue';
 import type { ICrossTypedIntrinsics } from '@symbiote-native/components';
 import type { IViewProps } from './components/view-props';
 import type { ITextProps } from './components/text-props';
@@ -110,7 +110,7 @@ export namespace JSX {
   // type stay exactly what the adapter exports, with no duplicate fields to keep in step per tag.
   type IWithJsxAttrs<Props> = Props & {
     key?: string | number | symbol;
-    ref?: import('@vue/runtime-core').VNodeRef;
+    ref?: import('vue').VNodeRef;
   };
 
   // DERIVED from the intrinsic union via the shared `ICrossTypedIntrinsics` recipe

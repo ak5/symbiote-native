@@ -1,11 +1,6 @@
 // The Vue twin of the React `section-list-rn-structure` test: the committed text stream in
 // document order, after RN's `SectionList-itest.js` and `VirtualizedSectionList.js` separators
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SectionList, mount, unmount } from '@symbiote-native/vue';
 import {

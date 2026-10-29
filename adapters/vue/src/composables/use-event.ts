@@ -1,7 +1,7 @@
 // Vue twins of `useEvent` and `useEventListener` of the `expo` package, for any emitter
 
-import { shallowRef, toValue, unref, watch } from '@vue/runtime-core';
-import type { MaybeRef, MaybeRefOrGetter, ShallowRef } from '@vue/runtime-core';
+import { shallowRef, toValue, unref, watch } from 'vue';
+import type { MaybeRef, MaybeRefOrGetter, ShallowRef } from 'vue';
 import { bindEventListener } from '@symbiote-native/engine';
 import type {
   IEventEmitterOf,

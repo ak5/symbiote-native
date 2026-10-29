@@ -1,7 +1,7 @@
 // The props snapshot the list lifecycle works against: defaults applied, slots resolved, native
 // listeners turned into emit bridges
 
-import type { Component, VNode } from '@vue/runtime-core';
+import type { Component, VNode } from 'vue';
 import {
   DEFAULT_INITIAL_NUM_TO_RENDER,
   DEFAULT_MAX_TO_RENDER_PER_BATCH,

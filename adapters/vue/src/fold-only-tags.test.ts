@@ -1,7 +1,7 @@
 // Four primitives that became TAGS, with no component spelling left to compare against. Each case
 // pins what the DELETED WRAPPER used to do, so a fold that failed to move down goes red here.
 // `./register` matters only for `image` — the other three fold in the renderer/engine layer.
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,

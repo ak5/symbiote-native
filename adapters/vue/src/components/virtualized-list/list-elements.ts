@@ -1,6 +1,6 @@
 // Turning a header, footer or empty slot value into a VNode
 
-import { h, isVNode, type Component, type VNode } from '@vue/runtime-core';
+import { h, isVNode, type Component, type VNode } from 'vue';
 import { pickItemRenderer } from '@symbiote-native/components';
 import type { IListItemInfo, IRenderItem } from './narrow-props';
 

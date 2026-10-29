@@ -10,7 +10,7 @@
 // `.payload`, which reads the node's current state), not the CREATION-log lookup (`fabric.find`),
 // which never reflects a later clone.
 
-import { defineComponent, h, ref, withDirectives } from '@vue/runtime-core';
+import { defineComponent, h, ref, withDirectives } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { useCssModule, vShow, withKeys, withModifiers } from './index';

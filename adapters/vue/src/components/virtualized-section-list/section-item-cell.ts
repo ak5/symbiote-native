@@ -8,7 +8,7 @@ import {
   shallowRef,
   watch,
   type VNode,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   createCellSeparators,
   type ISeparatorBoard,

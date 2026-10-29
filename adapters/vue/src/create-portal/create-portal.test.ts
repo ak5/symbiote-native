@@ -9,17 +9,10 @@
 // Each case mounts on its OWN rootTag with its own refs. A shared tag would let one case's surface
 // linger into the next and satisfy an assertion the case under test never earned.
 
-import {
-  defineComponent,
-  h,
-  inject,
-  provide,
-  ref,
-  shallowRef,
-} from '@vue/runtime-core';
+import { defineComponent, h, inject, provide, ref, shallowRef } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
-import type { Component } from '@vue/runtime-core';
+import type { Component } from 'vue';
 import * as engine from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';
 import { mount, unmount } from '@symbiote-native/vue';

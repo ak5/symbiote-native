@@ -12,7 +12,7 @@ import {
   shallowRef,
   watch,
   type VNode,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   EMPTY_OFFSET,
   LIST_ACTION_KIND,

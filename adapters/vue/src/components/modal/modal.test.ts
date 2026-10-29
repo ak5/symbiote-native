@@ -28,7 +28,7 @@
 // handle, which stays current (the engine mutates the node in place, it does not clone it), so no
 // live-tree walk is needed for those either. `createLiveTree` is used only where the CLAIM is
 // genuinely about current tree shape — the root's child count and the serialized shape.
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   Modal,

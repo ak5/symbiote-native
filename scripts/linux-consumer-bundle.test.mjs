@@ -67,3 +67,28 @@ test('requires Angular native AOT renderer output', () => {
     /angular\/render\/index/,
   );
 });
+
+test('requires one Vue component and reactivity runtime', () => {
+  const vue = [
+    sources[0],
+    '/app/node_modules/@symbiote-native/vue/build/render.js',
+    '/app/node_modules/vue/node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js',
+    '/app/node_modules/vue/node_modules/@vue/reactivity/dist/reactivity.esm-bundler.js',
+  ];
+  verifyLinuxConsumerBundle({ sources: vue }, 'vue');
+  for (const runtime of ['runtime-core', 'reactivity']) {
+    assert.throws(
+      () =>
+        verifyLinuxConsumerBundle(
+          {
+            sources: [
+              ...vue,
+              `/app/node_modules/@vue/${runtime}/dist/${runtime}.esm-bundler.js`,
+            ],
+          },
+          'vue',
+        ),
+      /must use one/,
+    );
+  }
+});

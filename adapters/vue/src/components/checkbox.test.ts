@@ -1,6 +1,6 @@
 // `checkbox` как тег через рендерер Vue, вид проверяет `checkbox-payload.itest.ts`
 // Число нод это оракул регистрации: без неё тег коммитит голый view без галочки
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import {

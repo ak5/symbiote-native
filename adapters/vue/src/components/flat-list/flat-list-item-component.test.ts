@@ -1,9 +1,5 @@
 // `listItemComponent` это RN `ListItemComponent`: компонент рисует ячейку по item и index
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FlatList, mount, unmount } from '@symbiote-native/vue';
 import {

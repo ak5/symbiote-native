@@ -87,7 +87,6 @@
     "@vue/babel-plugin-jsx": "catalog:",
     "@vue/compiler-core": "catalog:",
     "@vue/compiler-sfc": "catalog:",
-    "@vue/runtime-core": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {

@@ -17,6 +17,20 @@ export function verifyLinuxConsumerBundle(map, framework = 'react') {
       `Metro did not include ${source}`,
     );
   }
+  if (framework === 'vue') {
+    for (const runtime of ['runtime-core', 'reactivity']) {
+      const entries = new Set(
+        sources.filter(path =>
+          path.includes(`/@vue/${runtime}/dist/${runtime}.`),
+        ),
+      );
+      assert.equal(
+        entries.size,
+        1,
+        `Vue must use one ${runtime} instance from its peer runtime`,
+      );
+    }
+  }
   assert(
     !sources.some(path => path.includes('@symbiote-native/engine/src/')),
     'Metro reached workspace source instead of the packed engine',

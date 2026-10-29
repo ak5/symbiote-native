@@ -8,7 +8,7 @@ import {
   onMounted,
   onUnmounted,
   type VNode,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   Keyboard,
   Platform,

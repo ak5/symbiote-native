@@ -14,7 +14,7 @@
 // (which views exist, and the folded payload of one of them), not about mechanism.
 
 import { describe, expect, it } from 'vitest';
-import { defineComponent, h } from '@vue/runtime-core';
+import { defineComponent, h } from 'vue';
 import { mount, unmount } from '@symbiote-native/vue';
 import {
   createLiveTree,

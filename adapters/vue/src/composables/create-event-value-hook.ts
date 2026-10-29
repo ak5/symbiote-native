@@ -1,7 +1,7 @@
 // Every `useXStatus`-style composable (`useAudioPlayerStatus`, `useAudioPlaylistStatus`, ...)
 // binds this to its own event name + initial-value getter instead of repeating the watch wiring
 
-import { shallowRef, watch, type ShallowRef } from '@vue/runtime-core';
+import { shallowRef, watch, type ShallowRef } from 'vue';
 import type { IEventValueSource } from '@symbiote-native/engine';
 
 export function createEventValueHook<

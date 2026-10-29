@@ -15,7 +15,7 @@ import {
   h,
   shallowRef,
   type FunctionalComponent,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   routeScrollHandle,
   type IVirtualizedSectionListHandle,

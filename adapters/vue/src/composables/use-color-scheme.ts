@@ -5,7 +5,7 @@
 // React's useColorScheme returns the bare value via useSyncExternalStore; the underlying
 // Appearance module is shared verbatim; only the lifecycle differs.
 
-import { ref, onMounted, onUnmounted, type Ref } from '@vue/runtime-core';
+import { ref, onMounted, onUnmounted, type Ref } from 'vue';
 import {
   Appearance,
   type IColorSchemeName,

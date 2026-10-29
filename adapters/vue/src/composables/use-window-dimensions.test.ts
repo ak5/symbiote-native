@@ -1,6 +1,6 @@
 // `useWindowDimensions` of Vue: the window metrics, replaced when `Dimensions` reports a change
 
-import { defineComponent, h, type Ref, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, type Ref, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Dimensions, type IDisplayMetrics } from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/vue';

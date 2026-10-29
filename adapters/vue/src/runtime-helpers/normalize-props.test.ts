@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
-import { defineComponent, h, type Component } from '@vue/runtime-core';
+import { defineComponent, h, type Component } from 'vue';
 import * as engine from '@symbiote-native/engine';
 import * as vueAdapter from '@symbiote-native/vue';
 import { mount, unmount } from '@symbiote-native/vue';

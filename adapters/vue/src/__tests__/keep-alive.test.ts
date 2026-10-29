@@ -2,13 +2,7 @@
 // reactivate over this engine's nodeOps, or does it destroy and recreate like a plain
 // v-if would?
 
-import {
-  defineComponent,
-  h,
-  KeepAlive,
-  ref,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, h, KeepAlive, ref, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import {

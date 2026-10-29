@@ -8,7 +8,7 @@
 // Vue's documented custom-element mechanism: the checker reads props off a component's `$props`
 // TYPE, never off the value — hence `new () => { $props: … }`, narrowed here to drop the docs'
 // `HTMLElement`/`$emit` halves (no DOM here; our events reach a node as `on*` props).
-import type { PublicProps } from '@vue/runtime-core';
+import type { PublicProps } from 'vue';
 import type {
   ISymbioteIntrinsic,
   ICrossTypedIntrinsics,

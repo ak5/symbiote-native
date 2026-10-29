@@ -4,7 +4,7 @@
 // renderer → engine → Fabric, exactly like a hand-written h('view'). The React
 // twin is `adapters/react/src/descriptor-to-react.ts`.
 
-import { h, type VNode } from '@vue/runtime-core';
+import { h, type VNode } from 'vue';
 import type {
   IDescriptor,
   IDescriptorChild,

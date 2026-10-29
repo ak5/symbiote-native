@@ -14,7 +14,7 @@ import type {
   IAriaProps,
   IResponderProps,
 } from '@symbiote-native/components';
-import type { VNodeRef } from '@vue/runtime-core';
+import type { VNodeRef } from 'vue';
 
 export interface IViewProps
   extends IAccessibilityProps, IAriaProps, IResponderProps {

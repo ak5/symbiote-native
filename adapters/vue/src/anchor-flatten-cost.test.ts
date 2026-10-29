@@ -7,13 +7,7 @@
 // call returning a bare array would produce the same Fragment implicitly and hide why.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  defineComponent,
-  Fragment,
-  h,
-  ref,
-  type VNode,
-} from '@vue/runtime-core';
+import { defineComponent, Fragment, h, ref, type VNode } from 'vue';
 import {
   dlog,
   readCommitProfile,

@@ -4,7 +4,7 @@
 // header for why anything importing react-native must stay there.
 
 import { AppRegistry as RNAppRegistry } from 'react-native';
-import type { Component } from '@vue/runtime-core';
+import type { Component } from 'vue';
 import {
   bootstrapHost,
   type IBootstrapHostOptions,

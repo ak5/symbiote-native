@@ -1,11 +1,7 @@
 // FlatList's removeClippedSubviews, against RN's FlatList.js: the list ALWAYS sends it to its
 // ScrollView, defaulting to `Platform.OS === 'android'` when the app sets none.
 
-import {
-  defineComponent,
-  h,
-  type FunctionalComponent,
-} from '@vue/runtime-core';
+import { defineComponent, h, type FunctionalComponent } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FlatList, Platform, mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';

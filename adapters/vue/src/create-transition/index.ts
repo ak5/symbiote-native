@@ -15,7 +15,7 @@ import {
   type BaseTransitionProps,
   type SetupContext,
   type VNode,
-} from '@vue/runtime-core';
+} from 'vue';
 import {
   AnimatedValue,
   isSymbioteNode,

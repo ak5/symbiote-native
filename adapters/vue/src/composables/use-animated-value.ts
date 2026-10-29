@@ -2,7 +2,7 @@
 // runs once per component, so each call is the one instance. `markRaw` keeps `reactive()` from
 // wrapping the node in a Proxy
 
-import { markRaw } from '@vue/runtime-core';
+import { markRaw } from 'vue';
 import {
   createAnimatedColor,
   createAnimatedValue,

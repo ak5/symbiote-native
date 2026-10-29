@@ -2,7 +2,7 @@
 // `computeInset` on each, the live previous inset read off the reactive cell and teardown
 // Headless `Platform` is iOS so the will* pair is expected; the inset math is tested in core
 
-import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, ref, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { KeyboardAvoidingView, mount, unmount } from '@symbiote-native/vue';
 import { Keyboard, KEYBOARD_EVENT } from '@symbiote-native/engine';

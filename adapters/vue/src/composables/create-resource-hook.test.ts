@@ -1,7 +1,7 @@
 // Every `useReleasingSharedObject`-style composable (`useAudioPlayer`, `useImageManipulator`, ...)
 // binds this to its own `createXController()` instead of repeating the computed/watch wiring
 
-import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
+import { defineComponent, h, ref, type VNode } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from '@symbiote-native/vue';
 import { installRecordingFabric } from '@symbiote-native/test-utils';

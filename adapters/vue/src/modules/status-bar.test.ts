@@ -2,7 +2,7 @@
 // entry and unmounting restores what the stack held below it
 // Native call shapes are the engine's, covered in core/engine/src/status-bar
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
 

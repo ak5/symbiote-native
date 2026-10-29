@@ -19,7 +19,7 @@
 // insertStaticContent -> empty anchor pair) are never reachable from a real component-based
 // template — only from `v-html`-style static hoisting, which this codebase does not use.
 
-import { defineComponent, h, ref } from '@vue/runtime-core';
+import { defineComponent, h, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mount, unmount } from '../render';
 // No primitive import: `view` and `text` are TAGS written directly below.

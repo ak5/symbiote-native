@@ -15,7 +15,7 @@ import type {
   Component,
   ComponentInternalInstance,
   ComponentPublicInstance,
-} from '@vue/runtime-core';
+} from 'vue';
 import { createSymbioteRenderer } from './renderer';
 
 // One Vue app per surface, so a surface can be torn down (unmount) or cleanly

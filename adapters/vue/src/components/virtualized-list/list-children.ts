@@ -1,6 +1,6 @@
 // The list's child VNodes: header, the windowed cells with their spacers, footer
 
-import { h, type VNode } from '@vue/runtime-core';
+import { h, type VNode } from 'vue';
 import {
   FIRST_INDEX,
   LIST_SEGMENT_KIND,

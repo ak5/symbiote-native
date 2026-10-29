@@ -5,7 +5,7 @@
 // bare value via useState; the underlying Dimensions module is shared verbatim; only the
 // lifecycle differs (returns a Ref the template unwraps).
 
-import { ref, onMounted, onUnmounted, type Ref } from '@vue/runtime-core';
+import { ref, onMounted, onUnmounted, type Ref } from 'vue';
 import {
   Dimensions,
   type IDimensionsSet,
