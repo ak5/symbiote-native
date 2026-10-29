@@ -122,3 +122,7 @@ The standalone SDK-only job is folded into the production-engine app gate: the s
 assertions still run after the real engine smoke passes, using the same installed dependencies.
 There is one sequential Windows job, avoiding duplicate SDK installations and a superseded probe
 holding the workflow concurrency slot after a failed production build.
+
+Save the Windows dependency binary cache immediately after successful installation, before compiling
+the engine. A later engine failure must not discard completed Folly builds. The workflow uses
+explicit cache restore/save steps and retains vcpkg build logs on failure.

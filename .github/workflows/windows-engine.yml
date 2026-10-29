@@ -56,7 +56,8 @@ jobs:
           repository: microsoft/vcpkg
           ref: 09e7d22e2d9bf97f9549c9f37759bf11758d62f0
           path: .windows-vcpkg
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: windows-dependencies
         with:
           path: .windows-vcpkg-cache
           key: windows-vs2026-static-md-folly-${{ hashFiles('core/engine/windows/vcpkg.json') }}
@@ -72,6 +73,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .windows-vcpkg/vcpkg.exe install --triplet x64-windows-static-md "--x-manifest-root=$PWD/core/engine/windows" "--x-install-root=$PWD/.windows-vcpkg-installed" --disable-metrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/cache/save@v4
+        if: steps.windows-dependencies.outputs.cache-hit != 'true'
+        with:
+          path: .windows-vcpkg-cache
+          key: ${{ steps.windows-dependencies.outputs.cache-primary-key }}
       - name: Add the actual engine sources to the fixture
         shell: pwsh
         run: |
@@ -184,6 +190,7 @@ jobs:
           include-hidden-files: true
           path: |
             windows-engine.binlog
+            .windows-vcpkg/buildtrees/**/*.log
             windows-fabric.binlog
             .windows-fabric-probe/windows/**/windows-fabric-runtime.log
           if-no-files-found: ignore
