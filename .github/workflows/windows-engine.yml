@@ -250,7 +250,7 @@ jobs:
               if ($log -match 'FAIL:' -or -not $log.Contains("PASS: $title native layout 120->240")) {
                 throw "$title did not complete native layout and reactive update; exited=$($app.HasExited)"
               }
-              powershell.exe -NoProfile -File ./scripts/check-windows-native-input.ps1 -ApplicationProcessId $app.Id |
+              powershell.exe -STA -NoProfile -File ./scripts/check-windows-native-input.ps1 -ApplicationProcessId $app.Id |
                 Tee-Object -FilePath "windows-$framework-input-runtime.log"
               if ($LASTEXITCODE -ne 0) { throw "$title native input verification failed" }
               $log = Get-Content $logPath -Raw

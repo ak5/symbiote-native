@@ -12,4 +12,6 @@ Text inputs resolve to the SDK's `WindowsTextInput` component for both modes. Th
 
 SafeAreaView uses the same plain View as RNW on Windows. InputAccessoryView follows RNW's iOS-only contract and omits its whole subtree. Each framework fixture uses a SafeAreaView root to exercise the Windows component map.
 
+The keyboard gate also checks system clipboard exchange with a separate PowerShell client: native Ctrl+C must replace a fresh sentinel, and external Unicode text must paste through Ctrl+V and the framework's controlled update. This checks the native text control, not the Expo-backed clipboard companion.
+
 The library scaffold derives from Microsoft's React Native Windows 0.85 cpp-lib template at commit `22f3d36d000a81ae3734a48c909a781a21a43511`. Its MIT license is retained in `REACT_NATIVE_WINDOWS_LICENSE.txt`.

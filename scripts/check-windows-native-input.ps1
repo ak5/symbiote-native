@@ -31,11 +31,30 @@ if (-not [InputWindow]::SetForegroundWindow($app.MainWindowHandle)) { throw 'Cou
 $inputElement.SetFocus()
 if (-not $inputElement.Current.HasKeyboardFocus) { throw 'The native input did not receive keyboard focus' }
 [System.Windows.Forms.SendKeys]::SendWait('^ahello')
-$deadline = (Get-Date).AddSeconds(15)
+function Wait-InputValue([string]$Expected) {
+  $deadline = (Get-Date).AddSeconds(15)
+  do {
+    $value = $pattern.Current.Value
+    if ($value -ceq $Expected) { return }
+    Start-Sleep -Milliseconds 100
+  } while ((Get-Date) -lt $deadline)
+  throw "Native input did not become '$Expected': '$value'"
+}
+Wait-InputValue 'HELLO'
+Write-Host 'PASS: native input seed -> typed hello -> controlled HELLO'
+
+# A fresh sentinel prevents a previous framework's clipboard contents satisfying this check.
+[System.Windows.Forms.Clipboard]::SetText([guid]::NewGuid().ToString())
+[System.Windows.Forms.SendKeys]::SendWait('^a^c')
+$deadline = (Get-Date).AddSeconds(10)
 do {
-  $value = $pattern.Current.Value
-  if ($value -ceq 'HELLO') { break }
+  $copied = [System.Windows.Forms.Clipboard]::GetText()
+  if ($copied -ceq 'HELLO') { break }
   Start-Sleep -Milliseconds 100
 } while ((Get-Date) -lt $deadline)
-if ($value -cne 'HELLO') { throw "Native typing and framework controlled update failed: $value" }
-Write-Host 'PASS: native input seed -> typed hello -> controlled HELLO'
+if ($copied -cne 'HELLO') { throw "Native copy did not reach the system clipboard: '$copied'" }
+$externalText = 'from outside ' + [char]0x96EA
+[System.Windows.Forms.Clipboard]::SetText($externalText)
+[System.Windows.Forms.SendKeys]::SendWait('^a^v')
+Wait-InputValue ($externalText.ToUpperInvariant())
+Write-Host 'PASS: system clipboard native copy and external Unicode paste'
