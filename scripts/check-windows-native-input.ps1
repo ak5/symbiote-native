@@ -110,8 +110,19 @@ Write-Host "PASS: native OS resize updated framework viewport $initialWidth -> $
 
 $scrollCondition = [System.Windows.Automation.PropertyCondition]::new(
   [System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'windows-scroll')
-$scrollElement = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $scrollCondition)
-if ($null -eq $scrollElement) { throw 'The native scroll viewport is missing' }
+$deadline = (Get-Date).AddSeconds(15)
+do {
+  $scrollElement = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $scrollCondition)
+  if ($null -ne $scrollElement) { break }
+  Start-Sleep -Milliseconds 100
+} while ((Get-Date) -lt $deadline)
+if ($null -eq $scrollElement) {
+  $root.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+    [System.Windows.Automation.Condition]::TrueCondition) | Select-Object -First 100 | ForEach-Object {
+      Write-Host "UIA: id=$($_.Current.AutomationId) name=$($_.Current.Name) bounds=$($_.Current.BoundingRectangle)"
+    }
+  throw 'The native scroll viewport is missing'
+}
 $scrollBounds = $scrollElement.Current.BoundingRectangle
 if ($scrollBounds.IsEmpty -or $scrollBounds.Width -le 0 -or $scrollBounds.Height -le 0) {
   throw 'The native scroll viewport has no visible bounds'

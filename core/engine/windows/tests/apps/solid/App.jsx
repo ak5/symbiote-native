@@ -42,6 +42,9 @@ export default function App() {
       </text>
       <scroll-view
         testID="windows-scroll"
+        accessible={true}
+        accessibilityRole="list"
+        accessibilityLabel="Scrollable rows"
         onScroll={onScroll}
         scrollEventThrottle={16}
         style={{ width: 240, height: 200 }}

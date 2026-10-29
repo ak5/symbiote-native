@@ -237,6 +237,7 @@ jobs:
           $executable = $executables[0]
           $bundle = Join-Path $executable.DirectoryName 'Bundle/index.windows.bundle'
           if (-not (Test-Path $bundle)) { throw "Missing packaged JavaScript bundle: $bundle" }
+          $frameworkFailures = @()
           foreach ($framework in @('react', 'svelte', 'vue', 'solid', 'angular')) {
             Copy-Item ".windows-adapter-apps/$framework/index.windows.bundle" $bundle -Force
             $logPath = Join-Path $executable.DirectoryName 'windows-fabric-runtime.log'
@@ -268,11 +269,15 @@ jobs:
               if (-not $log.Contains("PASS: $title native scroll passed 200")) {
                 throw "$title did not report a native scroll event after OS wheel input"
               }
-              if ($log -match 'FAIL:') { throw "$title failed during native typing: $log" }
+              if ($log -match 'FAIL:') { throw "$title failed during native interaction: $log" }
+            } catch {
+              $frameworkFailures += "$framework verification failed: $_"
+              Write-Warning $frameworkFailures[-1]
             } finally {
               if (-not $app.HasExited) { Stop-Process -Id $app.Id }
             }
           }
+          if ($frameworkFailures.Count -ne 0) { throw ($frameworkFailures -join "`n") }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
