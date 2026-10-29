@@ -105,3 +105,15 @@ the production Windows module with a real JavaScriptCore/Fabric host: it install
 commits a View, recreates the module and asserts binding identity is preserved. It passed locally
 with the public backend. This establishes module behavior, while the actual Windows SDK build
 and platform registration remain separate pending gates.
+
+The `native` Windows gate now also builds a standard Win32 app with the actual engine and registers
+`SymbioteEngineModule`. `index-engine.windows.js` initializes it, runs `engine-smoke.js` through the
+production mutation buffer (create/commit/measure120→240), checks repeated module lookup preserves
+bindings, then runs the existing SDK-boundary probe. Its standalone tag uses a separate range to
+avoid colliding with the retained engine's allocator. The same smoke fixture passed locally under
+Hermes with real Fabric. Actual Windows execution remains pending.
+
+`scripts/configure-windows-engine.ps1` is shared by the library and application compile gates;
+both consume identical engine sources, dependencies and SDK-owned JSI headers. Run40937466948
+stopped before compilation because the vcpkg binary-cache setting used `files;path` instead of
+`files,path`; the corrected configuration still needs its Windows build result.

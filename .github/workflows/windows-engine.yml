@@ -67,7 +67,7 @@ jobs:
         run: |
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
           New-Item -ItemType Directory -Force .windows-vcpkg-cache | Out-Null
-          $env:VCPKG_BINARY_SOURCES = "clear;files;$PWD/.windows-vcpkg-cache,readwrite"
+          $env:VCPKG_BINARY_SOURCES = "clear;files,$PWD/.windows-vcpkg-cache,readwrite"
           & .windows-vcpkg/bootstrap-vcpkg.bat -disableMetrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .windows-vcpkg/vcpkg.exe install --triplet x64-windows-static-md "--x-manifest-root=$PWD/core/engine/windows" "--x-install-root=$PWD/.windows-vcpkg-installed" --disable-metrics
@@ -75,77 +75,7 @@ jobs:
       - name: Add the actual engine sources to the fixture
         shell: pwsh
         run: |
-          $projectDir = Join-Path $PWD '.windows-engine-probe/windows/SymbioteEngineProbe'
-          $projectPath = Join-Path $projectDir 'SymbioteEngineProbe.vcxproj'
-          $engineDir = (Resolve-Path core/engine/cpp).Path
-          $moduleDir = (Resolve-Path core/engine/windows).Path
-          $rnDir = (Resolve-Path .windows-engine-probe/node_modules/react-native).Path
-          [xml]$project = Get-Content $projectPath
-          $ns = $project.DocumentElement.NamespaceURI
-          $dependencyRoot = (Resolve-Path .windows-vcpkg-installed).Path
-          $vcpkgRoot = (Resolve-Path .windows-vcpkg).Path
-          $properties = $project.CreateElement('PropertyGroup', $ns)
-          foreach ($entry in @{
-            VcpkgRoot = "$vcpkgRoot\"
-            VcpkgEnabled = 'true'
-            VcpkgManifestInstall = 'false'
-            VcpkgTriplet = 'x64-windows-static-md'
-            VcpkgInstalledDir = "$dependencyRoot\"
-          }.GetEnumerator()) {
-            $property = $project.CreateElement($entry.Key, $ns)
-            $property.InnerText = $entry.Value
-            [void]$properties.AppendChild($property)
-          }
-          [void]$project.DocumentElement.AppendChild($properties)
-          $vcpkgProps = $project.CreateElement('Import', $ns)
-          $vcpkgProps.SetAttribute('Project', "$vcpkgRoot/scripts/buildsystems/msbuild/vcpkg.props")
-          [void]$project.DocumentElement.AppendChild($vcpkgProps)
-          # Expose only the missing conversion header; the SDK remains the sole JSI header owner.
-          $conversionDir = Join-Path $projectDir 'engine-includes/jsi'
-          New-Item -ItemType Directory -Force $conversionDir | Out-Null
-          Copy-Item "$rnDir/ReactCommon/jsi/jsi/JSIDynamic.h" $conversionDir
-          $group = $project.CreateElement('ItemGroup', $ns)
-          # Exporting this function forces the linker to retain the engine and resolve its Fabric calls.
-          @'
-          #include "SymbioteEngineBindings.h"
-          #include "SymbioteEngineModule.h"
-          extern "C" __declspec(dllexport) void InstallSymbioteEngine(facebook::jsi::Runtime &runtime) {
-            symbiote::installBindings(runtime);
-          }
-          '@ | Set-Content (Join-Path $projectDir 'EngineLinkProbe.cpp')
-          $sources = @(Get-ChildItem $engineDir -Filter '*.cpp')
-          if ($sources.Count -eq 0) { throw 'No engine sources found' }
-          $paths = @($sources | ForEach-Object FullName) + @((Join-Path $projectDir 'EngineLinkProbe.cpp'), (Join-Path $rnDir 'ReactCommon/jsi/jsi/JSIDynamic.cpp'))
-          foreach ($source in $paths) {
-            $item = $project.CreateElement('ClCompile', $ns)
-            $item.SetAttribute('Include', $source)
-            $pch = $project.CreateElement('PrecompiledHeader', $ns)
-            $pch.InnerText = 'NotUsing'
-            [void]$item.AppendChild($pch)
-            [void]$group.AppendChild($item)
-          }
-          [void]$project.DocumentElement.AppendChild($group)
-          $definitions = $project.CreateElement('ItemDefinitionGroup', $ns)
-          $compile = $project.CreateElement('ClCompile', $ns)
-          $includes = $project.CreateElement('AdditionalIncludeDirectories', $ns)
-          # RNW's SDK owns JSI; mixing its headers with npm React Native's JSI defines the types twice.
-          $includes.InnerText = "%(AdditionalIncludeDirectories);$engineDir;$moduleDir;$projectDir\engine-includes;$rnDir\ReactCommon"
-          [void]$compile.AppendChild($includes)
-          $defines = $project.CreateElement('PreprocessorDefinitions', $ns)
-          $defines.InnerText = 'SYMBIOTE_PUBLIC_FABRIC=1;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)'
-          [void]$compile.AppendChild($defines)
-          $standard = $project.CreateElement('LanguageStandard', $ns)
-          $standard.InnerText = 'stdcpp20'
-          [void]$compile.AppendChild($standard)
-          $parallel = $project.CreateElement('MultiProcessorCompilation', $ns)
-          $parallel.InnerText = 'false'
-          [void]$compile.AppendChild($parallel)
-          [void]$definitions.AppendChild($compile)
-          [void]$project.DocumentElement.AppendChild($definitions)
-          $vcpkgTargets = $project.CreateElement('Import', $ns)
-          $vcpkgTargets.SetAttribute('Project', "$vcpkgRoot/scripts/buildsystems/msbuild/vcpkg.targets")
-          [void]$project.DocumentElement.AppendChild($vcpkgTargets)
-          $project.Save($projectPath)
+          & scripts/configure-windows-engine.ps1 -ProjectPath .windows-engine-probe/windows/SymbioteEngineProbe/SymbioteEngineProbe.vcxproj -ReactNativePath .windows-engine-probe/node_modules/react-native
       - name: Compile and link against the released Windows SDK
         shell: pwsh
         run: |
@@ -159,11 +89,103 @@ jobs:
           Write-Host "Using installed Windows SDK $($sdk.Name)"
           msbuild .windows-engine-probe/windows/SymbioteEngineProbe.sln /restore /m:1 /p:Configuration=Debug /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /bl:windows-engine.binlog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Create a standard Windows application
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          New-Item -ItemType Directory .windows-fabric-probe | Out-Null
+          @{
+            name = 'symbiote-fabric-probe'
+            version = '0.0.0'
+            private = $true
+            dependencies = @{
+              react = '19.2.3'
+              'react-native' = '0.85.3'
+              'react-native-windows' = '0.85.0'
+            }
+            devDependencies = @{
+              '@react-native-community/cli' = '20.1.0'
+              '@react-native/community-cli-plugin' = '0.85.3'
+              '@react-native/babel-preset' = '0.85.3'
+              '@react-native/metro-config' = '0.85.3'
+              '@react-native/jest-preset' = '0.85.3'
+              '@types/react' = '19.2.0'
+            }
+          } | ConvertTo-Json -Depth 5 | Set-Content .windows-fabric-probe/package.json
+          Push-Location .windows-fabric-probe
+          npm install --ignore-scripts --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install react-native init-windows --template cpp-app --name SymbioteFabricProbe --namespace SymbioteFabricProbe --overwrite
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+      - name: Register the SDK-only native probe
+        shell: pwsh
+        run: |
+          $projectDir = '.windows-fabric-probe/windows/SymbioteFabricProbe'
+          Copy-Item core/engine/windows/tests/FabricProbe.h $projectDir
+          Copy-Item core/engine/cpp/SymbioteBuffer.h $projectDir
+          Copy-Item core/engine/windows/tests/index.windows.js .windows-fabric-probe
+          Copy-Item core/engine/windows/tests/babel.config.cjs .windows-fabric-probe
+          $sourcePath = Join-Path $projectDir 'SymbioteFabricProbe.cpp'
+          $source = Get-Content $sourcePath -Raw
+          $registration = 'AddAttributedModules(packageBuilder, true);'
+          if (-not $source.Contains($registration)) { throw 'The SDK template registration changed' }
+          $source = $source.Replace('#include "NativeModules.h"', "#include `"NativeModules.h`"`n#include <TurboModuleProvider.h>`n#include `"FabricProbe.h`"")
+          $source = $source.Replace($registration, $registration + "`n" + 'winrt::Microsoft::ReactNative::AddTurboModuleProvider<symbiote::windows::probe::FabricProbe>(packageBuilder, L"SymbioteFabricProbe");')
+          Set-Content $sourcePath $source
+      - name: Add the production engine to the application
+        shell: pwsh
+        run: |
+          & scripts/configure-windows-engine.ps1 -ProjectPath .windows-fabric-probe/windows/SymbioteFabricProbe/SymbioteFabricProbe.vcxproj -ReactNativePath .windows-fabric-probe/node_modules/react-native
+          Copy-Item core/engine/windows/tests/index-engine.windows.js .windows-fabric-probe/index.windows.js
+          Copy-Item core/engine/windows/tests/engine-smoke.js .windows-fabric-probe
+          $sourcePath = '.windows-fabric-probe/windows/SymbioteFabricProbe/SymbioteFabricProbe.cpp'
+          $source = Get-Content $sourcePath -Raw
+          $source = $source.Replace('#include "FabricProbe.h"', "#include `"FabricProbe.h`"`n#include `"SymbioteEngineModule.h`"")
+          $source = $source.Replace('AddAttributedModules(packageBuilder, true);', 'AddAttributedModules(packageBuilder, true);' + "`n" + 'winrt::Microsoft::ReactNative::AddTurboModuleProvider<symbiote::windows::SymbioteEngineModule>(packageBuilder, L"SymbioteEngine");')
+          Set-Content $sourcePath $source
+      - name: Build the bundled Win32 application
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          $kitsRoot = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows Kits\Installed Roots').KitsRoot10
+          $sdk = Get-ChildItem (Join-Path $kitsRoot 'Lib') -Directory |
+            Where-Object { $_.Name -match '^10\.0\.\d+\.0$' -and (Test-Path (Join-Path $_.FullName 'um/x64/kernel32.lib')) } |
+            Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+          if ($null -eq $sdk) { throw 'No installed x64 Windows SDK found' }
+          msbuild .windows-fabric-probe/windows/SymbioteFabricProbe.sln /restore /t:SymbioteFabricProbe /m:1 /p:Configuration=Release /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /p:UseBundle=true /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true '/p:BundlerExtraArgs=--max-workers 1' /bl:windows-fabric.binlog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run Fabric through the ABI runtime
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          $executables = @(Get-ChildItem .windows-fabric-probe/windows -Recurse -Filter SymbioteFabricProbe.exe)
+          if ($executables.Count -ne 1) { throw "Expected one native app, found $($executables.Count)" }
+          $logPath = Join-Path $executables[0].DirectoryName 'windows-fabric-runtime.log'
+          $app = Start-Process $executables[0].FullName -WorkingDirectory $executables[0].DirectoryName -PassThru
+          try {
+            $deadline = (Get-Date).AddSeconds(90)
+            do {
+              Start-Sleep -Milliseconds 500
+              $app.Refresh()
+              $log = if (Test-Path $logPath) { Get-Content $logPath -Raw } else { '' }
+            } while (-not $app.HasExited -and $log -notmatch '(PASS|FAIL):' -and (Get-Date) -lt $deadline)
+            Write-Host $log
+            if ($log -match 'FAIL:' -or $log -notmatch 'PASS: NativeState, shared command buffer, Fabric create/clone/commit/measure 120->240') {
+              throw "Native Windows Fabric probe did not pass; exited=$($app.HasExited)"
+            }
+          } finally {
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id }
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: windows-engine-build-log
-          path: windows-engine.binlog
+          include-hidden-files: true
+          path: |
+            windows-engine.binlog
+            windows-fabric.binlog
+            .windows-fabric-probe/windows/**/windows-fabric-runtime.log
           if-no-files-found: ignore
 
   fabric-runtime:

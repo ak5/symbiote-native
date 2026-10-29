@@ -106,7 +106,7 @@ struct FabricProbe final : facebook::react::TurboModule {
           props.setProperty(rt, "height", 80);
           props.setProperty(rt, "backgroundColor", static_cast<double>(0xff234567u));
           auto node = fabric.getPropertyAsFunction(rt, "createNode")
-              .call(rt, 1048576, jsi::String::createFromAscii(rt, "RCTView"), args[0], props, handle).asObject(rt);
+              .call(rt, 67108864, jsi::String::createFromAscii(rt, "RCTView"), args[0], props, handle).asObject(rt);
           commitAndMeasure(rt, fabric, node, args[0].asNumber(), 120);
           jsi::Object changed(rt);
           changed.setProperty(rt, "width", 240);
