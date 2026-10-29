@@ -187,14 +187,14 @@ jobs:
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
           $executables = @(Get-ChildItem .windows-fabric-probe/windows -Recurse -Filter SymbioteFabricProbe.exe)
           if ($executables.Count -ne 1) { throw "Expected one native app, found $($executables.Count)" }
-          $env:SYMBIOTE_PROBE_LOG = Join-Path $PWD 'windows-fabric-runtime.log'
+          $logPath = Join-Path $executables[0].DirectoryName 'windows-fabric-runtime.log'
           $app = Start-Process $executables[0].FullName -WorkingDirectory $executables[0].DirectoryName -PassThru
           try {
             $deadline = (Get-Date).AddSeconds(90)
             do {
               Start-Sleep -Milliseconds 500
               $app.Refresh()
-              $log = if (Test-Path $env:SYMBIOTE_PROBE_LOG) { Get-Content $env:SYMBIOTE_PROBE_LOG -Raw } else { '' }
+              $log = if (Test-Path $logPath) { Get-Content $logPath -Raw } else { '' }
             } while (-not $app.HasExited -and $log -notmatch '(PASS|FAIL):' -and (Get-Date) -lt $deadline)
             Write-Host $log
             if ($log -match 'FAIL:' -or $log -notmatch 'PASS: NativeState, shared command buffer, Fabric create/clone/commit/measure 120->240') {
@@ -209,4 +209,4 @@ jobs:
           name: windows-fabric-sdk-probe
           path: |
             windows-fabric.binlog
-            windows-fabric-runtime.log
+            .windows-fabric-probe/windows/**/windows-fabric-runtime.log

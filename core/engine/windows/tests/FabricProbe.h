@@ -2,7 +2,6 @@
 
 // SDK-boundary probe only. The production retained tree is not implemented here.
 #include <ReactCommon/TurboModule.h>
-#include <cstdlib>
 #include <cstring>
 #include <fstream>
 
@@ -10,8 +9,7 @@ namespace symbiote::windows::probe {
 namespace jsi = facebook::jsi;
 
 inline void report(const std::string &message) {
-  const char *path = std::getenv("SYMBIOTE_PROBE_LOG");
-  if (path != nullptr) std::ofstream(path, std::ios::app) << message << '\n';
+  std::ofstream("windows-fabric-runtime.log", std::ios::app) << message << '\n';
 }
 
 struct State final : jsi::NativeState {
