@@ -93,3 +93,9 @@ DLL CRT contract while avoiding a second set of dependency DLLs. Dependency buil
 and a binary cache. The fixture compiles the installed RN package's unchanged `JSIDynamic.cpp` and
 exposes only its conversion header in a generated include directory; it never adds npm's JSI
 include directory alongside the SDK's JSI. Actual Windows compile/link verification is pending.
+
+`windows/SymbioteEngineModule.h` is the SDK C++ TurboModule, registered under `SymbioteEngine`.
+Its first synchronous `getVersion()` call installs the shared bindings; later lookups preserve them.
+The JS resolver uses the same synchronous initialization path as Linux and propagates failures
+before caching a result. Eight resolver regression tests pass. Module syntax is checked locally;
+actual RNW registration and runtime execution still need to be added to the application gate.

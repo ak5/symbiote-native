@@ -249,14 +249,12 @@ function isBindings(value: unknown): value is INativeEngineBindings {
 let resolved = false;
 let bindings: INativeEngineBindings | undefined;
 
-// The native bindings, or undefined when this platform has none. Resolving the TurboModule is
-// done for its side effect: RCTTurboModuleManager runs installJSIBindingsWithRuntime: at the
-// moment it creates a module, so touching the module by name is what puts the global there.
+// iOS/Android install when resolved; portable C++ modules receive the runtime on their first call.
 export function nativeEngine(): INativeEngineBindings | undefined {
   if (resolved) return bindings;
-  resolved = true;
 
-  getNativeModule<unknown>('SymbioteEngine');
+  getNativeModule<{ getVersion(): number }>('SymbioteEngine')?.getVersion();
+  resolved = true;
 
   const installed: unknown = globalThis.__symbioteEngineNative;
   if (!isBindings(installed)) {

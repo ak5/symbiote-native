@@ -82,6 +82,49 @@ function installFakeTurboModuleProxy(bindings: unknown): {
 }
 
 describe('native engine bindings', () => {
+  it('initializes a C++ module before reading its bindings, once per resolution', () => {
+    let calls = 0;
+    const installed = fakeBindings(SUPPORTED_NATIVE_VERSION);
+    Object.assign(globalThis, {
+      nativeModuleProxy: {
+        [MODULE_NAME]: {
+          getVersion() {
+            calls += 1;
+            Object.assign(globalThis, { [GLOBAL_KEY]: installed });
+            return SUPPORTED_NATIVE_VERSION;
+          },
+        },
+      },
+    });
+    resetNativeEngine();
+
+    expect(nativeEngine()).toBe(installed);
+    expect(nativeEngine()).toBe(installed);
+    expect(calls).toBe(1);
+  });
+
+  it('surfaces failed initialization without caching a missing native engine', () => {
+    let calls = 0;
+    Object.assign(globalThis, {
+      nativeModuleProxy: {
+        [MODULE_NAME]: {
+          getVersion() {
+            calls += 1;
+            if (calls === 1) throw new Error('native initialization failed');
+            Object.assign(globalThis, {
+              [GLOBAL_KEY]: fakeBindings(SUPPORTED_NATIVE_VERSION),
+            });
+            return SUPPORTED_NATIVE_VERSION;
+          },
+        },
+      },
+    });
+    resetNativeEngine();
+
+    expect(() => nativeEngine()).toThrow('native initialization failed');
+    expect(nativeEngine()?.version).toBe(SUPPORTED_NATIVE_VERSION);
+  });
+
   it('reports no native store when nothing installed one', () => {
     resetNativeEngine();
     expect(nativeEngine()).toBeUndefined();

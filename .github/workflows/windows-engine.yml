@@ -78,6 +78,7 @@ jobs:
           $projectDir = Join-Path $PWD '.windows-engine-probe/windows/SymbioteEngineProbe'
           $projectPath = Join-Path $projectDir 'SymbioteEngineProbe.vcxproj'
           $engineDir = (Resolve-Path core/engine/cpp).Path
+          $moduleDir = (Resolve-Path core/engine/windows).Path
           $rnDir = (Resolve-Path .windows-engine-probe/node_modules/react-native).Path
           [xml]$project = Get-Content $projectPath
           $ns = $project.DocumentElement.NamespaceURI
@@ -107,6 +108,7 @@ jobs:
           # Exporting this function forces the linker to retain the engine and resolve its Fabric calls.
           @'
           #include "SymbioteEngineBindings.h"
+          #include "SymbioteEngineModule.h"
           extern "C" __declspec(dllexport) void InstallSymbioteEngine(facebook::jsi::Runtime &runtime) {
             symbiote::installBindings(runtime);
           }
@@ -127,7 +129,7 @@ jobs:
           $compile = $project.CreateElement('ClCompile', $ns)
           $includes = $project.CreateElement('AdditionalIncludeDirectories', $ns)
           # RNW's SDK owns JSI; mixing its headers with npm React Native's JSI defines the types twice.
-          $includes.InnerText = "%(AdditionalIncludeDirectories);$engineDir;$projectDir\engine-includes;$rnDir\ReactCommon"
+          $includes.InnerText = "%(AdditionalIncludeDirectories);$engineDir;$moduleDir;$projectDir\engine-includes;$rnDir\ReactCommon"
           [void]$compile.AppendChild($includes)
           $defines = $project.CreateElement('PreprocessorDefinitions', $ns)
           $defines.InnerText = 'SYMBIOTE_PUBLIC_FABRIC=1;_CRT_SECURE_NO_WARNINGS;NOMINMAX;%(PreprocessorDefinitions)'
