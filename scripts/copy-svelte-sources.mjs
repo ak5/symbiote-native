@@ -11,6 +11,7 @@
 //
 // Runs over every publishable package, not just svelte by name, so a future package authored the
 // same way is covered automatically — same discovery mechanism as fix-esm-extensions.mjs.
+import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import { publishablePackageEntries } from './lib/publishable-packages.mjs';
@@ -43,7 +44,7 @@ export function copySvelteSources(pkgDir) {
   return filesCopied;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   let totalFiles = 0;
   for (const { dir } of publishablePackageEntries()) {
     totalFiles += copySvelteSources(dir);

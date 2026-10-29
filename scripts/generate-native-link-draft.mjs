@@ -8,6 +8,7 @@
 
 // optionalManifestBundles is never drafted: which options are policy-sensitive is only readable
 // from the plugin's own option type, not from introspection (see main()'s printed hint below).
+import { pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { resolvePackageDir, resolvePlugin, introspectPlugin } from './lib/expo-mod-introspection.mjs';
@@ -259,6 +260,6 @@ export async function main() {
   console.log(`\nRun: npx eslint ${nativeLinkPath} - it will keep failing until every TODO above is resolved.`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }
