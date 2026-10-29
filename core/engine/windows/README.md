@@ -1,6 +1,8 @@
 # Windows engine
 
-This experimental target uses the released React Native Windows SDK, C++ TurboModules and the shared C++ retained tree through public Fabric JSI calls. Windows compile and application runtime verification are still in progress. The candidate React Native 0.85.3 peer range is under compatibility validation. Applications must pin `@react-native/virtualized-lists` to their React Native version.
+This experimental x64 target uses the released React Native Windows SDK, C++ TurboModules and the shared C++ retained tree through public Fabric JSI calls. It keeps the stock React Native, Fabric and Yoga sources unchanged.
+
+The verified host combination is React Native Windows 0.85.0, React Native 0.85.3 and React 19.2.3. Applications must pin `@react-native/virtualized-lists` and `@react-native/metro-babel-transformer` to their React Native version. Other SDK versions and architectures need their own native compatibility check.
 
 `react-native.config.cjs` exposes the `SymbioteNativeEngine` library and its WinRT package provider to the Windows autolinker. The provider registers `SymbioteEngineModule`; its first synchronous version call installs the engine bindings.
 
@@ -21,3 +23,34 @@ The library scaffold derives from Microsoft's React Native Windows 0.85 cpp-lib 
 The scrolling gate sends OS wheel input over each application's native ScrollView.
 It requires the framework's native scroll callback to report a vertical offset of
 at least 200; merely creating the control cannot satisfy the assertion.
+
+## Verification
+
+From this branch, build and bundle the installed framework consumer matrix with:
+
+```sh
+nice -n 10 pnpm run check:windows-consumers <new-consumer-directory>
+```
+
+This builds and packs the workspace packages, then installs ordinary npm consumers
+for React, Svelte, Vue, Solid and Angular. It verifies their production Metro
+bundles, including Angular AOT. Bundling can run on macOS; it does not prove a
+Windows native executable works.
+
+The complete native commands are in `.github/workflows/windows-engine.yml`.
+They require Windows, the Visual Studio C++ toolchain, a Windows SDK and vcpkg.
+The gate creates standard SDK library/application projects, installs the packed
+engine, runs the official Windows autolinker and builds the production WinRT
+provider plus a bundled Win32 application. Runtime checks use a real desktop
+session for UI Automation and keyboard/wheel input. Each framework runs in a
+fresh application process. Logs and MSBuild binary logs are uploaded even when
+a native check fails.
+
+## Host limits
+
+The engine target does not port Expo's native runtime or its companion modules.
+Native text-control copy/paste is separate from `@symbiote-native/clipboard`,
+which requires ExpoClipboard. Persistent storage and other companion APIs need
+compatible Windows native providers and native verification; a successful Metro
+bundle does not establish their availability. The standard CLI still scaffolds
+the mobile hosts; the Windows SDK application setup above supplies this host.

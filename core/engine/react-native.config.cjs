@@ -1,4 +1,4 @@
-// Declares this package's Android native project to @react-native-community/cli autolinking.
+// Declares the Android project and Windows WinRT provider for native autolinking.
 // Explicit rather than relying on auto-detection, so the Kotlin ReactPackage is registered
 // deterministically — same reasoning as `packages/android/react-native.config.js`.
 //
