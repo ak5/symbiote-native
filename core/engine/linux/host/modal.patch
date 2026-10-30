@@ -1118,7 +1118,7 @@ diff --git a/packages/core/tests/ModalControllerTest.cpp b/packages/core/tests/M
 new file mode 100644
 --- /dev/null
 +++ b/packages/core/tests/ModalControllerTest.cpp
-@@ -0,0 +1,360 @@
+@@ -0,0 +1,362 @@
 +#include "ModalController.h"
 +
 +#include "InputDispatcher.h"
@@ -1312,8 +1312,8 @@ new file mode 100644
 +}
 +
 +TEST_F(ModalControllerTest, ModalFocusRejectsBackgroundCommandsAndRestoresThePreviousField) {
-+    const auto background = makeField(4, folly::dynamic::object("width", 100)("height", 40));
-+    const auto field = makeField(6, folly::dynamic::object("width", 100)("height", 40));
++    const auto background = makeField(4, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
++    const auto field = makeField(6, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
 +    commit({background, children(modal(folly::dynamic::object("visible", true)), {field})});
 +    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
 +    const SceneCommand focus{.tag = 4, .name = "focus", .args = folly::dynamic::object()};
@@ -1328,9 +1328,9 @@ new file mode 100644
 +}
 +
 +TEST_F(ModalControllerTest, NestedModalFocusReturnsThroughItsParentBeforeRestoringTheBackground) {
-+    const auto background = makeField(4, folly::dynamic::object("width", 100)("height", 40));
-+    const auto parentField = makeField(6, folly::dynamic::object("width", 100)("height", 40));
-+    const auto childField = makeField(10, folly::dynamic::object("width", 100)("height", 40));
++    const auto background = makeField(4, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
++    const auto parentField = makeField(6, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
++    const auto childField = makeField(10, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
 +    const auto child = children(modal(folly::dynamic::object("visible", true), 8), {childField});
 +    commit({background, children(modal(folly::dynamic::object("visible", true)), {parentField, child})});
 +    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
@@ -1346,8 +1346,8 @@ new file mode 100644
 +}
 +
 +TEST_F(ModalControllerTest, AModalPreservesTheBackgroundEditorsLocalTextAndCaret) {
-+    const auto background = makeField(4, folly::dynamic::object("width", 100)("height", 40));
-+    const auto field = makeField(6, folly::dynamic::object("width", 100)("height", 40));
++    const auto background = makeField(4, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
++    const auto field = makeField(6, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
 +    commit({background, children(modal(folly::dynamic::object("visible", true)), {field})});
 +    ModalTextInputSink sink;
 +    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
@@ -1371,14 +1371,14 @@ new file mode 100644
 +}
 +
 +TEST_F(ModalControllerTest, ReplacingAModalFamilyResetsItsFocusAndPreservesTheBackgroundAnchor) {
-+    const auto background = makeField(4, folly::dynamic::object("width", 100)("height", 40));
-+    const auto original = makeField(6, folly::dynamic::object("width", 100)("height", 40));
++    const auto background = makeField(4, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
++    const auto original = makeField(6, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
 +    commit({background, children(modal(folly::dynamic::object("visible", true)), {original})});
 +    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
 +    dispatcher.dispatchCommands({SceneCommand{.tag = 4, .name = "focus", .args = folly::dynamic::object()}});
 +    dispatcher.setModalRoot(2);
 +    ASSERT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 6);
-+    const auto replacement = makeField(10, folly::dynamic::object("width", 100)("height", 40));
++    const auto replacement = makeField(10, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
 +    commit({background, children(modal(folly::dynamic::object("visible", true)), {replacement})});
 +    dispatcher.setModalRoot(2);
 +    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 10);
@@ -1397,19 +1397,21 @@ new file mode 100644
 +                                           .emitter = custom->getEventEmitter(),
 +                                           .role = "button",
 +                                           .actionName = "archive"};
-+    commit({custom});
++    const auto nested = children(modal(folly::dynamic::object("visible", true), 8), {custom});
++    const auto parent = children(modal(folly::dynamic::object("visible", true)), {nested});
++    commit({parent});
 +    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    dispatcher.setModalRoot(8);
 +    dispatcher.dispatchAccessibilityActions({action});
 +    ASSERT_EQ(events("topAccessibilityAction"), 1);
-+    const auto hidden = children(modal(folly::dynamic::object("visible", false), 8), {custom});
-+    commit({children(modal(folly::dynamic::object("visible", true)), {hidden})});
++    commit({children(parent, {visible(nested, false)})});
 +    dispatcher.setModalRoot(2);
 +    dispatcher.dispatchAccessibilityActions({action});
 +    EXPECT_EQ(events("topAccessibilityAction"), 1);
 +}
 +
 +TEST_F(ModalControllerTest, EscapeCannotCloseAModalWhileEarlierInputInTheFrameStartedComposition) {
-+    const auto field = makeField(6, folly::dynamic::object("width", 100)("height", 40));
++    const auto field = makeField(6, folly::dynamic::object("accessible", true)("width", 100)("height", 40));
 +    commit({children(modal(folly::dynamic::object("visible", true)), {field})});
 +    int closeRequests = 0;
 +    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId, [&] { ++closeRequests; });
