@@ -76,6 +76,9 @@ for (const framework of frameworks) {
   mkdirSync(app);
   const dependencies = {
     ...shared,
+    ...manifest(
+      join(repository, 'core/engine/windows/tests/storage-dependencies.json'),
+    ),
     ...Object.fromEntries([pack(join(repository, 'adapters', framework))]),
     react: '19.2.3',
     'react-native': '0.85.3',
@@ -130,11 +133,16 @@ for (const framework of frameworks) {
   cpSync(join(repository, `core/engine/windows/tests/apps/${framework}`), app, {
     recursive: true,
   });
-  for (const name of ['common.js', 'common.d.ts'])
+  for (const name of ['common.js', 'common.d.ts', 'persistence.js'])
     copyFileSync(
       join(repository, 'core/engine/windows/tests/apps', name),
       join(app, name),
     );
+  const entry = join(app, 'index.js');
+  writeFileSync(
+    entry,
+    readFileSync(entry, 'utf8') + "\nimport './persistence';\n",
+  );
   const babel =
     framework === 'solid'
       ? {
@@ -262,6 +270,16 @@ module.exports = mergeConfig(adapter, {maxWorkers: 1, resolver: {
         ),
     ),
     'Metro must select the Windows native component names',
+  );
+  assert(
+    sources.some(path =>
+      path
+        .replaceAll('\\', '/')
+        .endsWith(
+          '@react-native-async-storage/async-storage/lib/module/createAsyncStorage.windows.js',
+        ),
+    ),
+    'Metro must select the native Windows storage provider',
   );
   if (framework === 'vue') verifyVueRuntime(sources);
   console.log(`Packed Windows consumer ready: ${framework}`);

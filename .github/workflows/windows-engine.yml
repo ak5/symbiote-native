@@ -43,7 +43,7 @@ jobs:
         shell: pwsh
         run: |
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
-          node --test scripts/windows-app-fixtures.test.mjs
+          node --test --test-concurrency=1 scripts/windows-app-fixtures.test.mjs scripts/windows-persistence-probe.test.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           pnpm run check:windows-consumers .windows-adapter-apps
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -137,6 +137,7 @@ jobs:
           (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
           New-Item -ItemType Directory .windows-fabric-probe | Out-Null
           $engineVersion = (Get-Content core/engine/package.json -Raw | ConvertFrom-Json).version
+          $storage = Get-Content core/engine/windows/tests/storage-dependencies.json -Raw | ConvertFrom-Json
           @{
             name = 'symbiote-fabric-probe'
             version = '0.0.0'
@@ -146,6 +147,7 @@ jobs:
               'react-native' = '0.85.3'
               'react-native-windows' = '0.85.0'
               '@symbiote-native/engine' = "file:../.windows-engine-packs/symbiote-native-engine-$engineVersion.tgz"
+              '@react-native-async-storage/async-storage' = $storage.'@react-native-async-storage/async-storage'
             }
             devDependencies = @{
               '@react-native-community/cli' = '20.1.0'
@@ -167,6 +169,7 @@ jobs:
         run: |
           $projectDir = '.windows-fabric-probe/windows/SymbioteFabricProbe'
           Copy-Item core/engine/windows/SymbioteWindowMessages.h $projectDir
+          Copy-Item core/engine/windows/tests/PersistenceConfig.h $projectDir
           Copy-Item core/engine/windows/tests/FabricProbe.h $projectDir
           Copy-Item core/engine/cpp/SymbioteBuffer.h $projectDir
           Copy-Item core/engine/windows/tests/index.windows.js .windows-fabric-probe
@@ -177,10 +180,10 @@ jobs:
           if (-not $source.Contains($registration)) { throw 'The SDK template registration changed' }
           $source = $source.Replace('#include "NativeModules.h"', "#include `"NativeModules.h`"`n#include <TurboModuleProvider.h>`n#include `"FabricProbe.h`"")
           $source = $source.Replace($registration, $registration + "`n" + 'winrt::Microsoft::ReactNative::AddTurboModuleProvider<symbiote::windows::probe::FabricProbe>(packageBuilder, L"SymbioteFabricProbe");')
-          $source = $source.Replace('#include "pch.h"', "#include `"pch.h`"`n#include <winrt/Microsoft.UI.Interop.h>`n#include `"SymbioteWindowMessages.h`"")
+          $source = $source.Replace('#include "pch.h"', "#include `"pch.h`"`n#include <winrt/Microsoft.UI.Interop.h>`n#include `"SymbioteWindowMessages.h`"`n#include `"PersistenceConfig.h`"")
           $start = 'reactNativeWin32App.Start();'
           if (-not $source.Contains($start)) { throw 'The SDK app startup changed' }
-          $source = $source.Replace($start, 'symbiote::windows::WindowMessages windowMessages{winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id()), settings.Notifications()};' + "`n" + $start)
+          $source = $source.Replace($start, 'symbiote::windows::WindowMessages windowMessages{winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id()), settings.Notifications()};' + "`n" + 'try { symbiote::windows::probe::configurePersistence(); } catch (winrt::hresult_error const &error) { symbiote::windows::probe::report("FAIL: persistence configuration: " + winrt::to_string(error.message())); return 1; }' + "`n" + $start)
           Set-Content $sourcePath $source
       - name: Autolink the production native package into the application
         shell: pwsh
@@ -278,6 +281,14 @@ jobs:
             }
           }
           if ($frameworkFailures.Count -ne 0) { throw ($frameworkFailures -join "`n") }
+      - name: Verify native storage across fresh application processes
+        shell: pwsh
+        run: |
+          (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+          $executables = @(Get-ChildItem .windows-fabric-probe/windows -Recurse -Filter SymbioteFabricProbe.exe)
+          if ($executables.Count -ne 1) { throw "Expected one native app, found $($executables.Count)" }
+          node scripts/run-windows-persistence-consumers.mjs ($executables[0].FullName) .windows-adapter-apps windows-persistence-results
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -288,6 +299,7 @@ jobs:
             windows-package.binlog
             windows-*-runtime.log
             windows-fabric.binlog
+            windows-persistence-results/
             .windows-fabric-probe/windows/**/windows-fabric-runtime.log
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4

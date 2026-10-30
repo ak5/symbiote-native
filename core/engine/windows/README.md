@@ -84,3 +84,29 @@ reactNativeWin32App.Start();
 The forwarder removes its window subclass when the native window is destroyed
 or its owner leaves scope. The native application gate installs this same
 header and requires a real OS resize to reach every framework's metrics hook.
+
+## Persistent storage interoperability
+
+The app fixtures install `@react-native-async-storage/async-storage` 3.1.1 through
+normal npm installation and the Windows autolinker. Its Windows backend uses one
+SQLite database per application; see the provider's documentation at
+https://react-native-async-storage.github.io/.
+
+The persistence gate launches every framework twice. The first process writes a
+Unicode library snapshot into a fresh private database; a new process must
+restore the exact snapshot. Both phases must also mount and update the native
+framework UI. The runner checks the SQLite file header, preserves logs and a
+database copy, and restores the application's original bundle afterward.
+
+For the unpackaged Win32 fixture, `tests/PersistenceConfig.h` supplies the
+provider's explicit database-path property from `SYMBIOTE_PERSISTENCE_DATABASE`.
+The runner owns that temporary path and removes it after preserving diagnostics.
+This is application-owned storage; the ExpoSQLite companion still needs its own
+Windows provider.
+
+On Windows, after preparing the consumer matrix and native executable:
+
+```powershell
+(Get-Process -Id $PID).PriorityClass = 'BelowNormal'
+node scripts/run-windows-persistence-consumers.mjs <executable> <consumer-matrix> <new-output-directory>
+```
