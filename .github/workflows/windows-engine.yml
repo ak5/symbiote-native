@@ -231,7 +231,7 @@ jobs:
           $rn = (Resolve-Path .windows-fabric-probe/node_modules/react-native).Path + '\'
           $vcpkg = (Resolve-Path .windows-vcpkg).Path + '\'
           $installed = (Resolve-Path .windows-vcpkg-installed).Path + '\'
-          msbuild .windows-fabric-probe/windows/SymbioteFabricProbe.sln /restore /t:SymbioteFabricProbe /m:1 /p:Configuration=Release /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /p:UseBundle=true /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true '/p:BundlerExtraArgs=--max-workers 1' "/p:ReactNativeWindowsDir=$rnw" "/p:SymbioteReactNativeDirectory=$rn" "/p:VcpkgRoot=$vcpkg" "/p:VcpkgInstalledDir=$installed" /p:VcpkgManifestInstall=false /bl:windows-fabric.binlog
+          msbuild .windows-fabric-probe/windows/SymbioteFabricProbe.sln /restore /t:SymbioteFabricProbe /m:1 /p:Configuration=Release /p:Platform=x64 "/p:WindowsTargetPlatformVersion=$($sdk.Name)" /p:UseBundle=true /p:UseFabric=true /p:PlatformToolset=v145 /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true '/p:BundlerExtraArgs=--max-workers 1' "/p:ReactNativeWindowsDir=$rnw" "/p:SymbioteReactNativeDirectory=$rn" "/p:VcpkgRoot=$vcpkg" "/p:VcpkgInstalledDir=$installed" /p:VcpkgManifestInstall=false /bl:windows-fabric.binlog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run Fabric through the ABI runtime
         shell: pwsh

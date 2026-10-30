@@ -105,6 +105,11 @@ codegen output, so the fixture disables that unused step for this provider.
 CppWinRT still generates the WinRT provider from its IDL; native registration,
 compilation and runtime storage checks remain required.
 
+The application build passes `UseFabric=true` and `PlatformToolset=v145` to all
+project references. The provider chooses Win32 or UWP globals before importing
+RNW architecture defaults, so Fabric must be explicit at project evaluation.
+The toolset matches the SDK application and engine on the VS 2026 runner.
+
 The persistence gate launches every framework twice. The first process writes a
 Unicode library snapshot into a fresh private database; a new process must
 restore the exact snapshot. Both phases must also mount and update the native
