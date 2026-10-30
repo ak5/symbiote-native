@@ -21,6 +21,9 @@ function App() {
   const [empty, setEmpty] = useState('');
   const [custom, setCustom] = useState('none');
   const [reverseActions, setReverseActions] = useState(false);
+  const [selectedTab, setSelectedTab] = useState('alpha');
+  const [progress, setProgress] = useState(40);
+  const [selectedRadio, setSelectedRadio] = useState('one');
   const declaredActions = [
     { name: 'archive', label: 'Archive item' },
     { name: 'copyId', label: 'Copy identifier' },
@@ -167,6 +170,93 @@ function App() {
         },
       },
       createElement('text', { style: textStyle }, 'Reload session'),
+    ),
+
+    createElement(
+      'view',
+      {
+        role: 'tablist',
+        accessibilityLabel: 'Native tabs',
+        style: { width: 600, height: 48, flexDirection: 'row' },
+      },
+      ['alpha', 'beta', 'blocked'].map(tab =>
+        createElement(
+          'pressable',
+          {
+            key: tab,
+            accessible: true,
+            role: 'tab',
+            accessibilityLabel: `Native tab ${tab}`,
+            disabled: tab === 'blocked',
+            accessibilityState: {
+              selected: selectedTab === tab,
+              disabled: tab === 'blocked',
+            },
+            style: { width: 180, height: 40 },
+            onPress: () => {
+              if (tab === 'blocked') throw new Error('Disabled tab selected');
+              setSelectedTab(tab);
+            },
+          },
+          createElement('text', { style: textStyle }, tab),
+        ),
+      ),
+    ),
+    createElement(
+      'text',
+      { style: textStyle },
+      `Native selected tab ${selectedTab}`,
+    ),
+    createElement(
+      'view',
+      {
+        role: 'radiogroup',
+        accessibilityLabel: 'Native radio group',
+        style: { width: 400, height: 48, flexDirection: 'row' },
+      },
+      ['one', 'two'].map(choice =>
+        createElement(
+          'pressable',
+          {
+            key: choice,
+            accessible: true,
+            role: 'radio',
+            accessibilityLabel: `Native radio ${choice}`,
+            accessibilityState: { checked: selectedRadio === choice },
+            style: { width: 180, height: 40 },
+            onPress: () => setSelectedRadio(choice),
+          },
+          createElement('text', { style: textStyle }, choice),
+        ),
+      ),
+    ),
+    createElement(
+      'text',
+      { style: textStyle },
+      `Native selected radio ${selectedRadio}`,
+    ),
+    createElement('view', {
+      accessible: true,
+      role: 'progressbar',
+      accessibilityLabel: 'Native progress',
+      accessibilityValue: {
+        min: 0,
+        max: 100,
+        now: progress,
+        text: `${progress} percent`,
+      },
+      style: { width: 200, height: 24 },
+    }),
+    createElement(
+      'pressable',
+      {
+        accessible: true,
+        role: 'button',
+        accessibilityLabel: 'Advance native progress',
+        style: { width: 240, height: 40 },
+        onPress: () => setProgress(current => current + 10),
+      },
+      createElement('text', { style: textStyle }, 'Advance progress'),
     ),
 
     createElement('text', { style: textStyle }, longCluster),

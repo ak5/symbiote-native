@@ -25,6 +25,8 @@ git -C <host> apply --check "$PWD/core/engine/linux/host/modal.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/modal.patch"
 git -C <host> apply --check "$PWD/core/engine/linux/host/refresh.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/refresh.patch"
+git -C <host> apply --check "$PWD/core/engine/linux/host/selection.patch"
+git -C <host> apply "$PWD/core/engine/linux/host/selection.patch"
 ```
 
 `clipboard-safety.patch` prevents secure text from entering the clipboard,
@@ -184,3 +186,14 @@ real Wayland pan input, controlled acceptance/rejection, native indicator pixels
 keyboard/AT-SPI activation, draft preservation, removal, modal isolation and
 in-process reload. These new refresh runtime gates still require Linux results;
 local source and bundle checks do not establish native runtime support.
+
+`selection.patch` preserves an explicit unselected state for selectable item
+roles and maps a checked radio to its selected item. AccessKit uses that state to distinguish an unselected item from a node
+that cannot be selected. Native list items, tree items and options also expose
+activation through the existing guarded controller path.
+
+The independent AT-SPI client selects and reselects native tabs, rejects a
+disabled tab, and checks that old selection handles cannot change a reloaded
+library. It also reads numeric accessibility ranges and checks a real value
+change event after a framework update. These additions still need Linux runtime
+verification; they do not establish arbitrary numeric-value setters.

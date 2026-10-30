@@ -413,6 +413,62 @@ def main():
         alive.remove(injector)
 
 
+    def exercise_selection_and_value(root, alive, cycle):
+        tabs = until(lambda: named(root, 'Native tabs'), 'native tab list', alive)
+        assert tabs.get_role() == Atspi.Role.PAGE_TAB_LIST, tabs.get_role_name()
+        selection = tabs.get_selection_iface()
+        assert selection is not None, 'Native tab list has no real AT-SPI Selection interface'
+        alpha = until(lambda: named(root, 'Native tab alpha'), 'first native tab', alive)
+        beta = until(lambda: named(root, 'Native tab beta'), 'second native tab', alive)
+        assert alpha.get_role() == Atspi.Role.PAGE_TAB and beta.get_role() == Atspi.Role.PAGE_TAB
+        assert selection.get_n_selected_children() == 1
+        assert selection.get_selected_child(0) == alpha
+        assert selection.is_child_selected(0) and not selection.is_child_selected(1)
+        assert not selection.select_child(2), 'Disabled tab accepted native selection'
+        assert beta.get_state_set().contains(Atspi.StateType.SELECTABLE), 'Unselected tab cannot be selected'
+        assert selection.select_child(1), 'AT-SPI rejected selecting the initially unselected tab'
+        until(lambda: selection.get_selected_child(0) == beta and named(root, 'Native selected tab beta'),
+              'native selection reached the framework and returned as selected state', alive)
+        assert selection.get_n_selected_children() == 1
+        assert not selection.is_child_selected(0) and selection.is_child_selected(1)
+        assert alpha.get_state_set().contains(Atspi.StateType.SELECTABLE), 'Deselected tab lost selectability'
+        assert selection.select_child(0), 'AT-SPI rejected selecting the deselected tab'
+        until(lambda: selection.get_selected_child(0) == alpha and named(root, 'Native selected tab alpha'),
+              'native selection can return to the original tab', alive)
+        assert selection.get_n_selected_children() == 1
+        print(f'PASS native AT-SPI Selection: unselected tab, controlled state and reselection cycle={cycle}', flush=True)
+
+        radio = until(lambda: named(root, 'Native radio group'), 'native radio group', alive)
+        radio_selection = radio.get_selection_iface()
+        assert radio_selection is not None, 'Radio group has no native Selection interface'
+        first = until(lambda: named(root, 'Native radio one'), 'first native radio', alive)
+        second = until(lambda: named(root, 'Native radio two'), 'second native radio', alive)
+        assert radio_selection.get_n_selected_children() == 1
+        assert radio_selection.get_selected_child(0) == first, 'Checked radio is not selected'
+        assert radio_selection.select_child(1), 'Unchecked radio could not be selected'
+        until(lambda: radio_selection.get_selected_child(0) == second and named(root, 'Native selected radio two'),
+              'native radio selection updates controlled checked props', alive)
+        assert radio_selection.get_n_selected_children() == 1
+        assert not radio_selection.is_child_selected(0) and radio_selection.is_child_selected(1)
+        print(f'PASS native AT-SPI radio Selection from checked props cycle={cycle}', flush=True)
+
+        progress = until(lambda: named(root, 'Native progress'), 'native numeric progress', alive)
+        assert progress.get_role() == Atspi.Role.PROGRESS_BAR, progress.get_role_name()
+        value = progress.get_value_iface()
+        assert value is not None, 'Numeric accessibility props did not expose AT-SPI Value'
+        assert value.get_minimum_value() == 0 and value.get_maximum_value() == 100
+        assert value.get_current_value() == 40
+        updates_before = len(events)
+        advance = until(lambda: named(root, 'Advance native progress'), 'native progress action', alive)
+        assert advance.get_action_iface().do_action(0)
+        until(lambda: value.get_current_value() == 50, 'numeric native value after framework update', alive)
+        until(lambda: any(event['source'] == 'Native progress' and
+                          event['type'].startswith('object:property-change:accessible-value')
+                          for event in events[updates_before:]), 'native numeric value change event', alive)
+        assert value.get_minimum_value() == 0 and value.get_maximum_value() == 100
+        print(f'PASS native AT-SPI Value: numeric range, controlled update and value event cycle={cycle}', flush=True)
+        return selection
+
     runtime_directory = tempfile.TemporaryDirectory(prefix='symbiote-atspi-')
     try:
         directory = runtime_directory.name
@@ -471,6 +527,7 @@ def main():
             elif args.scenario == 'refresh':
                 exercise_refresh(root, desktop, window, alive, cycle)
             else:
+                previous_selection = exercise_selection_and_value(root, alive, cycle)
                 editor = until(lambda: named(root, 'Native editor'), 'native editor publication', alive)
                 until(lambda: text(editor) == 'é🐧z', 'Unicode editor value', alive)
                 expected = {'Native group': Atspi.Role.PANEL, 'Native image': Atspi.Role.IMAGE,
@@ -597,6 +654,18 @@ def main():
                 command(['wtype', 'Q'])
                 until(lambda: text(replacement) == 'é🐧zQ', 'old handles cannot edit the replacement session', alive)
                 print(f'PASS native AT-SPI in-process reload and stale handles cycle={cycle} accepted={accepted} rejected={rejected}', flush=True)
+                try:
+                    previous_selection.select_child(1)
+                except GLib.Error:
+                    pass
+                command(['wtype', 'R'])
+                until(lambda: text(replacement) == 'é🐧zQR', 'native input after stale selection request', alive)
+                fresh_tabs = until(lambda: named(root, 'Native tabs'), 'fresh native tab list', alive)
+                fresh_selection = fresh_tabs.get_selection_iface()
+                assert fresh_selection.is_child_selected(0) and not fresh_selection.is_child_selected(1)
+                assert named(root, 'Native selected tab alpha'), 'Old selection mutated the reloaded library'
+                print(f'PASS native AT-SPI stale selection handles after reload cycle={cycle}', flush=True)
+
 
             command(['swaymsg', f'[title="{title}"]', 'kill'])
             assert window.wait(timeout=10) == 0, 'Native shutdown failed'

@@ -1,0 +1,32 @@
+diff --git a/packages/core/src/AccessibilityBridge.cpp b/packages/core/src/AccessibilityBridge.cpp
+--- a/packages/core/src/AccessibilityBridge.cpp
++++ b/packages/core/src/AccessibilityBridge.cpp
+@@ -170,7 +170,8 @@
+ bool clickable(accesskit_role role) {
+     return role == ACCESSKIT_ROLE_BUTTON || role == ACCESSKIT_ROLE_LINK || role == ACCESSKIT_ROLE_SWITCH ||
+            role == ACCESSKIT_ROLE_CHECK_BOX || role == ACCESSKIT_ROLE_RADIO_BUTTON ||
+-           role == ACCESSKIT_ROLE_MENU_ITEM || role == ACCESSKIT_ROLE_TAB;
++           role == ACCESSKIT_ROLE_MENU_ITEM || role == ACCESSKIT_ROLE_TAB || role == ACCESSKIT_ROLE_LIST_ITEM ||
++           role == ACCESSKIT_ROLE_TREE_ITEM || role == ACCESSKIT_ROLE_LIST_BOX_OPTION;
+ }
+ 
+ class WakeDescriptor {
+@@ -320,8 +321,16 @@
+             if (state.busy) {
+                 accesskit_node_set_busy(node.get());
+             }
+-            if (state.selected) {
+-                accesskit_node_set_selected(node.get(), true);
++            // AccessKit needs an explicit false value to expose an unselected item as selectable.
++            if (state.selected || role == ACCESSKIT_ROLE_ARTICLE || role == ACCESSKIT_ROLE_COMMENT ||
++                role == ACCESSKIT_ROLE_LIST_ITEM || role == ACCESSKIT_ROLE_MENU_ITEM ||
++                role == ACCESSKIT_ROLE_MENU_ITEM_RADIO || role == ACCESSKIT_ROLE_TAB ||
++                role == ACCESSKIT_ROLE_MENU_ITEM_CHECK_BOX || role == ACCESSKIT_ROLE_TREE_ITEM ||
++                role == ACCESSKIT_ROLE_LIST_BOX_OPTION || role == ACCESSKIT_ROLE_MENU_LIST_OPTION ||
++                role == ACCESSKIT_ROLE_RADIO_BUTTON || role == ACCESSKIT_ROLE_TERM) {
++                const bool selected = state.selected || (role == ACCESSKIT_ROLE_RADIO_BUTTON &&
++                                                         state.checked == facebook::react::AccessibilityState::Checked);
++                accesskit_node_set_selected(node.get(), selected);
+             }
+             if (state.expanded) {
+                 accesskit_node_set_expanded(node.get(), *state.expanded);
