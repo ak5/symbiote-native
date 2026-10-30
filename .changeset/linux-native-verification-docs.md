@@ -1,5 +1,5 @@
 ---
-"@symbiote-native/engine": patch
+'@symbiote-native/engine': patch
 ---
 
-Clarify the native Linux verification coverage and remaining host limitations.
+Clarify native Linux verification coverage and identify missing modal, refresh, layout-conformance, system clipboard and accessibility host features.

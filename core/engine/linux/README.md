@@ -45,7 +45,17 @@ Cage, Lavapipe and the host's compiled `rnl_window` and `rnl_inject` executables
 The persistence runner reuses the pinned host's compositor launcher and refuses
 to overwrite an earlier result directory.
 
-System clipboard exchange with other applications and accessibility journeys
-remain unverified. The pinned host's clipboard is explicitly process-local.
+## Host limits
+
+The pinned host registers native view, text, image, scroll, text-input, switch
+and activity-indicator descriptors. It does not register `ModalHostView`,
+`PullToRefreshView` or `LayoutConformance`. Their shared component exports do
+not supply Linux native implementations. Preserve the host's unknown-component
+diagnostics; replacing these controls with an ordinary View would lose their
+behavior.
+
+The clipboard is explicitly process-local, and the host has no AT-SPI bridge.
+Its automation tree and injected input checks do not establish screen-reader
+interoperability or clipboard exchange with other applications.
 Expo-backed companion modules require their own Linux ports; their presence in
 the workspace does not make their native APIs available.
