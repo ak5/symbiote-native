@@ -564,14 +564,11 @@ async function processExample(
           EXTRA_PACKAGER_ARGS: '--max-workers 1',
         },
       });
-      if (
-        !existsSync(
-          join(
-            starterRoot,
-            'ios/build/catalyst/Build/Products/Release-maccatalyst/CatalystStarter.app/Contents/Info.plist',
-          ),
-        )
-      ) {
+      const starterApp = join(
+        starterRoot,
+        'ios/build/catalyst/Build/Products/Release-maccatalyst/CatalystStarter.app',
+      );
+      if (!existsSync(join(starterApp, 'Contents/Info.plist'))) {
         throw new Error(
           'Generated Catalyst starter did not produce a native app',
         );
@@ -586,17 +583,6 @@ async function processExample(
       log.push(
         `${framework}/catalyst: packed CLI generated starter native build passed`,
       );
-      const starterApp = join(
-        starterRoot,
-        'ios/build/catalyst/Build/Products/Release-maccatalyst/CatalystStarter.app',
-      );
-      const bundleId = run('/usr/libexec/PlistBuddy', [
-        '-c',
-        'Print :CFBundleIdentifier',
-        join(starterApp, 'Contents/Info.plist'),
-      ]).trim();
-      if (!/^[a-zA-Z0-9.-]+$/.test(bundleId))
-        throw new Error('Unexpected generated starter bundle identifier');
       const uiTests = join(
         exampleRoot,
         'ios/CanaryCatalystUITests/CanaryCatalystUITests.swift',
@@ -608,7 +594,7 @@ async function processExample(
 @MainActor
 final class GeneratedCatalystStarterUITests: XCTestCase {
   func testGeneratedStarterLaunchAndCounter() {
-    let starter = XCUIApplication(bundleIdentifier: ${JSON.stringify(bundleId)})
+    let starter = XCUIApplication(url: URL(fileURLWithPath: ${JSON.stringify(starterApp)}))
     starter.launch()
     defer { starter.terminate() }
     XCTAssertTrue(starter.staticTexts["Welcome to SymbioteNative!"].waitForExistence(timeout: 30))
@@ -621,9 +607,6 @@ final class GeneratedCatalystStarterUITests: XCTestCase {
 }
 `,
       );
-      await runAsync('open', ['-n', starterApp], {
-        env: frameworkNpmEnvironment,
-      });
       await runAsync('npm', ['run', 'test:catalyst'], {
         cwd: exampleRoot,
         env: frameworkNpmEnvironment,
