@@ -18,8 +18,12 @@ replace them with stubs or close the goal by merely documenting them as absent.
 Host changes live under `core/engine/linux/host`, against the documented host
 pin. They may change this separate Linux platform host, never stock React
 Native, Fabric or Yoga. Keep them in this fork; no submissions elsewhere.
-Clipboard shortcut guards and native controller tests precede a real Wayland
-backend and second-client verification. System clipboard, AT-SPI, modal,
+The shortcut guards passed native run41002818528. The second host patch now
+implements a real data device, source/offer FD transfers and a private clipboard
+queue on the same window connection. Source acknowledgement, focus/serial checks,
+nonblocking input requests and late-result validation are required. ADR-0004
+records that thread contract. Native protocol and second-client verification are
+still pending; do not replace them with a green bundle or only registry tests. System clipboard, AT-SPI, modal,
 refresh and layout-conformance behavior still need implementation and proof.
 
 The experimental engine target follows `react-native-linux/react-native-linux` at

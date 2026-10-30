@@ -11,6 +11,8 @@ Before configuring the pinned host, from the Symbiote repository root:
 test "$(git -C <host> rev-parse HEAD)" = 4db5e336b529c15628ffb8ba94cd6d880ff9a450
 git -C <host> apply --check "$PWD/core/engine/linux/host/clipboard-safety.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/clipboard-safety.patch"
+git -C <host> apply --check "$PWD/core/engine/linux/host/system-clipboard.patch"
+git -C <host> apply "$PWD/core/engine/linux/host/system-clipboard.patch"
 ```
 
 `clipboard-safety.patch` prevents secure text from entering the clipboard,
@@ -22,7 +24,16 @@ suite before application checks.
 Fork run `41002818528` passed all 21 native controller tests and the five-framework
 application and persistence matrix.
 
-This patch is preparation for system clipboard exchange. The host still uses
-its process-local clipboard; it does not yet exchange data with other clients.
-The other missing native host features remain part of the Linux target's scope.
-The host's MIT license is retained in `LICENSE`.
+`system-clipboard.patch` installs a Wayland data-device backend on the window's
+connection and seat. It dispatches clipboard proxies on a private worker queue.
+Writes require focus, an input press serial and compositor acknowledgement;
+reads validate complete UTF-8. Frame-thread editing polls pending results, and
+JavaScript promises settle on the JS thread. Late results cannot overwrite an
+intervening edit. The worker stops before its connection or seat is destroyed.
+The patch includes its threading decision in the host's ADR-0004.
+
+Native compile/runtime checks for this implementation are in progress. A second
+native client must verify system clipboard exchange before this capability is
+reported as complete. The earlier run above proves the shortcut safeguards and
+process-local clipboard journeys. AT-SPI and the other missing native controls
+remain in scope. The host's MIT license is retained in `LICENSE`.

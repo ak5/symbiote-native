@@ -37,17 +37,24 @@ jobs:
           cache: pnpm
       - name: Install compiler dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache clang-18 cmake ninja-build pkg-config libboost-dev libdouble-conversion-dev libfmt-dev libgoogle-glog-dev libcurl4-openssl-dev libsqlite3-dev libxkbcommon-dev libicu-dev
-      - name: Install JavaScript dependencies
-        run: |
-          nice -n 10 pnpm install --frozen-lockfile --ignore-scripts
-          nice -n 10 pnpm --dir .linux-host install --frozen-lockfile --ignore-scripts
+          sudo nice -n 10 apt-get update
+          sudo nice -n 10 apt-get install -y ccache clang-18 cmake ninja-build pkg-config libboost-dev libdouble-conversion-dev libfmt-dev libgoogle-glog-dev libcurl4-openssl-dev libsqlite3-dev libxkbcommon-dev libicu-dev libwayland-dev libgtest-dev clang-format-18
       - name: Apply the pinned Linux host changes
         run: |
           test "$(git -C .linux-host rev-parse HEAD)" = 4db5e336b529c15628ffb8ba94cd6d880ff9a450
           git -C .linux-host apply --check "$PWD/core/engine/linux/host/clipboard-safety.patch"
           git -C .linux-host apply "$PWD/core/engine/linux/host/clipboard-safety.patch"
+          git -C .linux-host apply --check "$PWD/core/engine/linux/host/system-clipboard.patch"
+          git -C .linux-host apply "$PWD/core/engine/linux/host/system-clipboard.patch"
+      - name: Check the standalone clipboard backend
+        run: |
+          nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/{Clipboard.cpp,Clipboard.h,ClipboardText.h,WaylandClipboard.cpp,WaylandClipboard.h,WaylandSeat.cpp,WaylandSeat.h,WaylandWindow.cpp,WaylandWindow.h,TextInputController.cpp,TextInputController.h,TurboModuleRegistry.cpp} .linux-host/packages/core/tests/ClipboardBackendTest.cpp .linux-host/packages/core/tests/TextInputControllerTest.cpp .linux-host/packages/core/tests/hermes/ClipboardModuleTest.cpp
+          nice -n 10 clang++-18 -std=c++20 -Wall -Wextra -Werror -pthread -I .linux-host/packages/core/src .linux-host/packages/core/src/Clipboard.cpp .linux-host/packages/core/src/WaylandClipboard.cpp .linux-host/packages/core/tests/ClipboardBackendTest.cpp -lwayland-client -lgtest -lgtest_main -o .linux-host/clipboard-checks
+          nice -n 10 timeout 60s .linux-host/clipboard-checks
+      - name: Install JavaScript dependencies
+        run: |
+          nice -n 10 pnpm install --frozen-lockfile --ignore-scripts
+          nice -n 10 pnpm --dir .linux-host install --frozen-lockfile --ignore-scripts
       - name: Generate native registration from the package configuration
         run: |
           node --input-type=commonjs <<'NODE'
@@ -79,7 +86,7 @@ jobs:
         run: |
           set -o pipefail
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_core_hermes_tests --parallel 2
-          nice -n 10 .linux-host/build/symbiote/bin/rnl_core_hermes_tests --gtest_filter='TextInputControllerTest.*' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
+          nice -n 10 timeout 60s .linux-host/build/symbiote/bin/rnl_core_hermes_tests --gtest_filter='TextInputControllerTest.*:ClipboardBackendTest.*:ClipboardTextTest.*:ClipboardModuleTest.*' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
       - name: Exercise module initialization and Fabric commits in Hermes
         run: |
           set -o pipefail
@@ -101,7 +108,7 @@ jobs:
           done
       - name: Install window dependencies
         run: |
-          sudo apt-get install -y libfontconfig-dev libfreetype-dev libvulkan-dev libwayland-dev mesa-vulkan-drivers wayland-protocols cage
+          sudo nice -n 10 apt-get install -y libfontconfig-dev libfreetype-dev libvulkan-dev libwayland-dev mesa-vulkan-drivers wayland-protocols cage
           nice -n 10 node .linux-host/scripts/vendor-skia.ts
           nice -n 10 node .linux-host/scripts/vendor-fonts.ts
       - name: Build the native window and input driver

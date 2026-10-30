@@ -57,8 +57,10 @@ not supply Linux native implementations. Preserve the host's unknown-component
 diagnostics; replacing these controls with an ordinary View would lose their
 behavior.
 
-The clipboard is explicitly process-local, and the host has no AT-SPI bridge.
-Its automation tree and injected input checks do not establish screen-reader
-interoperability or clipboard exchange with other applications.
+The pinned host's clipboard starts as process-local storage. The host patch adds
+a Wayland data-device backend; its native checks and second-client exchange
+verification must pass before claiming system clipboard support. The host still
+has no AT-SPI bridge. Its automation tree and injected input checks do not
+establish screen-reader interoperability.
 Expo-backed companion modules require their own Linux ports; their presence in
 the workspace does not make their native APIs available.

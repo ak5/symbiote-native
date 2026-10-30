@@ -1,0 +1,1644 @@
+diff --git a/docs/adr/0004-private-wayland-clipboard-queue.md b/docs/adr/0004-private-wayland-clipboard-queue.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..eb1a201ee2973f84316b9549a1eff55902e541c4
+--- /dev/null
++++ b/docs/adr/0004-private-wayland-clipboard-queue.md
+@@ -0,0 +1,33 @@
++# ADR-0004: Dispatch clipboard transfers on a private Wayland queue
++
++Status: Implemented in the ak5 fork; native protocol validation in progress.
++
++Clipboard ownership and transfers use the window's existing Wayland connection
++and seat. A dedicated worker dispatches only clipboard proxies on a private
++`wl_event_queue`. The window and Vulkan WSI retain their own queues. Every reader
++uses Wayland's prepare/read/cancel protocol. No window, rendering, input-model or
++JSI object moves onto the clipboard worker.
++
++Seat callbacks publish keyboard focus and valid press serials atomically. Writes
++require both, advertise a fresh source, and complete only when the compositor
++returns that source's correlation MIME type as the selection. Reads following a
++write wait for its acknowledgement. The correlation type identifies a request;
++it does not grant authority. The compositor and seat serial supply authority.
++
++Transfer pipes are nonblocking. Reads accept complete, valid UTF-8 up to 64 MiB;
++timeouts, malformed text and oversized transfers fail without applying data.
++Pending requests and transfers have bounded queues. SIGPIPE is blocked only in
++the worker, so a disappearing receiver cannot terminate the application.
++
++Backend callbacks return promptly. JavaScript promises settle through CallInvoker
++on the JS thread. Text input polls futures while frames continue; a delayed cut
++or paste applies only if the original field family, text, event count, selection
++and edit permissions still match. Focus changes and unmounts cancel pending edits.
++The window stops and joins the worker before releasing its seat or display.
++Missing compositor capabilities report unavailable clipboard access, rather than
++using the headless process-local store in a GUI application.
++
++Verification includes native controller delayed-result tests, concurrent backend
++registry tests, strict UTF-8 cases, real compositor copy/paste with a second client,
++large payloads, stalled owners, malformed data and shutdown with pending work.
++ASan/UBSan and TSan must exercise the transport as well as the registry.
+diff --git a/packages/core/CMakeLists.txt b/packages/core/CMakeLists.txt
+index 671b12e0c41f06ff50ecdaaffdd75dcd9b01fc2b..52de27c91a596434b13e6963a76c9e9366f7d747 100644
+--- a/packages/core/CMakeLists.txt
++++ b/packages/core/CMakeLists.txt
+@@ -1254,6 +1254,7 @@ elseif(RNL_ENABLE_WINDOW)
+         src/WaylandDispatchDiagnostics.cpp
+         src/WaylandSeat.cpp
+         src/WaylandSerialLedger.cpp
++        src/WaylandClipboard.cpp
+         src/WaylandWindow.cpp
+         src/WindowControlSequence.cpp
+         src/WindowDecorations.cpp
+diff --git a/packages/core/src/Clipboard.cpp b/packages/core/src/Clipboard.cpp
+index 4d0e49aaa074b3cc1a15e331eaed813a40922675..8b6fb385d51f1e3a62f66cbcdafbbefbf5be251e 100644
+--- a/packages/core/src/Clipboard.cpp
++++ b/packages/core/src/Clipboard.cpp
+@@ -10,19 +10,88 @@ namespace {
+ 
+ std::mutex clipboardMutex;
+ std::string clipboardStorage;
++std::weak_ptr<ClipboardBackend> clipboardBackend;
++bool hasClipboardBackend{false};
+ 
+ } // namespace
+ 
+-std::string clipboardText() {
++void setClipboardBackend(const std::shared_ptr<ClipboardBackend>& backend) {
+     const std::scoped_lock lock(clipboardMutex);
+-
+-    return clipboardStorage;
++    clipboardBackend = backend;
++    hasClipboardBackend = backend != nullptr;
+ }
+ 
+-void setClipboardText(std::string text) {
++void setClipboardUnavailable() {
+     const std::scoped_lock lock(clipboardMutex);
++    clipboardBackend.reset();
++    hasClipboardBackend = true;
++}
+ 
+-    clipboardStorage = std::move(text);
++void readClipboardText(ClipboardReadCallback complete) {
++    std::shared_ptr<ClipboardBackend> backend;
++    std::optional<std::string> local;
++    {
++        const std::scoped_lock lock(clipboardMutex);
++        if (!hasClipboardBackend) {
++            local = clipboardStorage;
++        } else {
++            backend = clipboardBackend.lock();
++        }
++    }
++    if (backend != nullptr) {
++        backend->readText(std::move(complete));
++    } else {
++        complete(std::move(local));
++    }
++}
++
++void writeClipboardText(std::string text, ClipboardWriteCallback complete) {
++    std::shared_ptr<ClipboardBackend> backend;
++    bool local = false;
++    {
++        const std::scoped_lock lock(clipboardMutex);
++        if (!hasClipboardBackend) {
++            clipboardStorage = std::move(text);
++            local = true;
++        } else {
++            backend = clipboardBackend.lock();
++        }
++    }
++    if (backend != nullptr) {
++        backend->writeText(std::move(text), std::move(complete));
++    } else {
++        complete(local);
++    }
++}
++
++std::future<std::optional<std::string>> requestClipboardText() {
++    const auto promise = std::make_shared<std::promise<std::optional<std::string>>>();
++    auto result = promise->get_future();
++    readClipboardText([promise](auto text) { promise->set_value(std::move(text)); });
++    return result;
++}
++
++std::future<bool> requestSetClipboardText(std::string text) {
++    const auto promise = std::make_shared<std::promise<bool>>();
++    auto result = promise->get_future();
++    writeClipboardText(std::move(text), [promise](bool accepted) { promise->set_value(accepted); });
++    return result;
++}
++
++std::optional<std::string> clipboardText() {
++    try {
++        return requestClipboardText().get();
++    } catch (const std::exception&) {
++        return std::nullopt;
++    }
++}
++
++bool setClipboardText(std::string text) {
++    try {
++        return requestSetClipboardText(std::move(text)).get();
++    } catch (const std::exception&) {
++        return false;
++    }
+ }
+ 
+ } // namespace react_native_linux
+diff --git a/packages/core/src/Clipboard.h b/packages/core/src/Clipboard.h
+index b08e5d514eb3d143540004b79f87ad7e52023cd6..a5447b2aac7b0d55ba88f3a1334c1a44a0479423 100644
+--- a/packages/core/src/Clipboard.h
++++ b/packages/core/src/Clipboard.h
+@@ -1,27 +1,34 @@
+ #pragma once
+ 
++#include <functional>
++#include <future>
++#include <memory>
++#include <optional>
+ #include <string>
+ 
+ namespace react_native_linux {
+ 
+-/**
+- * The clipboard Ctrl+C, Ctrl+X and Ctrl+V move text through, in this process and nowhere else.
+- *
+- * This is deliberately **not** `wl_data_device` yet, and the reason is the rig rather than the protocol.
+- * A system clipboard on Wayland is a data source, a data offer, a MIME negotiation and a file-descriptor
+- * transfer, all of which need a compositor and a second client to be worth anything — and the proof rig for the
+- * text field is `hello_react`, which has no compositor at all. An in-process clipboard is testable in the unit
+- * suite, testable headlessly, and behaviourally identical for everything the editing model can get wrong: what
+- * is copied, what a cut leaves behind, what a paste does to a selection, and what a multi-line paste becomes in
+- * a single-line field.
+- *
+- * `wl_data_device` — copy to and paste from other applications, plus the primary selection middle-click paste —
+- * is issue #60, and it replaces the body of these two functions and nothing else.
+- *
+- * Threading contract: the frame thread reads and writes it for the text field's shortcuts, and the JavaScript
+- * thread through the `RNCClipboard` module (#23), so both functions take one mutex and the text is copied out.
++/** Both the frame and JavaScript threads call this backend; it must return promptly and synchronize its own operations.
++ * Completion callbacks may run on a backend thread; callers schedule owner-thread work.
+  */
+-std::string clipboardText();
+-void setClipboardText(std::string text);
++using ClipboardReadCallback = std::function<void(std::optional<std::string>)>;
++using ClipboardWriteCallback = std::function<void(bool)>;
++
++class ClipboardBackend {
++public:
++    virtual ~ClipboardBackend() = default;
++    virtual void readText(ClipboardReadCallback complete) = 0;
++    virtual void writeText(std::string text, ClipboardWriteCallback complete) = 0;
++};
++
++/** The window owns the backend and stops it before destroying its Wayland connection. Null selects headless storage. */
++void setClipboardBackend(const std::shared_ptr<ClipboardBackend>& backend);
++void setClipboardUnavailable();
++void readClipboardText(ClipboardReadCallback complete);
++void writeClipboardText(std::string text, ClipboardWriteCallback complete);
++std::future<std::optional<std::string>> requestClipboardText();
++std::future<bool> requestSetClipboardText(std::string text);
++std::optional<std::string> clipboardText();
++bool setClipboardText(std::string text);
+ 
+ } // namespace react_native_linux
+diff --git a/packages/core/src/ClipboardText.h b/packages/core/src/ClipboardText.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..9f6e252c55abe00ebedf72b39ffc5e192e22e103
+--- /dev/null
++++ b/packages/core/src/ClipboardText.h
+@@ -0,0 +1,37 @@
++#pragma once
++
++#include <cstddef>
++#include <string_view>
++
++namespace react_native_linux {
++
++inline bool validClipboardUtf8(std::string_view text) {
++    size_t offset = 0;
++    while (offset < text.size()) {
++        const auto first = static_cast<unsigned char>(text[offset++]);
++        if (first < 0x80) {
++            continue;
++        }
++        const int remaining = first >= 0xC2 && first <= 0xDF   ? 1
++                              : first >= 0xE0 && first <= 0xEF ? 2
++                              : first >= 0xF0 && first <= 0xF4 ? 3
++                                                               : -1;
++        if (remaining < 0 || text.size() - offset < static_cast<size_t>(remaining)) {
++            return false;
++        }
++        const auto second = static_cast<unsigned char>(text[offset]);
++        if ((first == 0xE0 && second < 0xA0) || (first == 0xED && second >= 0xA0) || (first == 0xF0 && second < 0x90) ||
++            (first == 0xF4 && second >= 0x90)) {
++            return false;
++        }
++        for (int count = 0; count < remaining; ++count) {
++            const auto continuation = static_cast<unsigned char>(text[offset++]);
++            if (continuation < 0x80 || continuation > 0xBF) {
++                return false;
++            }
++        }
++    }
++    return true;
++}
++
++} // namespace react_native_linux
+diff --git a/packages/core/src/TextInputController.cpp b/packages/core/src/TextInputController.cpp
+index eca5cda54fbd4714a7bfa02a68b17be69429e9b8..772aad15b8a47ea26e7f94f76813014e1928923e 100644
+--- a/packages/core/src/TextInputController.cpp
++++ b/packages/core/src/TextInputController.cpp
+@@ -3,6 +3,8 @@
+ #include "Clipboard.h"
+ #include "ScrollPhysics.h"
+ 
++#include <chrono>
++
+ #ifdef RNL_ENABLE_TEXT_GEOMETRY
+ #include "TextGeometry.h"
+ #endif
+@@ -136,6 +138,9 @@ void TextInputController::setMountedFields(const std::vector<std::shared_ptr<con
+     }
+ 
+     fields_ = std::move(mounted);
++    if (pendingClipboard_ && !fields_.contains(pendingClipboard_->shadowNode->getTag())) {
++        pendingClipboard_.reset();
++    }
+ }
+ 
+ void TextInputController::setFocusedNode(const std::shared_ptr<const facebook::react::ShadowNode>& shadowNode) {
+@@ -148,6 +153,7 @@ void TextInputController::setFocusedNode(const std::shared_ptr<const facebook::r
+     // fields #340 is about. The compositor-side teardown answers the same rule with an empty pre-edit delivered
+     // to whichever field holds the caret now; this is the client half, applied at the focus change itself.
+     if (nextTag != focusedTag_) {
++        pendingClipboard_.reset();
+         TextInputField* previous = focusedField();
+ 
+         if (previous != nullptr && previous->editor.isComposing()) {
+@@ -224,26 +230,25 @@ TextInputKeyResult TextInputController::handleShortcut(const InputEvent& event,
+     }
+ 
+     if (event.key == kCopyKey || event.key == kCutKey) {
++        pendingClipboard_.reset();
+         if (!field.shadowNode->getConcreteProps().secureTextEntry && field.editor.hasSelection()) {
+-            setClipboardText(field.editor.selectedText());
+-
++            auto result = requestSetClipboardText(field.editor.selectedText());
+             if (event.key == kCutKey && isEditable) {
+-                field.editor.deleteBackward();
++                pendingClipboard_ = PendingClipboard{field.shadowNode, field.editor.text(), field.editor.selection(),
++                                                     field.editor.mostRecentEventCount(), std::move(result)};
++                finishClipboardOperation(field);
+             }
+         }
+-
+         return TextInputKeyResult::Consumed;
+     }
+ 
+     if (event.key == kPasteKey) {
++        pendingClipboard_.reset();
+         if (isEditable) {
+-            const std::string text = clipboardText();
+-
+-            if (!text.empty()) {
+-                field.editor.insertText(text);
+-            }
++            pendingClipboard_ = PendingClipboard{field.shadowNode, field.editor.text(), field.editor.selection(),
++                                                 field.editor.mostRecentEventCount(), requestClipboardText()};
++            finishClipboardOperation(field);
+         }
+-
+         return TextInputKeyResult::Consumed;
+     }
+ 
+@@ -454,6 +459,44 @@ void TextInputController::dispatchCommand(const SceneCommand& command) {
+     publish(field);
+ }
+ 
++void TextInputController::finishClipboardOperation(TextInputField& field) {
++    if (!pendingClipboard_ || pendingClipboard_->shadowNode->getTag() != field.shadowNode->getTag()) {
++        return;
++    }
++    const auto& pending = *pendingClipboard_;
++    const auto selection = field.editor.selection();
++    const auto& props = field.shadowNode->getConcreteProps();
++    if (focusedTag_ != field.shadowNode->getTag() ||
++        &pending.shadowNode->getFamily() != &field.shadowNode->getFamily() || pending.text != field.editor.text() ||
++        pending.eventCount != field.editor.mostRecentEventCount() ||
++        pending.selection.anchorByte != selection.anchorByte || pending.selection.caretByte != selection.caretByte ||
++        !props.editable || props.readOnly) {
++        pendingClipboard_.reset();
++        return;
++    }
++    const auto status =
++        std::visit([](const auto& result) { return result.wait_for(std::chrono::seconds::zero()); }, pending.result);
++    if (status != std::future_status::ready) {
++        return;
++    }
++    auto completed = std::move(*pendingClipboard_);
++    pendingClipboard_.reset();
++    try {
++        if (auto* cut = std::get_if<std::future<bool>>(&completed.result)) {
++            if (cut->get() && !props.secureTextEntry) {
++                field.editor.deleteBackward();
++            }
++        } else {
++            const auto text = std::get<std::future<std::optional<std::string>>>(completed.result).get();
++            if (text && !text->empty()) {
++                field.editor.insertText(*text);
++            }
++        }
++    } catch (const std::exception&) {
++        // A broken or rejected clipboard operation leaves the original field intact.
++    }
++}
++
+ void TextInputController::synchronize() {
+     for (auto& entry : fields_) {
+         // The newest clone rather than the node the commit walk handed over: a state write this loop made last
+@@ -468,6 +511,7 @@ void TextInputController::synchronize() {
+ 
+         entry.second.shadowNode = shadowNode;
+         reconcile(entry.second);
++        finishClipboardOperation(entry.second);
+         publish(entry.second);
+     }
+ }
+diff --git a/packages/core/src/TextInputController.h b/packages/core/src/TextInputController.h
+index c8264e46b1dd6cac400b86ed0c4302042970d5b2..59b409ffd841e8ab62442470a6da0ce64cc02bf0 100644
+--- a/packages/core/src/TextInputController.h
++++ b/packages/core/src/TextInputController.h
+@@ -7,10 +7,12 @@
+ 
+ #include <cstddef>
+ #include <cstdint>
++#include <future>
+ #include <memory>
+ #include <optional>
+ #include <string>
+ #include <unordered_map>
++#include <variant>
+ #include <vector>
+ 
+ #include <react/renderer/components/textinput/TextInputEventEmitter.h>
+@@ -182,6 +184,17 @@ private:
+         int writtenEventCount{-1};
+     };
+ 
++    struct PendingClipboard {
++        std::shared_ptr<const TextInputShadowNode> shadowNode;
++        std::string text;
++        EditorSelection selection;
++        int eventCount;
++        std::variant<std::future<bool>, std::future<std::optional<std::string>>> result;
++    };
++
++    std::optional<PendingClipboard> pendingClipboard_;
++    void finishClipboardOperation(TextInputField& field);
++
+     TextInputField* focusedField();
+     TextInputField* fieldUnderPointer(facebook::react::Point surfacePoint);
+     const TextInputField* focusedField() const;
+diff --git a/packages/core/src/TurboModuleRegistry.cpp b/packages/core/src/TurboModuleRegistry.cpp
+index 7e717fc1cc2dd9dc8a2f7e6f7e6218a96627eb4a..4a5ec27f6050cda46ef3d8f82617cae4178e6f65 100644
+--- a/packages/core/src/TurboModuleRegistry.cpp
++++ b/packages/core/src/TurboModuleRegistry.cpp
+@@ -798,31 +798,46 @@ public:
+     static constexpr std::string_view kModuleName = "RNCClipboard";
+ 
+     explicit LinuxClipboardModule(std::shared_ptr<facebook::react::CallInvoker> jsInvoker)
+-        : TurboModule(std::string(kModuleName), std::move(jsInvoker)) {
+-        methodMap_["getString"] = {0, [](facebook::jsi::Runtime& runtime, TurboModule& /*turboModule*/,
+-                                         const facebook::jsi::Value* /*arguments*/, size_t /*count*/) {
+-                                       return resolved(runtime,
+-                                                       facebook::jsi::String::createFromUtf8(runtime, clipboardText()));
+-                                   }};
+-        methodMap_["hasString"] = {0, [](facebook::jsi::Runtime& runtime, TurboModule& /*turboModule*/,
+-                                         const facebook::jsi::Value* /*arguments*/, size_t /*count*/) {
+-                                       return resolved(runtime, facebook::jsi::Value(!clipboardText().empty()));
+-                                   }};
+-        methodMap_["setString"] = {1, [](facebook::jsi::Runtime& runtime, TurboModule& /*turboModule*/,
+-                                         const facebook::jsi::Value* arguments, size_t count) {
+-                                       setClipboardText(count > 0 && arguments[0].isString()
+-                                                            ? arguments[0].getString(runtime).utf8(runtime)
+-                                                            : std::string());
+-
+-                                       return facebook::jsi::Value::undefined();
+-                                   }};
++        : TurboModule(std::string(kModuleName), jsInvoker) {
++        methodMap_["getString"] = {0, [jsInvoker](facebook::jsi::Runtime& runtime, TurboModule&,
++                                                  const facebook::jsi::Value*,
++                                                  size_t) { return readResult(runtime, jsInvoker, false); }};
++        methodMap_["hasString"] = {0, [jsInvoker](facebook::jsi::Runtime& runtime, TurboModule&,
++                                                  const facebook::jsi::Value*,
++                                                  size_t) { return readResult(runtime, jsInvoker, true); }};
++        methodMap_["setString"] = {
++            1, [](facebook::jsi::Runtime& runtime, TurboModule&, const facebook::jsi::Value* arguments, size_t count) {
++                if (count != 1 || !arguments[0].isString()) {
++                    throw facebook::jsi::JSError(runtime, "RNCClipboard.setString requires a string");
++                }
++                writeClipboardText(arguments[0].getString(runtime).utf8(runtime), [](bool accepted) {
++                    if (!accepted) {
++                        std::cerr << "[rnl-clipboard] system clipboard write failed" << std::endl;
++                    }
++                });
++                return facebook::jsi::Value::undefined();
++            }};
+     }
+ 
+ private:
+-    static facebook::jsi::Value resolved(facebook::jsi::Runtime& runtime, facebook::jsi::Value value) {
++    static facebook::jsi::Value readResult(facebook::jsi::Runtime& runtime,
++                                           std::shared_ptr<facebook::react::CallInvoker> jsInvoker, bool presenceOnly) {
+         return facebook::react::createPromiseAsJSIValue(
+-            runtime, [&value](facebook::jsi::Runtime& /*promiseRuntime*/,
+-                              const std::shared_ptr<facebook::react::Promise>& promise) { promise->resolve(value); });
++            runtime, [jsInvoker, presenceOnly](facebook::jsi::Runtime&,
++                                               const std::shared_ptr<facebook::react::Promise>& promise) {
++                readClipboardText([jsInvoker, promise, presenceOnly](std::optional<std::string> text) {
++                    jsInvoker->invokeAsync(
++                        [promise, presenceOnly, text = std::move(text)](facebook::jsi::Runtime& runtime) {
++                            if (!text) {
++                                promise->reject("System clipboard read is unavailable");
++                            } else if (presenceOnly) {
++                                promise->resolve(facebook::jsi::Value(!text->empty()));
++                            } else {
++                                promise->resolve(facebook::jsi::String::createFromUtf8(runtime, *text));
++                            }
++                        });
++                });
++            });
+     }
+ };
+ 
+diff --git a/packages/core/src/WaylandClipboard.cpp b/packages/core/src/WaylandClipboard.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..6834abacdde2f2e1257b7f7dd7a31faac6093ff4
+--- /dev/null
++++ b/packages/core/src/WaylandClipboard.cpp
+@@ -0,0 +1,546 @@
++#include "WaylandClipboard.h"
++
++#include "ClipboardText.h"
++
++#include <algorithm>
++#include <atomic>
++#include <cerrno>
++#include <chrono>
++#include <csignal>
++#include <cstring>
++#include <deque>
++#include <fcntl.h>
++#include <functional>
++#include <iostream>
++#include <mutex>
++#include <poll.h>
++#include <pthread.h>
++#include <random>
++#include <stdexcept>
++#include <thread>
++#include <unistd.h>
++#include <unordered_map>
++#include <utility>
++#include <vector>
++#include <wayland-client.h>
++
++namespace react_native_linux {
++namespace {
++
++constexpr size_t kMaximumTextBytes = 64 * 1024 * 1024;
++constexpr auto kReadTimeout = std::chrono::seconds(2);
++constexpr char kUtf8Mime[] = "text/plain;charset=utf-8";
++
++class Descriptor final {
++public:
++    explicit Descriptor(int value = -1) : value_(value) {}
++
++    Descriptor(const Descriptor&) = delete;
++    Descriptor& operator=(const Descriptor&) = delete;
++
++    Descriptor(Descriptor&& other) noexcept : value_(std::exchange(other.value_, -1)) {}
++
++    Descriptor& operator=(Descriptor&& other) noexcept {
++        if (this != &other) {
++            reset(std::exchange(other.value_, -1));
++        }
++        return *this;
++    }
++
++    ~Descriptor() { reset(); }
++
++    int get() const noexcept { return value_; }
++
++    void reset(int value = -1) noexcept {
++        if (value_ >= 0) {
++            close(value_);
++        }
++        value_ = value;
++    }
++
++private:
++    int value_;
++};
++
++bool nonblocking(int descriptor) {
++    const int flags = fcntl(descriptor, F_GETFL);
++    return flags >= 0 && fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) == 0;
++}
++
++} // namespace
++
++struct WaylandClipboard::State {
++
++    struct Task {
++        std::function<void()> run;
++        std::function<void()> cancel;
++        size_t bytes{0};
++    };
++
++    struct Offer {
++        State* owner;
++        std::unique_ptr<wl_data_offer, decltype(&wl_data_offer_destroy)> proxy;
++        bool utf8{false};
++        bool plain{false};
++        bool utf8String{false};
++        std::string ownTag{};
++    };
++
++    struct Source {
++        State* owner;
++        std::unique_ptr<wl_data_source, decltype(&wl_data_source_destroy)> proxy;
++        std::shared_ptr<const std::string> text;
++        std::string tag;
++        ClipboardWriteCallback acknowledgement;
++        std::chrono::steady_clock::time_point deadline;
++    };
++
++    struct Read {
++        Descriptor descriptor;
++        std::string text;
++        ClipboardReadCallback complete;
++        std::chrono::steady_clock::time_point deadline;
++    };
++
++    struct Write {
++        Descriptor descriptor;
++        std::shared_ptr<const std::string> text;
++        size_t offset{0};
++    };
++
++    wl_display* display;
++    std::unique_ptr<wl_data_device_manager, decltype(&wl_data_device_manager_destroy)> manager;
++    std::unique_ptr<wl_event_queue, decltype(&wl_event_queue_destroy)> queue{nullptr, wl_event_queue_destroy};
++    std::unique_ptr<wl_data_device, void (*)(wl_data_device*)> device{nullptr, [](wl_data_device* value) {
++                                                                          if (wl_data_device_get_version(value) >=
++                                                                              WL_DATA_DEVICE_RELEASE_SINCE_VERSION) {
++                                                                              wl_data_device_release(value);
++                                                                          } else {
++                                                                              wl_data_device_destroy(value);
++                                                                          }
++                                                                      }};
++    Descriptor wakeRead;
++    Descriptor wakeWrite;
++    std::atomic<uint64_t> inputState{0};
++    std::mutex mutex;
++    bool accepting{true};
++    std::deque<Task> tasks;
++    size_t queuedBytes{0};
++    std::deque<ClipboardReadCallback> deferredReads;
++    std::unordered_map<wl_data_offer*, std::unique_ptr<Offer>> offers;
++    std::unordered_map<wl_data_source*, std::unique_ptr<Source>> sources;
++    wl_data_offer* selection{nullptr};
++    std::vector<Read> reads;
++    std::vector<Write> writes;
++    std::jthread worker;
++    std::string tagPrefix;
++    uint64_t nextSource{0};
++
++    State(wl_display* connection, wl_data_device_manager* dataManager, wl_seat* seat)
++        : display(connection), manager(dataManager, wl_data_device_manager_destroy) {
++        std::random_device random;
++        tagPrefix = "application/x-rnl-clipboard-" + std::to_string(random()) + "-" + std::to_string(random()) + "-";
++        queue.reset(wl_display_create_queue(display));
++        if (queue == nullptr) {
++            throw std::runtime_error("Cannot create the Wayland clipboard event queue");
++        }
++        wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(manager.get()), queue.get());
++        device.reset(wl_data_device_manager_get_data_device(manager.get(), seat));
++        if (device == nullptr) {
++            throw std::runtime_error("Cannot create the Wayland clipboard data device");
++        }
++        static const wl_data_device_listener listener{
++            .data_offer =
++                [](void* data, wl_data_device*, wl_data_offer* proxy) {
++                    auto& state = *static_cast<State*>(data);
++                    auto offer = std::make_unique<Offer>(Offer{&state, {proxy, wl_data_offer_destroy}});
++                    static const wl_data_offer_listener offerListener{
++                        .offer =
++                            [](void* data, wl_data_offer*, const char* mime) {
++                                auto& offer = *static_cast<Offer*>(data);
++                                offer.utf8 |= std::strcmp(mime, kUtf8Mime) == 0;
++                                offer.plain |= std::strcmp(mime, "text/plain") == 0;
++                                offer.utf8String |= std::strcmp(mime, "UTF8_STRING") == 0;
++                                for (const auto& [proxy, source] : offer.owner->sources) {
++                                    if (source->tag == mime) {
++                                        offer.ownTag = source->tag;
++                                        break;
++                                    }
++                                }
++                            },
++                        .source_actions = [](void*, wl_data_offer*, uint32_t) {},
++                        .action = [](void*, wl_data_offer*, uint32_t) {},
++                    };
++                    wl_data_offer_add_listener(proxy, &offerListener, offer.get());
++                    state.offers.emplace(proxy, std::move(offer));
++                },
++            .enter = [](void* data, wl_data_device*, uint32_t, wl_surface*, wl_fixed_t, wl_fixed_t,
++                        wl_data_offer* offer) { static_cast<State*>(data)->offers.erase(offer); },
++            .leave = [](void*, wl_data_device*) {},
++            .motion = [](void*, wl_data_device*, uint32_t, wl_fixed_t, wl_fixed_t) {},
++            .drop = [](void*, wl_data_device*) {},
++            .selection =
++                [](void* data, wl_data_device*, wl_data_offer* offer) {
++                    auto& state = *static_cast<State*>(data);
++                    if (state.selection != offer) {
++                        state.offers.erase(state.selection);
++                    }
++                    state.selection = offer;
++                    const auto found = state.offers.find(offer);
++                    if (found != state.offers.end() && !found->second->ownTag.empty()) {
++                        for (auto& [proxy, source] : state.sources) {
++                            if (source->tag == found->second->ownTag && static_cast<bool>(source->acknowledgement)) {
++                                auto complete = std::move(source->acknowledgement);
++                                complete(true);
++                            }
++                        }
++                    }
++                },
++        };
++        wl_data_device_add_listener(device.get(), &listener, this);
++        int descriptors[2];
++        if (pipe2(descriptors, O_CLOEXEC | O_NONBLOCK) != 0) {
++            throw std::runtime_error("Cannot create the Wayland clipboard wake pipe");
++        }
++        wakeRead.reset(descriptors[0]);
++        wakeWrite.reset(descriptors[1]);
++        worker = std::jthread([this](std::stop_token stop) { run(stop); });
++    }
++
++    void wake() noexcept {
++        const char byte = 0;
++        while (::write(wakeWrite.get(), &byte, 1) < 0 && errno == EINTR) {
++        }
++    }
++
++    void enqueue(Task task) {
++        {
++            const std::scoped_lock lock(mutex);
++            if (accepting && tasks.size() < 256 && task.bytes <= kMaximumTextBytes - queuedBytes) {
++                queuedBytes += task.bytes;
++                tasks.push_back(std::move(task));
++                wake();
++                return;
++            }
++        }
++        task.cancel();
++    }
++
++    void startRead(ClipboardReadCallback complete) {
++        const bool awaitingWrite = std::any_of(sources.begin(), sources.end(), [](const auto& source) {
++            return static_cast<bool>(source.second->acknowledgement);
++        });
++        if (awaitingWrite && deferredReads.size() < 256) {
++            deferredReads.push_back(std::move(complete));
++            return;
++        }
++        if (awaitingWrite || reads.size() >= 4 || (inputState.load() & 1) == 0) {
++            complete(std::nullopt);
++            return;
++        }
++        if (wl_display_dispatch_queue_pending(display, queue.get()) < 0) {
++            throw std::runtime_error("Wayland clipboard dispatch failed");
++        }
++        const auto found = offers.find(selection);
++        if (found == offers.end()) {
++            complete(std::string());
++            return;
++        }
++        const auto& offer = *found->second;
++        const char* mime = offer.utf8         ? kUtf8Mime
++                           : offer.plain      ? "text/plain"
++                           : offer.utf8String ? "UTF8_STRING"
++                                              : nullptr;
++        if (mime == nullptr) {
++            complete(std::string());
++            return;
++        }
++        int descriptors[2];
++        if (pipe2(descriptors, O_CLOEXEC) != 0) {
++            complete(std::nullopt);
++            return;
++        }
++        Descriptor reader(descriptors[0]);
++        Descriptor writer(descriptors[1]);
++        if (!nonblocking(reader.get())) {
++            complete(std::nullopt);
++            return;
++        }
++        reads.push_back(
++            Read{std::move(reader), {}, std::move(complete), std::chrono::steady_clock::now() + kReadTimeout});
++        wl_data_offer_receive(offer.proxy.get(), mime, writer.get());
++    }
++
++    void startWrite(std::string text, ClipboardWriteCallback acknowledgement) {
++        const uint64_t input = inputState.load();
++        if ((input & 3) != 3 || sources.size() >= 4 || text.size() > kMaximumTextBytes || !validClipboardUtf8(text)) {
++            acknowledgement(false);
++            return;
++        }
++        auto source = std::make_unique<Source>(
++            Source{this,
++                   {wl_data_device_manager_create_data_source(manager.get()), wl_data_source_destroy},
++                   std::make_shared<const std::string>(std::move(text)),
++                   tagPrefix + std::to_string(++nextSource),
++                   acknowledgement,
++                   std::chrono::steady_clock::now() + kReadTimeout});
++        if (source->proxy == nullptr) {
++            acknowledgement(false);
++            return;
++        }
++        static const wl_data_source_listener listener{
++            .target = [](void*, wl_data_source*, const char*) {},
++            .send =
++                [](void* data, wl_data_source*, const char* mime, int descriptor) {
++                    auto& source = *static_cast<Source*>(data);
++                    Descriptor output(descriptor);
++                    if ((std::strcmp(mime, kUtf8Mime) == 0 || std::strcmp(mime, "text/plain") == 0 ||
++                         std::strcmp(mime, "UTF8_STRING") == 0) &&
++                        source.owner->writes.size() < 4 && nonblocking(output.get())) {
++                        source.owner->writes.push_back(Write{std::move(output), source.text});
++                    }
++                },
++            .cancelled =
++                [](void* data, wl_data_source* proxy) {
++                    auto& source = *static_cast<Source*>(data);
++                    if (static_cast<bool>(source.acknowledgement)) {
++                        auto complete = std::move(source.acknowledgement);
++                        complete(false);
++                    }
++                    source.owner->sources.erase(proxy);
++                },
++            .dnd_drop_performed = [](void*, wl_data_source*) {},
++            .dnd_finished = [](void*, wl_data_source*) {},
++            .action = [](void*, wl_data_source*, uint32_t) {},
++        };
++        wl_data_source* proxy = source->proxy.get();
++        wl_data_source_add_listener(proxy, &listener, source.get());
++        wl_data_source_offer(proxy, source->tag.c_str());
++        sources.emplace(proxy, std::move(source));
++        wl_data_source_offer(proxy, kUtf8Mime);
++        wl_data_source_offer(proxy, "text/plain");
++        wl_data_source_offer(proxy, "UTF8_STRING");
++        wl_data_device_set_selection(device.get(), proxy, static_cast<uint32_t>(input >> 2));
++    }
++
++    void advanceTransfers() {
++        std::erase_if(reads, [](Read& transfer) {
++            char buffer[8192];
++            while (true) {
++                if (std::chrono::steady_clock::now() >= transfer.deadline) {
++                    transfer.complete(std::nullopt);
++                    return true;
++                }
++                const auto count = ::read(transfer.descriptor.get(), buffer, sizeof(buffer));
++                if (count > 0) {
++                    if (static_cast<size_t>(count) > kMaximumTextBytes - transfer.text.size()) {
++                        transfer.complete(std::nullopt);
++                        return true;
++                    }
++                    transfer.text.append(buffer, static_cast<size_t>(count));
++                } else if (count == 0) {
++                    transfer.complete(validClipboardUtf8(transfer.text) ? std::make_optional(std::move(transfer.text))
++                                                                        : std::nullopt);
++                    return true;
++                } else if (errno != EINTR) {
++                    if ((errno != EAGAIN && errno != EWOULDBLOCK) ||
++                        std::chrono::steady_clock::now() >= transfer.deadline) {
++                        transfer.complete(std::nullopt);
++                        return true;
++                    }
++                    return false;
++                }
++            }
++        });
++        std::erase_if(sources, [](auto& item) {
++            auto& source = item.second;
++            if (source->acknowledgement && std::chrono::steady_clock::now() >= source->deadline) {
++                auto complete = std::move(source->acknowledgement);
++                complete(false);
++                return true;
++            }
++            return false;
++        });
++        if (std::none_of(sources.begin(), sources.end(),
++                         [](const auto& source) { return static_cast<bool>(source.second->acknowledgement); })) {
++            auto pending = std::move(deferredReads);
++            deferredReads.clear();
++            for (auto& complete : pending) {
++                startRead(std::move(complete));
++            }
++        }
++        std::erase_if(writes, [](Write& transfer) {
++            while (transfer.offset < transfer.text->size()) {
++                const auto count = ::write(transfer.descriptor.get(), transfer.text->data() + transfer.offset,
++                                           transfer.text->size() - transfer.offset);
++                if (count > 0) {
++                    transfer.offset += static_cast<size_t>(count);
++                } else if (count == 0 || (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)) {
++                    return true;
++                } else if (errno != EINTR) {
++                    return false;
++                }
++            }
++            return true;
++        });
++    }
++
++    void run(std::stop_token stop) noexcept {
++        sigset_t signals;
++        sigemptyset(&signals);
++        sigaddset(&signals, SIGPIPE);
++        try {
++            if (pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0) {
++                throw std::runtime_error("Cannot protect clipboard transfers from SIGPIPE");
++            }
++            while (!stop.stop_requested()) {
++                if (wl_display_dispatch_queue_pending(display, queue.get()) < 0) {
++                    throw std::runtime_error("Wayland clipboard dispatch failed");
++                }
++                std::deque<Task> pending;
++                {
++                    const std::scoped_lock lock(mutex);
++                    pending.swap(tasks);
++                    queuedBytes = 0;
++                }
++                for (auto& task : pending) {
++                    try {
++                        task.run();
++                    } catch (...) {
++                        task.cancel();
++                        throw;
++                    }
++                }
++                pending.clear();
++                advanceTransfers();
++                std::vector<pollfd> descriptors{{wl_display_get_fd(display), POLLIN, 0}, {wakeRead.get(), POLLIN, 0}};
++                int timeout = -1;
++                for (const auto& transfer : reads) {
++                    descriptors.push_back({transfer.descriptor.get(), POLLIN, 0});
++                    const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
++                                               transfer.deadline - std::chrono::steady_clock::now())
++                                               .count();
++                    const int milliseconds = static_cast<int>(std::clamp<int64_t>(remaining, 0, 2000));
++                    timeout = timeout < 0 ? milliseconds : std::min(timeout, milliseconds);
++                }
++                for (const auto& transfer : writes) {
++                    descriptors.push_back({transfer.descriptor.get(), POLLOUT, 0});
++                }
++                for (const auto& [proxy, source] : sources) {
++                    if (static_cast<bool>(source->acknowledgement)) {
++                        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
++                                                   source->deadline - std::chrono::steady_clock::now())
++                                                   .count();
++                        const int milliseconds = static_cast<int>(std::clamp<int64_t>(remaining, 0, 2000));
++                        timeout = timeout < 0 ? milliseconds : std::min(timeout, milliseconds);
++                    }
++                }
++                if (wl_display_prepare_read_queue(display, queue.get()) != 0) {
++                    if (errno == EAGAIN) {
++                        continue;
++                    }
++                    throw std::runtime_error("Cannot prepare the Wayland clipboard connection");
++                }
++                const int flushed = wl_display_flush(display);
++                if (flushed < 0 && errno != EAGAIN) {
++                    wl_display_cancel_read(display);
++                    throw std::runtime_error("Cannot flush the Wayland clipboard connection");
++                }
++                if (flushed < 0) {
++                    descriptors[0].events |= POLLOUT;
++                }
++                const int polled = poll(descriptors.data(), descriptors.size(), timeout);
++                const int pollError = errno;
++                if (polled > 0 && (descriptors[0].revents & POLLIN) != 0) {
++                    if (wl_display_read_events(display) < 0) {
++                        throw std::runtime_error("Cannot read the Wayland clipboard connection");
++                    }
++                } else {
++                    wl_display_cancel_read(display);
++                }
++                if (polled < 0 && pollError != EINTR) {
++                    throw std::runtime_error("Clipboard poll failed");
++                }
++                if ((descriptors[0].revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
++                    throw std::runtime_error("Wayland clipboard disconnected");
++                }
++                char buffer[64];
++                while (::read(wakeRead.get(), buffer, sizeof(buffer)) > 0) {
++                }
++            }
++        } catch (const std::exception& error) {
++            std::cerr << "[rnl-clipboard] transfer worker stopped: " << error.what() << std::endl;
++        }
++        std::deque<Task> pending;
++        {
++            const std::scoped_lock lock(mutex);
++            accepting = false;
++            pending.swap(tasks);
++        }
++        for (auto& task : pending) {
++            task.cancel();
++        }
++        for (auto& transfer : reads) {
++            transfer.complete(std::nullopt);
++        }
++        for (auto& complete : deferredReads) {
++            complete(std::nullopt);
++        }
++        deferredReads.clear();
++        reads.clear();
++        writes.clear();
++        for (auto& [proxy, source] : sources) {
++            if (static_cast<bool>(source->acknowledgement)) {
++                source->acknowledgement(false);
++            }
++        }
++        sources.clear();
++        offers.clear();
++        device.reset();
++        manager.reset();
++        queue.reset();
++    }
++};
++
++WaylandClipboard::WaylandClipboard(wl_display* display, wl_data_device_manager* manager, wl_seat* seat)
++    : state_(std::make_unique<State>(display, manager, seat)) {}
++
++WaylandClipboard::~WaylandClipboard() { stop(); }
++
++void WaylandClipboard::readText(ClipboardReadCallback complete) {
++    state_->enqueue(
++        {[state = state_.get(), complete] { state->startRead(complete); }, [complete] { complete(std::nullopt); }});
++}
++
++void WaylandClipboard::writeText(std::string text, ClipboardWriteCallback complete) {
++    const size_t bytes = text.size();
++    state_->enqueue({[state = state_.get(), complete, text = std::move(text)]() mutable {
++                         state->startWrite(std::move(text), complete);
++                     },
++                     [complete] { complete(false); }, bytes});
++}
++
++void WaylandClipboard::setFocus(bool focused) noexcept {
++    if (focused) {
++        state_->inputState.fetch_or(1);
++    } else {
++        state_->inputState.fetch_and(~uint64_t{1});
++    }
++    state_->wake();
++}
++
++void WaylandClipboard::setSelectionSerial(uint32_t serial) noexcept {
++    uint64_t previous = state_->inputState.load();
++    while (!state_->inputState.compare_exchange_weak(previous, (uint64_t{serial} << 2) | 2 | (previous & 1))) {
++    }
++}
++
++void WaylandClipboard::stop() noexcept {
++    if (state_->worker.joinable()) {
++        state_->worker.request_stop();
++        state_->wake();
++        state_->worker.join();
++    }
++}
++
++} // namespace react_native_linux
+diff --git a/packages/core/src/WaylandClipboard.h b/packages/core/src/WaylandClipboard.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..844b3c0dbdbeaae934b0829aa6cefcfdad4f9c28
+--- /dev/null
++++ b/packages/core/src/WaylandClipboard.h
+@@ -0,0 +1,35 @@
++#pragma once
++
++#include "Clipboard.h"
++
++#include <cstdint>
++#include <memory>
++
++struct wl_display;
++struct wl_data_device_manager;
++struct wl_seat;
++
++namespace react_native_linux {
++
++/**
++ * Owns one data-device manager and a private queue on the window's connection.
++ * Only its worker dispatches clipboard proxies. Input callbacks publish focus and
++ * qualifying press serials atomically; frame callers poll the result; JS callers may await a transfer.
++ * The window must stop this worker before destroying its seat or display.
++ */
++class WaylandClipboard final : public ClipboardBackend {
++public:
++    WaylandClipboard(wl_display* display, wl_data_device_manager* manager, wl_seat* seat);
++    ~WaylandClipboard() override;
++    void readText(ClipboardReadCallback complete) override;
++    void writeText(std::string text, ClipboardWriteCallback complete) override;
++    void setFocus(bool focused) noexcept;
++    void setSelectionSerial(uint32_t serial) noexcept;
++    void stop() noexcept;
++
++private:
++    struct State;
++    std::unique_ptr<State> state_;
++};
++
++} // namespace react_native_linux
+diff --git a/packages/core/src/WaylandSeat.cpp b/packages/core/src/WaylandSeat.cpp
+index bc832ae3737e14c50447fcb95ca431a8d7e5e228..f648b5cae3878f3b9ece2f7e8980a5114a80c763 100644
+--- a/packages/core/src/WaylandSeat.cpp
++++ b/packages/core/src/WaylandSeat.cpp
+@@ -1,6 +1,7 @@
+ #include "WaylandSeat.h"
+ 
+ #include "TextInputClient.h"
++#include "WaylandClipboard.h"
+ 
+ #include <array>
+ #include <chrono>
+@@ -148,6 +149,11 @@ WaylandSeat::~WaylandSeat() noexcept {
+ 
+ wl_seat* WaylandSeat::seat() const noexcept { return seat_; }
+ 
++void WaylandSeat::attachClipboard(const std::shared_ptr<WaylandClipboard>& clipboard) {
++    clipboard_ = clipboard;
++    clipboard->setFocus(hasKeyboardFocus_);
++}
++
+ std::vector<InputEvent> WaylandSeat::takeEvents() { return queue_.drain(); }
+ 
+ size_t WaylandSeat::droppedEventCount() const noexcept { return queue_.droppedEventCount(); }
+@@ -252,6 +258,11 @@ void WaylandSeat::pushPointerPosition(InputEventKind kind, int32_t surfaceX, int
+ 
+ void WaylandSeat::pushPointerButton(uint32_t serial, uint32_t button, uint32_t state, uint32_t timeMilliseconds) {
+     serialLedger_.recordPointerButton(serial, state == WL_POINTER_BUTTON_STATE_PRESSED);
++    if (state == WL_POINTER_BUTTON_STATE_PRESSED) {
++        if (const auto clipboard = clipboard_.lock()) {
++            clipboard->setSelectionSerial(serial);
++        }
++    }
+ 
+     const int domButton = domButtonOfEvdevCode(button);
+ 
+@@ -291,6 +302,11 @@ InputEvent WaylandSeat::makeKeyEvent(uint32_t evdevKeycode, InputEventKind kind)
+ 
+ void WaylandSeat::pushKey(uint32_t serial, uint32_t key, uint32_t state, uint32_t timeMilliseconds) {
+     serialLedger_.recordKeyboardKey(serial, state == WL_KEYBOARD_KEY_STATE_PRESSED);
++    if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
++        if (const auto clipboard = clipboard_.lock()) {
++            clipboard->setSelectionSerial(serial);
++        }
++    }
+ 
+     if (keyboardState_ == nullptr) {
+         return;
+@@ -330,6 +346,9 @@ void WaylandSeat::releaseKeyboard() noexcept {
+     }
+ 
+     hasKeyboardFocus_ = false;
++    if (const auto clipboard = clipboard_.lock()) {
++        clipboard->setFocus(false);
++    }
+     // No keyboard, no repeat: with the capability gone no release can ever arrive to stop it.
+     keyRepeat_.release();
+     heldKeyCode_.reset();
+@@ -446,6 +465,9 @@ void WaylandSeat::handleKeyboardEnter(void* data, wl_keyboard* /*keyboard*/, uin
+ 
+     seat->serialLedger_.recordKeyboardEnter(serial);
+     seat->hasKeyboardFocus_ = true;
++    if (const auto clipboard = seat->clipboard_.lock()) {
++        clipboard->setFocus(true);
++    }
+ }
+ 
+ void WaylandSeat::handleKeyboardLeave(void* data, wl_keyboard* /*keyboard*/, uint32_t /*serial*/,
+@@ -453,6 +475,9 @@ void WaylandSeat::handleKeyboardLeave(void* data, wl_keyboard* /*keyboard*/, uin
+     WaylandSeat* seat = static_cast<WaylandSeat*>(data);
+ 
+     seat->hasKeyboardFocus_ = false;
++    if (const auto clipboard = seat->clipboard_.lock()) {
++        clipboard->setFocus(false);
++    }
+     // The compositor will not deliver the release for a key held when focus left, so repeat has to stop here.
+     seat->keyRepeat_.release();
+     seat->heldKeyCode_.reset();
+diff --git a/packages/core/src/WaylandSeat.h b/packages/core/src/WaylandSeat.h
+index cb6ef0e86ff20f0fd629d452a458b5854fc3c1ba..cb7abf236ef1ee26a599adb2a1e02afd73c5346b 100644
+--- a/packages/core/src/WaylandSeat.h
++++ b/packages/core/src/WaylandSeat.h
+@@ -24,6 +24,8 @@ struct zwp_text_input_manager_v3;
+ 
+ namespace react_native_linux {
+ 
++class WaylandClipboard;
++
+ class TextInputClient;
+ 
+ /**
+@@ -85,6 +87,7 @@ public:
+      */
+     void advanceKeyRepeat();
+     void attachTextInput(zwp_text_input_manager_v3* manager);
++    void attachClipboard(const std::shared_ptr<WaylandClipboard>& clipboard);
+     TextInputClient* textInput() const noexcept;
+     /** `wl_keyboard.enter` most recently reached this seat's surface and no `.leave` has followed it yet. */
+     bool hasKeyboardFocus() const noexcept;
+@@ -145,6 +148,7 @@ private:
+     static void handleKeyboardRepeatInfo(void* data, wl_keyboard* keyboard, int32_t rate, int32_t delay);
+ 
+     wl_seat* seat_{nullptr};
++    std::weak_ptr<WaylandClipboard> clipboard_;
+     wl_pointer* pointer_{nullptr};
+     wl_keyboard* keyboard_{nullptr};
+     xkb_context* xkbContext_{nullptr};
+diff --git a/packages/core/src/WaylandWindow.cpp b/packages/core/src/WaylandWindow.cpp
+index 9d403a67a1516cee699efda5eb1e4a3c09be13b1..262a9f04fcde9dbffa63504a371e98bf6f29a2c2 100644
+--- a/packages/core/src/WaylandWindow.cpp
++++ b/packages/core/src/WaylandWindow.cpp
+@@ -1,6 +1,8 @@
+ #include "WaylandWindow.h"
+ 
+ #include "AutomationProtocol.h"
++#include "Clipboard.h"
++#include "WaylandClipboard.h"
+ #include "WaylandDispatchDiagnostics.h"
+ #include "fractional-scale-v1-client-protocol.h"
+ #include "presentation-time-client-protocol.h"
+@@ -18,6 +20,7 @@
+ #include <poll.h>
+ #include <stdexcept>
+ #include <string_view>
++#include <utility>
+ #include <vector>
+ #include <wayland-client.h>
+ 
+@@ -149,10 +152,24 @@ WaylandWindow::WaylandWindow(const WindowIdentity& identity, WindowSize initialS
+     if (seat_ != nullptr && textInputManager_ != nullptr) {
+         seat_->attachTextInput(textInputManager_);
+     }
++    setClipboardUnavailable();
++    if (seat_ != nullptr && clipboardManager_ != nullptr) {
++        clipboard_ =
++            std::make_shared<WaylandClipboard>(display_, std::exchange(clipboardManager_, nullptr), seat_->seat());
++        seat_->attachClipboard(clipboard_);
++        setClipboardBackend(clipboard_);
++    }
+ }
+ 
+ WaylandWindow::~WaylandWindow() noexcept {
+     destroyFrameCallback();
++    if (clipboard_ != nullptr) {
++        clipboard_->stop();
++        clipboard_.reset();
++    }
++    if (clipboardManager_ != nullptr) {
++        wl_data_device_manager_destroy(clipboardManager_);
++    }
+ 
+     // Before the connection goes away: releasing the pointer, the keyboard and the seat are all requests on it.
+     // The seat also owns the text input, which is destroyed before the manager that created it.
+@@ -409,6 +426,9 @@ void WaylandWindow::bindGlobal(wl_registry* registry, uint32_t name, const char*
+     } else if (std::strcmp(interfaceName, wl_shm_interface.name) == 0) {
+         void* bound = wl_registry_bind(registry, name, &wl_shm_interface, 1);
+         sharedMemory_ = static_cast<wl_shm*>(bound);
++    } else if (std::strcmp(interfaceName, wl_data_device_manager_interface.name) == 0) {
++        clipboardManager_ = static_cast<wl_data_device_manager*>(
++            wl_registry_bind(registry, name, &wl_data_device_manager_interface, std::min(version, uint32_t{3})));
+     } else if (std::strcmp(interfaceName, wl_seat_interface.name) == 0 && version >= kMinimumSeatVersion) {
+         void* bound = wl_registry_bind(registry, name, &wl_seat_interface, kMinimumSeatVersion);
+         seat_ = std::make_unique<WaylandSeat>(static_cast<wl_seat*>(bound), serialLedger_);
+diff --git a/packages/core/src/WaylandWindow.h b/packages/core/src/WaylandWindow.h
+index 8cb93058dcdc89f11a9201d5d31d5c9dbc714aca..6f926f1f774db502a2ee0157174e74fa576f8ac9 100644
+--- a/packages/core/src/WaylandWindow.h
++++ b/packages/core/src/WaylandWindow.h
+@@ -21,6 +21,7 @@ struct wl_callback;
+ struct wl_callback_listener;
+ struct wl_compositor;
+ struct wl_display;
++struct wl_data_device_manager;
+ struct wl_output;
+ struct wl_registry;
+ struct wl_registry_listener;
+@@ -52,6 +53,8 @@ struct zxdg_toplevel_decoration_v1_listener;
+ 
+ namespace react_native_linux {
+ 
++class WaylandClipboard;
++
+ struct WindowSize {
+     uint32_t width;
+     uint32_t height;
+@@ -124,9 +127,9 @@ struct WindowIdentity {
+  * stays exactly 1. See *Scale* in docs/cpp-toolchain.md.
+  *
+  * Threading contract: every member runs on the thread that constructed the window, which is the thread that owns
+- * the process run loop. The Wayland connection is never touched from another thread. The Vulkan WSI dispatches the
+- * same connection on its own private event queue, which is why this class uses the prepare-read/read-events
+- * protocol rather than `wl_display_dispatch`.
++ * the process run loop. Clipboard proxies dispatch on a worker-owned queue (ADR-0004); the Vulkan WSI also uses
++ * a private queue on this connection. Window proxies remain on this thread. All readers coordinate through
++ * prepare-read/read-events/cancel-read rather than `wl_display_dispatch`.
+  */
+ class WaylandWindow final {
+ public:
+@@ -379,6 +382,8 @@ private:
+     wl_compositor* compositor_{nullptr};
+     WaylandSerialLedger serialLedger_;
+     wl_shm* sharedMemory_{nullptr};
++    wl_data_device_manager* clipboardManager_{nullptr};
++    std::shared_ptr<WaylandClipboard> clipboard_;
+     std::unique_ptr<WaylandSeat> seat_;
+     zwp_text_input_manager_v3* textInputManager_{nullptr};
+     zxdg_decoration_manager_v1* decorationManager_{nullptr};
+diff --git a/packages/core/tests/ClipboardBackendTest.cpp b/packages/core/tests/ClipboardBackendTest.cpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..a083a50fe4834e30ce38a28ddff7affed9b06eca
+--- /dev/null
++++ b/packages/core/tests/ClipboardBackendTest.cpp
+@@ -0,0 +1,180 @@
++#include "Clipboard.h"
++#include "ClipboardText.h"
++
++#include <atomic>
++#include <functional>
++#include <gtest/gtest.h>
++#include <memory>
++#include <mutex>
++#include <optional>
++#include <string>
++#include <thread>
++#include <vector>
++
++namespace react_native_linux {
++namespace {
++
++class RecordingClipboard final : public ClipboardBackend {
++public:
++    void readText(ClipboardReadCallback complete) override {
++        std::optional<std::string> text;
++        {
++            const std::scoped_lock lock(mutex_);
++            if (available) {
++                text = text_;
++            }
++        }
++        if (onRead) {
++            onRead();
++        }
++        complete(std::move(text));
++    }
++
++    void writeText(std::string text, ClipboardWriteCallback complete) override {
++        bool accepted;
++        {
++            const std::scoped_lock lock(mutex_);
++            accepted = available;
++            if (accepted) {
++                text_ = std::move(text);
++            }
++        }
++        if (onWrite) {
++            onWrite();
++        }
++        complete(accepted);
++    }
++
++    std::string storedText() {
++        const std::scoped_lock lock(mutex_);
++        return text_;
++    }
++
++    bool available{true};
++    std::function<void()> onRead;
++    std::function<void()> onWrite;
++
++private:
++    std::mutex mutex_;
++    std::string text_;
++};
++
++class ClipboardBackendTest : public ::testing::Test {
++protected:
++    void SetUp() override {
++        setClipboardBackend(nullptr);
++        setClipboardText("headless");
++    }
++
++    void TearDown() override {
++        setClipboardBackend(nullptr);
++        setClipboardText("");
++    }
++};
++
++TEST_F(ClipboardBackendTest, HeadlessStorageRetainsItsText) {
++    EXPECT_EQ(clipboardText(), "headless");
++    EXPECT_TRUE(setClipboardText(""));
++    EXPECT_EQ(clipboardText(), "");
++}
++
++TEST_F(ClipboardBackendTest, RoutesReadsAndWritesThroughTheInstalledBackend) {
++    const auto backend = std::make_shared<RecordingClipboard>();
++    setClipboardBackend(backend);
++    EXPECT_TRUE(setClipboardText("system text"));
++    EXPECT_EQ(backend->storedText(), "system text");
++    EXPECT_EQ(clipboardText(), "system text");
++    setClipboardBackend(nullptr);
++    EXPECT_EQ(clipboardText(), "headless");
++}
++
++TEST_F(ClipboardBackendTest, FailureCannotReturnOrOverwriteHeadlessData) {
++    const auto backend = std::make_shared<RecordingClipboard>();
++    backend->available = false;
++    setClipboardBackend(backend);
++    EXPECT_FALSE(clipboardText().has_value());
++    EXPECT_FALSE(setClipboardText("lost write"));
++    setClipboardBackend(nullptr);
++    EXPECT_EQ(clipboardText(), "headless");
++}
++
++TEST_F(ClipboardBackendTest, ExpiredBackendDoesNotRevertToHeadlessStorage) {
++    auto backend = std::make_shared<RecordingClipboard>();
++    setClipboardBackend(backend);
++    backend.reset();
++    EXPECT_FALSE(clipboardText().has_value());
++    EXPECT_FALSE(setClipboardText("lost write"));
++    setClipboardBackend(nullptr);
++    EXPECT_EQ(clipboardText(), "headless");
++}
++
++TEST_F(ClipboardBackendTest, MissingWindowCapabilityDoesNotUseHeadlessStorage) {
++    setClipboardUnavailable();
++    EXPECT_FALSE(clipboardText().has_value());
++    EXPECT_FALSE(setClipboardText("lost write"));
++    setClipboardBackend(nullptr);
++    EXPECT_EQ(clipboardText(), "headless");
++}
++
++TEST_F(ClipboardBackendTest, InvokesBackendCallbacksOutsideTheRegistryLock) {
++    const auto backend = std::make_shared<RecordingClipboard>();
++    backend->writeText("backend text", [](bool) {});
++    backend->onRead = [] { setClipboardBackend(nullptr); };
++    setClipboardBackend(backend);
++    EXPECT_EQ(clipboardText(), "backend text");
++    EXPECT_EQ(clipboardText(), "headless");
++    backend->onWrite = [] { setClipboardBackend(nullptr); };
++    setClipboardBackend(backend);
++    EXPECT_TRUE(setClipboardText("new backend text"));
++    EXPECT_EQ(backend->storedText(), "new backend text");
++    EXPECT_EQ(clipboardText(), "headless");
++}
++
++TEST_F(ClipboardBackendTest, ConcurrentCallsRetainTheSelectedBackendForEachOperation) {
++    const auto first = std::make_shared<RecordingClipboard>();
++    const auto second = std::make_shared<RecordingClipboard>();
++    first->writeText("first", [](bool) {});
++    second->writeText("second", [](bool) {});
++    setClipboardBackend(first);
++    std::atomic<bool> valid{true};
++    std::thread reader([&] {
++        for (int count = 0; count < 1000; ++count) {
++            const auto text = clipboardText();
++            if (!text.has_value() || (*text != "first" && *text != "second" && *text != "updated")) {
++                valid = false;
++            }
++        }
++    });
++    std::thread writer([&] {
++        for (int count = 0; count < 1000; ++count) {
++            if (!setClipboardText("updated")) {
++                valid = false;
++            }
++        }
++    });
++    for (int count = 0; count < 1000; ++count) {
++        setClipboardBackend(count % 2 == 0 ? first : second);
++    }
++    reader.join();
++    writer.join();
++    EXPECT_TRUE(valid);
++}
++
++TEST(ClipboardTextTest, AcceptsUnicodeScalarValues) {
++    for (const auto& text : std::vector<std::string>{"", "ascii", std::string(1, '\0'), "雪🙂", "\x7f", "\xc2\x80",
++                                                     "\xdf\xbf", "\xe0\xa0\x80", "\xed\x9f\xbf", "\xee\x80\x80",
++                                                     "\xef\xbf\xbf", "\xf0\x90\x80\x80", "\xf4\x8f\xbf\xbf"}) {
++        EXPECT_TRUE(validClipboardUtf8(text)) << text;
++    }
++}
++
++TEST(ClipboardTextTest, RejectsMalformedOverlongSurrogateAndOutOfRangeSequences) {
++    for (const auto& text : std::vector<std::string>{
++             "\x80", "\xbf", "\xc0\xaf", "\xc1\xbf", "\xc2", "\xc2!", "\xe0\x9f\xbf", "\xe2\x82", "\xe2!\x80",
++             "\xe2\x80!", "\xed\xa0\x80", "\xf0\x8f\xbf\xbf", "\xf4\x90\x80\x80", "\xf5\x80\x80\x80", "\xff"}) {
++        EXPECT_FALSE(validClipboardUtf8(text)) << text;
++    }
++}
++
++} // namespace
++} // namespace react_native_linux
+diff --git a/packages/core/tests/TextInputControllerTest.cpp b/packages/core/tests/TextInputControllerTest.cpp
+index 48043689562c5cfffbc7f4947054d4bcc605d708..0e503567b8ed18566c5317b128e51ec7934e76f9 100644
+--- a/packages/core/tests/TextInputControllerTest.cpp
++++ b/packages/core/tests/TextInputControllerTest.cpp
+@@ -46,6 +46,11 @@ using ChildList = std::vector<std::shared_ptr<const ShadowNode>>;
+  */
+ class TextInputControllerTest : public TextInputFieldFixture {
+ protected:
++    void TearDown() override {
++        react_native_linux::setClipboardBackend(nullptr);
++        TextInputFieldFixture::TearDown();
++    }
++
+     TextInputController makeController() { return TextInputController(uiManager_, mountingManager_, kSurfaceId); }
+ 
+     void commitTextInput(folly::dynamic extraProps) {
+@@ -375,6 +380,123 @@ TEST_F(TextInputControllerTest, ReadOnlyCutCopiesTheSelectionWithoutDeletingIt)
+     EXPECT_EQ(countRecorded(kChangeEvent), 0U);
+ }
+ 
++TEST_F(TextInputControllerTest, UnavailableSystemClipboardCannotDeleteSelectedText) {
++    class UnavailableClipboard final : public react_native_linux::ClipboardBackend {
++    public:
++        void readText(react_native_linux::ClipboardReadCallback complete) override { complete(std::nullopt); }
++
++        void writeText(std::string, react_native_linux::ClipboardWriteCallback complete) override { complete(false); }
++    };
++
++    commitTextInput(folly::dynamic::object());
++    type("keep selection");
++    const InputModifiers control{.control = true};
++    controller_->handleKey(key("a", control));
++    controller_->synchronize();
++    recordedEventTypes_->clear();
++    const auto backend = std::make_shared<UnavailableClipboard>();
++    react_native_linux::setClipboardBackend(backend);
++
++    for (const auto* shortcut : {"x", "v"}) {
++        EXPECT_EQ(controller_->handleKey(key(shortcut, control)), TextInputKeyResult::Consumed);
++        controller_->synchronize();
++        EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++        EXPECT_EQ(countRecorded(kSelectionChangeEvent), 0U);
++    }
++    react_native_linux::setClipboardBackend(nullptr);
++    controller_->handleKey(key("c", control));
++    EXPECT_EQ(react_native_linux::clipboardText(), "keep selection");
++}
++
++class DelayedClipboard final : public react_native_linux::ClipboardBackend {
++public:
++    void readText(react_native_linux::ClipboardReadCallback complete) override { read = std::move(complete); }
++
++    void writeText(std::string, react_native_linux::ClipboardWriteCallback complete) override {
++        write = std::move(complete);
++    }
++
++    react_native_linux::ClipboardReadCallback read;
++    react_native_linux::ClipboardWriteCallback write;
++};
++
++TEST_F(TextInputControllerTest, PasteReturnsBeforeTheTransferAndAppliesOnlyAfterCompletion) {
++    commitTextInput(folly::dynamic::object());
++    type("old");
++    const InputModifiers control{.control = true};
++    controller_->handleKey(key("a", control));
++    controller_->synchronize();
++    recordedEventTypes_->clear();
++    const auto backend = std::make_shared<DelayedClipboard>();
++    react_native_linux::setClipboardBackend(backend);
++    controller_->handleKey(key("v", control));
++    controller_->synchronize();
++    EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++    backend->read(std::string("from peer"));
++    controller_->synchronize();
++    EXPECT_EQ(countRecorded(kChangeEvent), 1U);
++    react_native_linux::setClipboardBackend(nullptr);
++    controller_->handleKey(key("a", control));
++    controller_->handleKey(key("c", control));
++    EXPECT_EQ(react_native_linux::clipboardText(), "from peer");
++}
++
++TEST_F(TextInputControllerTest, LatePasteCannotOverwriteAnInterveningUserEdit) {
++    commitTextInput(folly::dynamic::object());
++    type("old");
++    const InputModifiers control{.control = true};
++    controller_->handleKey(key("a", control));
++    const auto backend = std::make_shared<DelayedClipboard>();
++    react_native_linux::setClipboardBackend(backend);
++    controller_->handleKey(key("v", control));
++    type("new edit");
++    backend->read(std::string("late clipboard"));
++    controller_->synchronize();
++    react_native_linux::setClipboardBackend(nullptr);
++    controller_->handleKey(key("a", control));
++    controller_->handleKey(key("c", control));
++    EXPECT_EQ(react_native_linux::clipboardText(), "new edit");
++}
++
++TEST_F(TextInputControllerTest, CutReturnsBeforeAcknowledgementAndDeletesOnlyAfterSuccess) {
++    commitTextInput(folly::dynamic::object());
++    type("selected");
++    const InputModifiers control{.control = true};
++    controller_->handleKey(key("a", control));
++    controller_->synchronize();
++    recordedEventTypes_->clear();
++    const auto backend = std::make_shared<DelayedClipboard>();
++    react_native_linux::setClipboardBackend(backend);
++    controller_->handleKey(key("x", control));
++    controller_->synchronize();
++    EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++    backend->write(true);
++    controller_->synchronize();
++    EXPECT_EQ(countRecorded(kChangeEvent), 1U);
++    react_native_linux::setClipboardBackend(nullptr);
++    type("replacement");
++    controller_->handleKey(key("a", control));
++    controller_->handleKey(key("c", control));
++    EXPECT_EQ(react_native_linux::clipboardText(), "replacement");
++}
++
++TEST_F(TextInputControllerTest, LateCutCannotDeleteTextAfterTheSelectionMoves) {
++    commitTextInput(folly::dynamic::object());
++    type("selected");
++    const InputModifiers control{.control = true};
++    controller_->handleKey(key("a", control));
++    const auto backend = std::make_shared<DelayedClipboard>();
++    react_native_linux::setClipboardBackend(backend);
++    controller_->handleKey(key("x", control));
++    controller_->handleKey(key("ArrowLeft"));
++    backend->write(true);
++    controller_->synchronize();
++    react_native_linux::setClipboardBackend(nullptr);
++    controller_->handleKey(key("a", control));
++    controller_->handleKey(key("c", control));
++    EXPECT_EQ(react_native_linux::clipboardText(), "selected");
++}
++
+ TEST_F(TextInputControllerTest, ATextKeyIsConsumedAndAnUnfocusedControllerIgnoresEverything) {
+     commitTextInput(folly::dynamic::object());
+ 
+diff --git a/packages/core/tests/hermes/CMakeLists.txt b/packages/core/tests/hermes/CMakeLists.txt
+index 9b20944daa7581a0212d5c257e2245d6a83e1184..1cd550496562e796e977f115d65d2f8f7272e194 100644
+--- a/packages/core/tests/hermes/CMakeLists.txt
++++ b/packages/core/tests/hermes/CMakeLists.txt
+@@ -99,6 +99,7 @@ endif()
+ # rather than linked from rnl_react_core because the runner exists only for tests, and rnl_react_core is what
+ # rnl_window links.
+ add_executable(rnl_core_hermes_tests
++    ../ClipboardBackendTest.cpp
+     ../TextInputControllerTest.cpp
+     AdditionalSurfaceTest.cpp
+     ClipboardModuleTest.cpp
+diff --git a/packages/core/tests/hermes/ClipboardModuleTest.cpp b/packages/core/tests/hermes/ClipboardModuleTest.cpp
+index d63fa8eaee938e783eba8909abc0651316869092..2abcca15ef54130582feed7d4727ea279c745092 100644
+--- a/packages/core/tests/hermes/ClipboardModuleTest.cpp
++++ b/packages/core/tests/hermes/ClipboardModuleTest.cpp
+@@ -17,6 +17,8 @@ constexpr char kClipboardProbe[] = R"JAVASCRIPT(
+ const clipboard = globalThis.nativeModuleProxy.RNCClipboard;
+ 
+ (async () => {
++  let invalidRejected = false;
++  try { clipboard.setString(123); } catch { invalidRejected = true; }
+   const pasted = await clipboard.getString();
+   const hadPasted = await clipboard.hasString();
+ 
+@@ -24,7 +26,7 @@ const clipboard = globalThis.nativeModuleProxy.RNCClipboard;
+   const hadEmpty = await clipboard.hasString();
+ 
+   clipboard.setString('from JavaScript');
+-  globalThis.clipboardTrace = `${pasted} ${hadPasted} ${hadEmpty} ${await clipboard.getString()}`;
++  globalThis.clipboardTrace = `${pasted} ${hadPasted} ${hadEmpty} ${await clipboard.getString()} invalid=${invalidRejected}`;
+ })();
+ )JAVASCRIPT";
+ 
+@@ -45,7 +47,7 @@ TEST(ClipboardModuleTest, SharesTheTextFieldClipboardWithJavaScript) {
+         trace.set_value(value.isString() ? value.getString(runtime).utf8(runtime) : "the probe never finished");
+     });
+ 
+-    EXPECT_EQ(trace.get_future().get(), "copied in a field true false from JavaScript");
++    EXPECT_EQ(trace.get_future().get(), "copied in a field true false from JavaScript invalid=true");
+     EXPECT_EQ(clipboardText(), "from JavaScript");
+     EXPECT_FALSE(reactHost.hasReportedFatalError());
+ }

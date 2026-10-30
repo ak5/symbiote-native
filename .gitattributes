@@ -1,0 +1,2 @@
+# Unified diff context lines contain required spacing; check the applied C++ files.
+core/engine/linux/host/*.patch -whitespace
