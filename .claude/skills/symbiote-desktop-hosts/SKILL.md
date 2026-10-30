@@ -79,7 +79,9 @@ Keep every required case enabled and require discovery of all 38 refresh cases.
 Strict native window ASan/UBSan/LSan and TSan checks include complete shutdown.
 Keep halt-on-error and leak detection enabled, with no exclusions. Build pinned
 Skia/Mesa with matching instrumentation rather than disabling a detector to link
-or hide a report. Rust dependencies are not instrumented by these C++ sanitizers.
+or hide a report. C++ flags do not instrument Rust. Sanitizer jobs must use the pinned nightly,
+rust-src, dependency-wide Rust flags, rebuilt std and the external C++ runtime.
+Require actual archive instrumentation symbols, including TSan atomic operations.
 Use at most two native compiler workers, one Metro worker and sequential heavy
 jobs under `nice -n 10`. Do not push while a useful workflow is live: its
 cancel-in-progress policy would cancel the current evidence.

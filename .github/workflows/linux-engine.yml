@@ -62,6 +62,8 @@ jobs:
           git -C .linux-host apply "$PWD/core/engine/linux/host/selection.patch"
           git -C .linux-host apply --check "$PWD/core/engine/linux/host/input-driver-cleanup.patch"
           git -C .linux-host apply "$PWD/core/engine/linux/host/input-driver-cleanup.patch"
+          git -C .linux-host apply --check "$PWD/core/engine/linux/host/rust-sanitizers.patch"
+          git -C .linux-host apply "$PWD/core/engine/linux/host/rust-sanitizers.patch"
       - name: Check native accessibility source formatting
         run: |
           nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/AccessibilityBridge.cpp .linux-host/packages/core/src/AccessibilityBridge.h .linux-host/packages/core/src/EditorModel.cpp .linux-host/packages/core/src/EditorModel.h .linux-host/packages/core/src/RetainedScene.cpp .linux-host/packages/core/src/RetainedScene.h .linux-host/packages/core/src/LinuxMountingManager.cpp .linux-host/packages/core/src/LinuxMountingManager.h .linux-host/packages/core/src/InputDispatcher.cpp .linux-host/packages/core/src/InputDispatcher.h .linux-host/packages/core/src/FabricHost.h .linux-host/packages/core/src/WindowSession.cpp .linux-host/packages/core/src/WindowSession.h .linux-host/packages/core/src/WindowMain.cpp .linux-host/packages/core/tests/{AccessibilitySnapshotTest,NativeAccessibilityActionTest,EditorTest}.cpp
@@ -265,10 +267,12 @@ jobs:
             sudo sysctl -w vm.mmap_rnd_bits=28
             sudo nice -n 10 apt-get install -y python3-venv python3-mako python3-yaml python3-packaging llvm-19-dev libdrm-dev libelf-dev libexpat1-dev libzstd-dev bison flex glslang-tools
           fi
+      - name: Install pinned Rust sanitizer toolchain and standard library sources
+        run: nice -n 10 rustup toolchain install nightly-2026-10-29 --profile minimal --component rust-src
       - name: Apply the pinned Linux host changes
         run: |
           test "$(git -C .linux-host rev-parse HEAD)" = 4db5e336b529c15628ffb8ba94cd6d880ff9a450
-          for patch in clipboard-safety system-clipboard layout-conformance accessibility custom-actions lifecycle-cleanup modal refresh selection input-driver-cleanup; do
+          for patch in clipboard-safety system-clipboard layout-conformance accessibility custom-actions lifecycle-cleanup modal refresh selection input-driver-cleanup rust-sanitizers; do
             git -C .linux-host apply --check "$PWD/core/engine/linux/host/$patch.patch"
             git -C .linux-host apply "$PWD/core/engine/linux/host/$patch.patch"
           done
@@ -307,8 +311,16 @@ jobs:
       - name: Build the real native window with sanitizers
         working-directory: .linux-host
         run: |
-          nice -n 10 cmake --preset "${{ matrix.sanitizer }}" -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_AUTOLINKING_CMAKE="$GITHUB_WORKSPACE/.linux-host/symbiote-generated/rnl_autolinking.cmake"
+          nice -n 10 cmake --preset "${{ matrix.sanitizer }}" -DRust_TOOLCHAIN=nightly-2026-10-29 -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_AUTOLINKING_CMAKE="$GITHUB_WORKSPACE/.linux-host/symbiote-generated/rnl_autolinking.cmake"
           nice -n 10 cmake --build --preset "${{ matrix.sanitizer }}" --target rnl_window rnl_inject --parallel 2
+      - name: Verify Rust sanitizer instrumentation
+        run: |
+          nice -n 10 nm --undefined-only ".linux-host/build/${{ matrix.sanitizer }}/_deps/accesskit_c-build/libaccesskit.a" > ".linux-host/symbiote-rust-${{ matrix.sanitizer }}-symbols.log"
+          if [ "${{ matrix.sanitizer }}" = tsan ]; then
+            grep -E '__tsan_atomic(8|16|32|64|128)_' .linux-host/symbiote-rust-tsan-symbols.log
+          else
+            grep -E '__asan_(load|store|report)' .linux-host/symbiote-rust-asan-symbols.log
+          fi
       - name: Exercise the actual accessibility app, reload and stale handles
         run: |
           set -o pipefail
@@ -335,6 +347,7 @@ jobs:
             .linux-host/symbiote-accessibility-*.log
             .linux-host/symbiote-modal-*.log
             .linux-host/symbiote-refresh-*.log
+            .linux-host/symbiote-rust-*-symbols.log
             .linux-host/accessibility-${{ matrix.sanitizer }}-results
             .linux-host/modal-${{ matrix.sanitizer }}-results
             .linux-host/refresh-${{ matrix.sanitizer }}-results

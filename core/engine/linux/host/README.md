@@ -29,6 +29,8 @@ git -C <host> apply --check "$PWD/core/engine/linux/host/selection.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/selection.patch"
 git -C <host> apply --check "$PWD/core/engine/linux/host/input-driver-cleanup.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/input-driver-cleanup.patch"
+git -C <host> apply --check "$PWD/core/engine/linux/host/rust-sanitizers.patch"
+git -C <host> apply "$PWD/core/engine/linux/host/rust-sanitizers.patch"
 ```
 
 The host's MIT license is retained in `LICENSE`. The patch series supplies these
@@ -132,7 +134,9 @@ persistence phases. Saved stdout and all 30 PNG signatures were checked, and
 React's second-cycle screenshot was visually inspected. This run precedes the
 refresh and selection patches; their new native gates still require
 Linux results. Its accessibility application also passed both strict
-ASan/UBSan/leak-detection lifecycle cycles; TSan verification remains pending.
+ASan/UBSan/leak-detection lifecycle cycles. Its TSan run stopped at a Rust
+async-task handoff while that dependency was uninstrumented. Full Rust
+instrumentation and the extended control journeys still require runtime proof.
 
 The workflow requires discovery and execution of all 38 refresh regressions in
 the actual Hermes target. Five packed framework applications each run twice on
@@ -149,8 +153,15 @@ run in separate CTest processes so ReactHost can install feature defaults before
 first use. All builds run sequentially with at most two compiler workers.
 
 `scripts/build-linux-skia.py` builds the locked Skia archives with RTTI and
-matching sanitizers; GN's effective flags are checked. Rust dependencies are not
-instrumented by these C++ sanitizers. TSan also uses a fully instrumented Mesa
+matching sanitizers; GN's effective flags are checked. `rust-sanitizers.patch` propagates ASan/TSan instrumentation to Rust dependencies
+and rebuilds std with the matching mode. The sanitizer jobs use
+`nightly-2026-10-29` plus rust-src and `-Zexternal-clangrt` to share the C++ runtime.
+Ordinary host builds keep their stable Rust requirement. Cargo remains locked
+with two workers; Corrosion supplies an explicit target so host build scripts
+and procedural macros are not instrumented. CI checks the real archive for
+sanitizer references, including TSan atomic operations, before runtime tests.
+See [Rust's sanitizer guidance](https://doc.rust-lang.org/unstable-book/compiler-flags/sanitizer.html#threadsanitizer)
+for the need to expose all synchronization and rebuild the standard library. TSan also uses a fully instrumented Mesa
 25.2.8 driver built from its checksum-pinned official archive.
 [mesa-tsan.patch](mesa-tsan.patch) removes default sanitizer exclusions, uses
 atomic access for the timeout cache and synchronizes fence completion queries

@@ -1,0 +1,21 @@
+diff --git a/packages/core/CMakeLists.txt b/packages/core/CMakeLists.txt
+--- a/packages/core/CMakeLists.txt
++++ b/packages/core/CMakeLists.txt
+@@ -1257,6 +1257,17 @@
+         COMMAND ${RNL_PATCH} -N -t -p1 -i ${CMAKE_CURRENT_SOURCE_DIR}/cmake/accesskit-owned-actions.patch)
+     FetchContent_MakeAvailable(accesskit_c)
+     corrosion_set_cargo_flags(accesskit --locked --jobs=2)
++    set(_rnl_rust_sanitizer "")
++    if(CMAKE_CXX_FLAGS MATCHES "-fsanitize=thread")
++        set(_rnl_rust_sanitizer thread)
++    elseif(CMAKE_CXX_FLAGS MATCHES "-fsanitize=address")
++        set(_rnl_rust_sanitizer address)
++    endif()
++    if(_rnl_rust_sanitizer)
++        # Rust dependencies and std share the C++ sanitizer runtime and visible synchronization.
++        corrosion_add_target_rustflags(accesskit "-Zsanitizer=${_rnl_rust_sanitizer}" -Zexternal-clangrt)
++        corrosion_set_cargo_flags(accesskit -Zbuild-std=std,panic_unwind)
++    endif()
+ 
+     add_custom_target(rnl_accessibility_transport_tests
+         COMMAND ${RNL_CARGO} test --locked --jobs 2 --target-dir ${CMAKE_BINARY_DIR}/accessibility-test-target --manifest-path ${accesskit_atspi_common_SOURCE_DIR}/Cargo.toml -- --test-threads=1
