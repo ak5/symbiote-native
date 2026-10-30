@@ -60,15 +60,16 @@ The workflow requires its controller, scene and Hermes/Fabric regression cases.
 Each framework also runs a packed modal application through an independent
 AT-SPI client on a private Sway seat, covering opaque/transparent rendering,
 real window resizing, nested dialogs, editor state and in-process reload.
-The normal native job in run `41115170458` passed all five frameworks in both
-cycles with none/fade/slide animations, including the native editor acknowledgement
-regressions. Full lifecycle sanitizer verification remains required.
+The normal native job in run `41128043290` at `07bce45d` passed all five
+frameworks in both cycles with none/fade/slide animations, including native editor
+acknowledgement. Full lifecycle sanitizer verification remains required.
 
 The refresh patch supplies the stock `PullToRefreshView` descriptor, native
 pull/release handling, controlled refreshing, viewport indicator/title painting
 and accessible native activation. The workflow requires its 39 native cases and
-five-framework window journeys. These refresh runtime checks still require Linux
-verification; preserve unknown-component diagnostics for any unavailable control.
+five-framework window journeys. Run `41128043290` passed all 39 cases and both
+native refresh cycles in every framework, including Angular conditional mounting.
+Preserve unknown-component diagnostics for any unavailable control.
 
 The host patch uses React Native's existing `LayoutConformance` shadow node and
 Yoga strict/compatibility behavior. A Linux descriptor invalidates layout on
@@ -79,9 +80,9 @@ The pinned host's clipboard starts as process-local storage. The host patch adds
 a Wayland data-device backend. Run `41016615907` passed native checks and
 second-client exchange verification, including ASan/UBSan and TSan builds.
 The accessibility patch connects the host to AccessKit's Unix AT-SPI transport.
-Its independent normal client and reload checks passed in run `41115170458`.
-Full lifecycle sanitizer checks and the added selection/value journeys remain
-unverified; automation-tree inspection and injected input alone do not establish
+Its independent normal client, selection/value events and reload checks passed
+both cycles in run `41128043290`. Full lifecycle sanitizer checks remain pending;
+automation-tree inspection and injected input alone do not establish
 screen-reader interoperability.
 Expo-backed companion modules require their own Linux ports; their presence in
 the workspace does not make their native APIs available.

@@ -126,17 +126,24 @@ finalizes Fontconfig. Embedded hosts retain control of process finalization.
 
 ## Verification
 
-[Run 41115170458](https://github.com/ak5/symbiote-native/actions/runs/41115170458)
-at `fccec398` passed its normal native job: 133 CTest cases, independent AT-SPI
-lifecycle/custom-action checks, the five-framework keyboard/clipboard/resize/
-scrolling matrix, all 30 modal animation/cycle journeys and ten fresh-process
-persistence phases. Saved stdout and all 30 PNG signatures were checked, and
-React's second-cycle screenshot was visually inspected. This run precedes the
-refresh and selection patches; their new native gates still require
-Linux results. Its accessibility application also passed both strict
-ASan/UBSan/leak-detection lifecycle cycles. Its TSan run stopped at a Rust
-async-task handoff while that dependency was uninstrumented. Full Rust
-instrumentation and the extended control journeys still require runtime proof.
+[Run 41128043290](https://github.com/ak5/symbiote-native/actions/runs/41128043290)
+at `07bce45d` passed its normal native job: all 172 CTest cases, including the
+39 refresh regressions; independent AT-SPI lifecycle, custom actions, selection
+and value-event checks; the five-framework keyboard/clipboard/resize/scrolling
+matrix; 30 modal animation/cycle journeys; ten refresh journeys; and ten
+fresh-process persistence phases. Saved stdout, persistence logs and actual PNG
+headers were checked. The Angular refresh screenshot was also visually inspected.
+The window build compiled the bridge and shared C++ bindings from the installed
+engine package, with their paths checked against CMake's compile commands.
+
+That run's ASan and TSan jobs built instrumented C++, Rust dependencies and Rust
+std; actual archive symbols were checked. Both stopped at the first native tab
+lookup before exercising the accessibility fixture. Their saved native logs
+contained no sanitizer report before that timeout. They do not establish a full
+sanitizer pass or graceful shutdown. The client now waits for a committed fixture
+control before starting functional assertions; that correction still requires
+native verification. All functional assertions and sanitizer detectors remain
+enabled.
 
 The workflow requires discovery and execution of all 39 refresh regressions in
 the actual Hermes target. Five packed framework applications each run twice on
