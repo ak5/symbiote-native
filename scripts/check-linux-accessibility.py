@@ -94,7 +94,8 @@ def main():
 
     def text(node):
         interface = node.get_text_iface()
-        return interface.get_text(0, -1) if interface is not None else ''
+        # GI's Accessible.get_text() is the deprecated interface getter, not Text.get_text().
+        return Atspi.Text.get_text(interface, 0, -1) if interface is not None else ''
 
     def event_received(event, *_):
         try:
@@ -185,17 +186,17 @@ def main():
                               event['source'] == 'Native editor' and event['detail1'] == 1 for event in events),
                   'focus event', alive)
             command(['wtype', '-P', 'Left', '-p', 'Left'])
-            until(lambda: editor.get_text_iface().get_caret_offset() == 2, 'native caret movement', alive)
+            until(lambda: Atspi.Text.get_caret_offset(editor) == 2, 'native caret movement', alive)
             until(lambda: any(event['type'].startswith('object:text-caret-moved') and
                               event['source'] == 'Native editor' for event in events), 'caret event', alive)
             assert editor.get_editable_text_iface().set_text_contents('é🐧z!')
             until(lambda: text(editor) == 'é🐧z!', 'native editable-text replacement', alive)
-            assert editor.get_text_iface().add_selection(1, 2)
+            assert Atspi.Text.add_selection(editor, 1, 2)
             def selected_emoji():
                 interface = editor.get_text_iface()
-                if interface.get_n_selections() != 1:
+                if Atspi.Text.get_n_selections(interface) != 1:
                     return False
-                selection = interface.get_selection(0)
+                selection = Atspi.Text.get_selection(interface, 0)
                 return selection.start_offset == 1 and selection.end_offset == 2
             until(selected_emoji, 'native Unicode selection acknowledgement', alive)
             command(['wtype', 'X'])
