@@ -64,7 +64,7 @@ regressions. Full lifecycle sanitizer verification remains required.
 
 The refresh patch supplies the stock `PullToRefreshView` descriptor, native
 pull/release handling, controlled refreshing, viewport indicator/title painting
-and accessible native activation. The workflow requires its 38 native cases and
+and accessible native activation. The workflow requires its 39 native cases and
 five-framework window journeys. These refresh runtime checks still require Linux
 verification; preserve unknown-component diagnostics for any unavailable control.
 

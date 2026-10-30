@@ -133,7 +133,7 @@ jobs:
           set -o pipefail
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_core_hermes_tests --parallel 2
           nice -n 10 ctest --test-dir .linux-host/build/symbiote --show-only -R '^Refresh(Gesture|Scene|Controller|Host)Test\.' | tee .linux-host/symbiote-refresh-discovery.log
-          grep -Fx 'Total Tests: 38' .linux-host/symbiote-refresh-discovery.log
+          grep -Fx 'Total Tests: 39' .linux-host/symbiote-refresh-discovery.log
           nice -n 10 ctest --test-dir .linux-host/build/symbiote --verbose --output-on-failure --no-tests=error --timeout 60 -j 1 -R '^(TextInputControllerTest|ClipboardBackendTest|ClipboardTextTest|ClipboardModuleTest|LayoutConformanceHostTest|AccessibilitySnapshotTest|NativeAccessibilityActionTest|EditorModelTest|ModalControllerTest|ModalSceneTest|ModalHostTest|RefreshGestureTest|RefreshSceneTest|RefreshControllerTest|RefreshHostTest)\.' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
       - name: Exercise module initialization and Fabric commits in Hermes
         run: |

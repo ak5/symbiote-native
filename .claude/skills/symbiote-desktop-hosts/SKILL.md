@@ -74,7 +74,7 @@ activation, removal, modal isolation and reload. Preserve all existing assertion
 Run controller/Hermes cases through CTest one case per process. Feature defaults
 can be read by standalone controllers before ReactHost installs its overrides;
 combining these suites in one GTest process breaks runtime initialization.
-Keep every required case enabled and require discovery of all 38 refresh cases.
+Keep every required case enabled and require discovery of all 39 refresh cases.
 
 Strict native window ASan/UBSan/LSan and TSan checks include complete shutdown.
 Keep halt-on-error and leak detection enabled, with no exclusions. Build pinned

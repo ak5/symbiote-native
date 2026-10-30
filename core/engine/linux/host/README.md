@@ -138,7 +138,7 @@ ASan/UBSan/leak-detection lifecycle cycles. Its TSan run stopped at a Rust
 async-task handoff while that dependency was uninstrumented. Full Rust
 instrumentation and the extended control journeys still require runtime proof.
 
-The workflow requires discovery and execution of all 38 refresh regressions in
+The workflow requires discovery and execution of all 39 refresh regressions in
 the actual Hermes target. Five packed framework applications each run twice on
 private Sway/D-Bus sessions. Refresh checks require real Wayland pan input,
 acceptance/rejection, native pixels, keyboard/AT-SPI activation, draft preservation,

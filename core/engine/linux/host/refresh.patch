@@ -121,23 +121,56 @@ diff --git a/packages/core/src/InputDispatcher.h b/packages/core/src/InputDispat
 diff --git a/packages/core/src/LinuxMountingManager.cpp b/packages/core/src/LinuxMountingManager.cpp
 --- a/packages/core/src/LinuxMountingManager.cpp
 +++ b/packages/core/src/LinuxMountingManager.cpp
-@@ -104,6 +104,15 @@
-     return changed;
- }
+@@ -10,6 +10,7 @@
+ #include <utility>
+ #include <vector>
  
++#include <react/renderer/components/FBReactNativeSpec/Props.h>
+ #include <react/renderer/components/view/ViewProps.h>
+ #include <react/renderer/mounting/ShadowViewMutation.h>
+ 
+@@ -100,6 +101,15 @@
+                                                  facebook::react::Tag activeTag) {
+     const std::lock_guard<std::mutex> guard(sceneMutex_);
+     const bool changed = scene_.setModalPresentations(presentations, activeTag);
++    hasPendingDamage_ = hasPendingDamage_ || changed;
++    return changed;
++}
++
 +bool LinuxMountingManager::setRefreshControlState(facebook::react::Tag tag,
 +                                                  const facebook::react::SharedEventEmitter& emitter, bool refreshing,
 +                                                  double distance) {
 +    const std::lock_guard<std::mutex> guard(sceneMutex_);
 +    const bool changed = scene_.setRefreshControlState(tag, emitter, refreshing, distance);
-+    hasPendingDamage_ = hasPendingDamage_ || changed;
-+    return changed;
-+}
-+
- void LinuxMountingManager::setFocus(facebook::react::Tag tag, bool isFocusVisible) {
-     const std::lock_guard<std::mutex> guard(sceneMutex_);
+     hasPendingDamage_ = hasPendingDamage_ || changed;
+     return changed;
+ }
+@@ -269,11 +279,23 @@
+             verifyTagIsKnown("Remove", mutation.oldChildShadowView.tag);
+             scene_.removeChild(mutation.parentTag, mutation.oldChildShadowView);
+             break;
+-        case facebook::react::ShadowViewMutation::Update:
++        case facebook::react::ShadowViewMutation::Update: {
+             verifyTagIsKnown("Update", mutation.newChildShadowView.tag);
++            const auto previous = std::dynamic_pointer_cast<const facebook::react::PullToRefreshViewProps>(
++                mutation.oldChildShadowView.props);
++            const auto next = std::dynamic_pointer_cast<const facebook::react::PullToRefreshViewProps>(
++                mutation.newChildShadowView.props);
++            // Preserve a committed true/false transition even when both occur between frames.
++            if (previous && next && previous->refreshing != next->refreshing) {
++                commands_.push_back(SceneCommand{.tag = mutation.newChildShadowView.tag,
++                                                 .name = "setNativeRefreshing",
++                                                 .args = folly::dynamic::array(next->refreshing),
++                                                 .emitter = mutation.newChildShadowView.eventEmitter});
++            }
+             recordAccessibilityChangeIfAny(mutation.newChildShadowView, accessibilityChangesThisTransaction);
+             scene_.updateNode(mutation.newChildShadowView);
+             break;
++        }
+         }
+     }
  
-@@ -294,7 +303,8 @@
+@@ -294,7 +316,8 @@
      const std::lock_guard<std::mutex> guard(sceneMutex_);
  
      verifyTagIsKnown("Command", shadowView.tag);
@@ -794,7 +827,7 @@ diff --git a/packages/core/tests/RefreshControllerTest.cpp b/packages/core/tests
 new file mode 100644
 --- /dev/null
 +++ b/packages/core/tests/RefreshControllerTest.cpp
-@@ -0,0 +1,230 @@
+@@ -0,0 +1,257 @@
 +#include "InputDispatcher.h"
 +#include "ScrollController.h"
 +#include "ShadowTreeTestSupport.h"
@@ -908,6 +941,33 @@ new file mode 100644
 +    pull(100);
 +    release();
 +    EXPECT_EQ(refreshEvents(), 0);
++}
++
++TEST_F(RefreshControllerTest, CommittedStopSurvivesAcceptanceAndCompletionBetweenFrames) {
++    Node refresh = control();
++    Node tree = scroll(refresh);
++    commit(tree);
++    pull(-128);
++    release();
++    ASSERT_EQ(refreshEvents(), 1);
++    for (const bool refreshing : {true, false}) {
++        const auto props =
++            refreshDescriptor_.cloneProps(PropsParserContext{kSurfaceId, *contextContainer_}, refresh->getProps(),
++                                          RawProps{folly::dynamic::object("refreshing", refreshing)});
++        refresh = refresh->clone(ShadowNodeFragment{.props = props});
++        tree = tree->clone(ShadowNodeFragment{
++            .children = std::make_shared<const Children>(Children{tree->getChildren().front(), refresh})});
++        commit(tree);
++    }
++    const auto commands = mountingManager_->takeCommands();
++    ASSERT_EQ(commands.size(), 2);
++    controller_->dispatchCommands(commands);
++    controller_->advance(16);
++    EXPECT_FALSE(mountingManager_->visualTreeNodes().at(4).refreshControl->refreshing);
++    EXPECT_EQ(refreshEvents(), 1);
++    pull(-128);
++    release();
++    EXPECT_EQ(refreshEvents(), 2);
 +}
 +
 +TEST_F(RefreshControllerTest, ARejectedControlledRefreshCanBePulledAgain) {
