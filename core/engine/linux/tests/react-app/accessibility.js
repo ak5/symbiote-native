@@ -1,5 +1,8 @@
 import { createElement, useState } from 'react';
-import { AppRegistry as NativeAppRegistry } from 'react-native';
+import {
+  AppRegistry as NativeAppRegistry,
+  TurboModuleRegistry,
+} from 'react-native';
 import { registerApp } from '@symbiote-native/react/bootstrap';
 import { dlog } from '@symbiote-native/engine';
 
@@ -114,6 +117,24 @@ function App() {
       style: fieldStyle,
     }),
     createElement('text-input', emptyProps),
+    createElement(
+      'pressable',
+      {
+        accessible: true,
+        accessibilityRole: 'button',
+        accessibilityLabel: 'Reload native session',
+        style: { width: 240, height: 40 },
+        onPress: () => {
+          const settings =
+            /** @type {import('react-native').TurboModule & { reloadWithReason(reason: string): void }} */ (
+              TurboModuleRegistry.getEnforcing('DevSettings')
+            );
+          settings.reloadWithReason('AT-SPI lifecycle');
+        },
+      },
+      createElement('text', { style: textStyle }, 'Reload session'),
+    ),
+
     createElement('text', { style: textStyle }, longCluster),
     createElement(
       'view',

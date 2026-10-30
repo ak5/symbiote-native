@@ -12,3 +12,9 @@ D-Bus/Wayland seat, and align the native regression fixtures with the pinned SDK
 
 Reject queued accessibility actions after a control or ancestor becomes hidden.
 Document exact companion-provider gaps and verify the native image fixture loads.
+
+Exercise native in-process session replacement and old AT-SPI handles, and run
+the real packed app under native ASan/UBSan and TSan after the normal gate.
+
+Preserve oversized grapheme text through AccessKit Label values rather than a
+label property that the platform does not use for that role.

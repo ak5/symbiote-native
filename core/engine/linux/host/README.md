@@ -78,3 +78,13 @@ geometry, hidden/protected text, focus/caret events, native text and selection
 edits, Pressable activation and session removal/recreation. The client requires
 AT-SPI's GI bindings; it never attaches to the operator's desktop or session bus.
 Passing this client is still pending, as are lifecycle sanitizer checks.
+
+The lifecycle client also requests a real in-process DevSettings reload, sends
+old-handle edits across the reload boundary, and verifies a new adapter and
+fresh editable state in the same process. The workflow replays the packed app
+against native ASan/UBSan and TSan builds after the normal job succeeds. These
+builds use the host's existing sanitizer presets, at most two compiler workers
+and sequential matrix jobs. They enable halt-on-error and leak detection without
+suppressions. Rust's dependency and the prebuilt Skia archive are not rebuilt
+with C++ sanitizers; the host, engine and C++ bridge are instrumented. Passing
+lifecycle/sanitizer logs are still required before claiming this gate complete.

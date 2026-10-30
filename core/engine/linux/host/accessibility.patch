@@ -2,7 +2,7 @@ diff --git a/docs/adr/0005-accesskit-c-abi-accessibility.md b/docs/adr/0005-acce
 new file mode 100644
 --- /dev/null
 +++ b/docs/adr/0005-accesskit-c-abi-accessibility.md
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,89 @@
 +# ADR-0005: Use AccessKit's C ABI for native Linux accessibility
 +
 +- Status: accepted in the ak5/symbiote-native fork; implementation in progress
@@ -77,12 +77,16 @@ new file mode 100644
 +fields. Full role-conformance enumeration and precise optional text geometry
 +still require their own implementation and checks. AccessKit's uint8 character-length ABI uses a readable label fallback for a
 +selectable cluster over 255 UTF-8 bytes; range navigation is unavailable there.
++AccessKit's Label role derives its readable name from `value`; the fallback
++therefore sets the native value, preserving static text without inventing a text
++range. Editable fields keep their own label and expose a readable child value.
 +Do not report the accessibility target complete while these checks are pending.
 +
 +## Sources
 +
 +- [C bindings and build contract](https://github.com/AccessKit/accesskit-c/tree/e9f6614309eeb820ff03cacd174b1dccee98250c)
 +- [Activation and text contracts](https://github.com/AccessKit/accesskit/blob/accesskit-v0.25.1/accesskit/src/lib.rs)
++- [Consumer label/value contract](https://github.com/AccessKit/accesskit/blob/accesskit_unix-v0.24.0/accesskit_consumer/src/node.rs)
 +- [Unix adapter lifecycle](https://github.com/AccessKit/accesskit/blob/accesskit_unix-v0.24.0/adapters/unix/src/adapter.rs)
 +- [Existing host decision question](https://github.com/react-native-linux/react-native-linux/issues/347)
 +
@@ -124,7 +128,7 @@ diff --git a/packages/core/src/AccessibilityBridge.cpp b/packages/core/src/Acces
 new file mode 100644
 --- /dev/null
 +++ b/packages/core/src/AccessibilityBridge.cpp
-@@ -0,0 +1,624 @@
+@@ -0,0 +1,629 @@
 +#include "AccessibilityBridge.h"
 +
 +#include "AutomationProtocol.h"
@@ -516,12 +520,17 @@ new file mode 100644
 +            const auto bytes = segments.graphemeStarts[index] - segments.graphemeStarts[index - 1];
 +            if (bytes > std::numeric_limits<uint8_t>::max()) {
 +                // shortcut: AccessKit's uint8 ABI limits range navigation; use a label until wider lengths exist.
-+                NativeNode label(accesskit_node_new(ACCESSKIT_ROLE_LABEL), accesskit_node_free);
-+                accesskit_node_set_label_with_length(label.get(), text.data(), text.size());
-+                accesskit_node_set_bounds(label.get(), boundsOf(geometry.bounds, publication_.window.contentOffsetY));
-+                const auto identity = nativeId(source) + 1;
-+                accesskit_node_push_child(parent, identity);
-+                accesskit_tree_update_push_node(update_.get(), identity, label.release());
++                // AccessKit labels derive their name from value, not the label property.
++                accesskit_node_set_value_with_length(parent, text.data(), text.size());
++                if (source.editor) {
++                    NativeNode label(accesskit_node_new(ACCESSKIT_ROLE_LABEL), accesskit_node_free);
++                    accesskit_node_set_value_with_length(label.get(), text.data(), text.size());
++                    accesskit_node_set_bounds(label.get(),
++                                              boundsOf(geometry.bounds, publication_.window.contentOffsetY));
++                    const auto identity = nativeId(source) + 1;
++                    accesskit_node_push_child(parent, identity);
++                    accesskit_tree_update_push_node(update_.get(), identity, label.release());
++                }
 +                std::cerr << "[a11y] text is readable; range navigation exceeds AccessKit's character-length limit\n";
 +                return;
 +            }

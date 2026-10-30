@@ -69,7 +69,7 @@ jobs:
           nice -n 10 clang-format-18 --style=file:.linux-host/.clang-format --dry-run --Werror core/engine/linux/tests/wayland-clipboard-probe.cpp
           for variant in normal asan tsan; do
             flags=()
-            if [ "$variant" = asan ]; then flags=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
+            if [ "$variant" = asan ]; then flags=('-fsanitize=address,undefined' -fno-omit-frame-pointer); fi
             if [ "$variant" = tsan ]; then
               flags=(-fsanitize=thread -fno-omit-frame-pointer)
               # Clang 18's TSan shadow mapping needs this ASLR width on the disposable runner.
@@ -157,6 +157,11 @@ jobs:
         run: |
           nice -n 10 node --test scripts/linux-persistence-probe.test.mjs
           nice -n 10 node scripts/run-linux-persistence-consumers.mjs .linux-host .linux-host/symbiote-app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-accessibility-bundle
+          path: .linux-host/symbiote-app/react/accessibility.linux.bundle.js
+          if-no-files-found: error
       - uses: actions/cache/save@v4
         if: always() && steps.compiler-cache.outputs.cache-primary-key != ''
         with:
@@ -172,4 +177,101 @@ jobs:
             .linux-host/build/e2e
             .linux-host/clipboard-protocol/results-*
             .linux-host/accessibility-results
+          if-no-files-found: ignore
+
+  accessibility-sanitizers:
+    needs: native
+    if: github.repository == 'ak5/symbiote-native'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        sanitizer: [asan, tsan]
+    env:
+      CC: clang-18
+      CXX: clang++-18
+      CMAKE_BUILD_PARALLEL_LEVEL: 2
+      CCACHE_MAXSIZE: 2G
+      ASAN_OPTIONS: halt_on_error=1:detect_leaks=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      TSAN_OPTIONS: halt_on_error=1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: react-native-linux/react-native-linux
+          ref: 4db5e336b529c15628ffb8ba94cd6d880ff9a450
+          path: .linux-host
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-accessibility-bundle
+          path: .linux-accessibility
+      - name: Install native compiler and accessibility dependencies
+        run: |
+          sudo nice -n 10 apt-get update
+          sudo nice -n 10 apt-get install -y ccache clang-18 cmake ninja-build pkg-config libboost-dev libdouble-conversion-dev libfmt-dev libgoogle-glog-dev libcurl4-openssl-dev libsqlite3-dev libxkbcommon-dev libicu-dev libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev mesa-vulkan-drivers wayland-protocols sway wtype at-spi2-core python3-gi gir1.2-atspi-2.0 libglib2.0-bin dbus-daemon
+          if [ "${{ matrix.sanitizer }}" = tsan ]; then
+            # Match the shadow mapping used by the independent clipboard TSan gate.
+            sudo sysctl -w vm.mmap_rnd_bits=28
+          fi
+      - name: Apply the pinned Linux host changes
+        run: |
+          test "$(git -C .linux-host rev-parse HEAD)" = 4db5e336b529c15628ffb8ba94cd6d880ff9a450
+          for patch in clipboard-safety system-clipboard layout-conformance accessibility; do
+            git -C .linux-host apply --check "$PWD/core/engine/linux/host/$patch.patch"
+            git -C .linux-host apply "$PWD/core/engine/linux/host/$patch.patch"
+          done
+      - name: Prepare the native host and engine registration
+        run: |
+          nice -n 10 pnpm --dir .linux-host install --frozen-lockfile --ignore-scripts
+          node --input-type=commonjs <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const root = path.resolve('core/engine');
+          const config = require(path.join(root, 'react-native.config.cjs'));
+          fs.writeFileSync('.linux-host/symbiote-config.json', JSON.stringify({
+            root: process.cwd(),
+            dependencies: { '@symbiote-native/engine': { root, platforms: config.dependency.platforms } },
+          }));
+          NODE
+          nice -n 10 node .linux-host/scripts/autolink.ts .linux-host/symbiote-config.json .linux-host/symbiote-generated
+          nice -n 10 node .linux-host/scripts/vendor-react-native.ts
+          nice -n 10 node .linux-host/scripts/vendor-skia.ts
+          nice -n 10 node .linux-host/scripts/vendor-fonts.ts
+      - uses: actions/cache/restore@v4
+        id: compiler-cache
+        with:
+          path: ~/.cache/ccache
+          key: linux-accessibility-${{ matrix.sanitizer }}-4db5e33-${{ github.sha }}
+          restore-keys: linux-accessibility-${{ matrix.sanitizer }}-4db5e33-
+      - name: Build the real native window with sanitizers
+        working-directory: .linux-host
+        run: |
+          nice -n 10 cmake --preset "${{ matrix.sanitizer }}" -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_AUTOLINKING_CMAKE="$GITHUB_WORKSPACE/.linux-host/symbiote-generated/rnl_autolinking.cmake"
+          nice -n 10 cmake --build --preset "${{ matrix.sanitizer }}" --target rnl_window --parallel 2
+      - name: Exercise the actual accessibility app, reload and stale handles
+        run: |
+          set -o pipefail
+          nice -n 10 /usr/bin/python3 scripts/check-linux-accessibility.py ".linux-host/build/${{ matrix.sanitizer }}/bin/rnl_window" .linux-accessibility/accessibility.linux.bundle.js ".linux-host/accessibility-${{ matrix.sanitizer }}-results" 2>&1 | tee ".linux-host/symbiote-accessibility-${{ matrix.sanitizer }}.log"
+      - uses: actions/cache/save@v4
+        if: always() && steps.compiler-cache.outputs.cache-primary-key != ''
+        with:
+          path: ~/.cache/ccache
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-accessibility-${{ matrix.sanitizer }}-logs
+          include-hidden-files: true
+          path: |
+            .linux-host/symbiote-accessibility-*.log
+            .linux-host/accessibility-${{ matrix.sanitizer }}-results
           if-no-files-found: ignore

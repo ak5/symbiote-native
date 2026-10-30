@@ -221,6 +221,45 @@ def main():
                   'real framework event handlers', alive)
             print(f'PASS native AT-SPI activation and notifications cycle={cycle}', flush=True)
 
+            old_root = root
+            reloads_before = log.read_text(errors='replace').count('[rnl-reload] reloaded')
+            reload_action = named(root, 'Reload native session').get_action_iface()
+            assert reload_action.do_action(0)
+            accepted, rejected = 0, 0
+            # Spread real old-handle requests across native frames while the owner reloads.
+            for request in range(32):
+                pump()
+                try:
+                    if Atspi.EditableText.set_text_contents(editor, f'old-session-{request}'):
+                        accepted += 1
+                    else:
+                        rejected += 1
+                except GLib.Error:
+                    rejected += 1
+                    break
+                time.sleep(0.005)
+            until(lambda: log.read_text(errors='replace').count('[rnl-reload] reloaded') == reloads_before + 1,
+                  'in-process native session reload', alive)
+
+            def replaced_root():
+                candidate = named(desktop, title)
+                return candidate if candidate is not None and candidate != old_root else None
+
+            root = until(replaced_root, 'new AT-SPI adapter in the same process', alive)
+            replacement = until(lambda: named(root, 'Native editor'), 'new native editor', alive)
+            until(lambda: text(replacement) == 'é🐧z' and named(root, 'Native count 0'),
+                  'fresh native session state', alive)
+            try:
+                Atspi.EditableText.set_text_contents(editor, 'late-after-reload')
+            except GLib.Error:
+                pass  # A removed AT-SPI object is expected to reject the old handle.
+            assert replacement.get_component_iface().grab_focus()
+            until(lambda: replacement.get_state_set().contains(Atspi.StateType.FOCUSED),
+                  'replacement editor native focus', alive)
+            command(['wtype', 'Q'])
+            until(lambda: text(replacement) == 'é🐧zQ', 'old handles cannot edit the replacement session', alive)
+            print(f'PASS native AT-SPI in-process reload and stale handles cycle={cycle} accepted={accepted} rejected={rejected}', flush=True)
+
             command(['swaymsg', f'[title="{title}"]', 'kill'])
             assert window.wait(timeout=10) == 0, 'Native shutdown failed'
             until(lambda: not named(desktop, title), 'AT-SPI session removal', [compositor], 10)
