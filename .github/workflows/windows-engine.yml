@@ -3,6 +3,8 @@ name: Windows engine compatibility
 on:
   push:
     branches: [feat/windows]
+    # The standalone Settings inspector is not an input to the native application.
+    paths-ignore: [.github/workflows/windows-display-probe.yml]
   workflow_dispatch:
 
 permissions:

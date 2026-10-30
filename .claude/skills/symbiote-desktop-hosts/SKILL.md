@@ -66,7 +66,9 @@ Report native client pixels, current monitor bounds, DPI/96 and UISettings text 
 Only own typed state passes through the property bag, within this application's EXE; never unwrap SDK-private values.
 Capture changes on the UI thread, protect snapshots for the JS thread and hold module callbacks weakly.
 Remove the subclass and revoke text-scale notifications on destruction. Install the subclass last to avoid dangling callbacks
-if startup configuration throws. Native metrics/provider verification is pending the next Windows run.
+if startup configuration throws. Native run40993232079 at e1884e4a passed the installed provider, all five exact client
+984x749/scale1 checks and real OS resize updates, five graceful shutdowns and ten storage phases.
+This is default-scale verification; a real OS scale change remains to be tested.
 
 Fork run `40986359425` at `f5e4e27f` passed all five native framework journeys:
 layout updates, UI Automation focus/typing/controlled uppercase, native Ctrl+C with a separate OS clipboard client,

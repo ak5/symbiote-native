@@ -12,7 +12,10 @@ using System.Runtime.InteropServices;
 public struct InputRect { public int Left, Top, Right, Bottom; }
 public static class InputWindow {
   [DllImport("user32.dll", SetLastError=true)] public static extern bool GetClientRect(IntPtr window, out InputRect rect);
+  [DllImport("user32.dll", SetLastError=true)] public static extern bool GetWindowRect(IntPtr window, out InputRect rect);
   [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr window);
+  [DllImport("user32.dll")] public static extern IntPtr GetWindowDpiAwarenessContext(IntPtr window);
+  [DllImport("user32.dll")] public static extern int GetAwarenessFromDpiAwarenessContext(IntPtr context);
   [DllImport("user32.dll", SetLastError=true)] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
   [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, int data, UIntPtr extraInfo);
@@ -25,6 +28,11 @@ $previousDpiContext = [InputWindow]::SetThreadDpiAwarenessContext([IntPtr]::new(
 if ($previousDpiContext -eq [IntPtr]::Zero) { throw 'Cannot enable per-monitor DPI awareness for native input verification' }
 try {
   $app = Get-Process -Id $ApplicationProcessId
+  if ($app.MainWindowHandle -eq [IntPtr]::Zero) { throw 'The native application window is missing' }
+  $windowAwareness = [InputWindow]::GetAwarenessFromDpiAwarenessContext(
+    [InputWindow]::GetWindowDpiAwarenessContext($app.MainWindowHandle))
+  if ($windowAwareness -ne 2) { throw 'The native SDK window is not per-monitor DPI aware' }
+  Write-Host 'PASS: native window uses per-monitor DPI awareness'
   $root = [System.Windows.Automation.AutomationElement]::FromHandle($app.MainWindowHandle)
   if ($null -eq $root) { throw 'Native application window is missing' }
   $condition = [System.Windows.Automation.PropertyCondition]::new(
@@ -112,15 +120,17 @@ try {
   $initial = Wait-CalibratedViewport
   $initialWidth = $initial.Width
   Write-Host "PASS: native client viewport $($initial.Width)x$($initial.Height) scale $($initial.Scale)"
-  $bounds = $root.Current.BoundingRectangle
+  $bounds = [InputRect]::new()
+  if (-not [InputWindow]::GetWindowRect($app.MainWindowHandle, [ref]$bounds)) { throw 'Cannot read native window bounds' }
   # Keep position, z-order and activation unchanged while changing the real OS window size.
   if (-not [InputWindow]::SetWindowPos($app.MainWindowHandle, [IntPtr]::Zero, 0, 0,
-      ([int][Math]::Ceiling($bounds.Width) + 160), [int][Math]::Ceiling($bounds.Height), 0x16)) {
+      ($bounds.Right - $bounds.Left + 160), ($bounds.Bottom - $bounds.Top), 0x16)) {
     throw 'The native window could not be resized'
   }
-  $resizedBounds = $root.Current.BoundingRectangle
-  if ($resizedBounds.Width -le $bounds.Width + 1) {
-    throw "The OS window size did not increase: $($bounds.Width) -> $($resizedBounds.Width)"
+  $resizedBounds = [InputRect]::new()
+  if (-not [InputWindow]::GetWindowRect($app.MainWindowHandle, [ref]$resizedBounds)) { throw 'Cannot read resized native window bounds' }
+  if (($resizedBounds.Right - $resizedBounds.Left) -le ($bounds.Right - $bounds.Left + 1)) {
+    throw 'The OS window size did not increase'
   }
   $resized = Wait-CalibratedViewport
   $resizedWidth = $resized.Width
