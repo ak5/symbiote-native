@@ -1117,7 +1117,25 @@ new file mode 100644
 diff --git a/packages/core/src/TextInputController.cpp b/packages/core/src/TextInputController.cpp
 --- a/packages/core/src/TextInputController.cpp
 +++ b/packages/core/src/TextInputController.cpp
-@@ -720,10 +720,6 @@
+@@ -628,13 +628,15 @@
+     const facebook::react::TextInputState& stateData = field.shadowNode->getStateData();
+     const std::string reactTreeText = stateData.reactTreeAttributedString.getString();
+ 
+-    if (reactTreeText == field.reactTreeText) {
++    // Native state writes advance the state's count without acknowledging React's authored text.
++    const int reactTreeEventCount = field.shadowNode->getConcreteProps().mostRecentEventCount;
++    if (reactTreeText == field.reactTreeText || reactTreeEventCount != field.editor.mostRecentEventCount()) {
+         return;
+     }
+ 
+     field.reactTreeText = reactTreeText;
+     field.writtenEventCount = -1;
+-    field.editor.reconcileProps(reactTreeText, static_cast<int>(stateData.mostRecentEventCount));
++    field.editor.reconcileProps(reactTreeText, reactTreeEventCount);
+ }
+ 
+ void TextInputController::publish(TextInputField& field) {
+@@ -720,10 +722,6 @@
      }
  
      if (isFocused && textInputFocusSink_ != nullptr) {
@@ -1128,7 +1146,7 @@ diff --git a/packages/core/src/TextInputController.cpp b/packages/core/src/TextI
          textInputFocusSink_->setCursorRectangle(
              static_cast<int32_t>(box.origin.x + geometry.caret.origin.x - field.scrollOffsetX),
              static_cast<int32_t>(box.origin.y + geometry.caret.origin.y),
-@@ -732,6 +728,13 @@
+@@ -732,6 +730,13 @@
  #else
      field.contentSize = field.shadowNode->getLayoutMetrics().frame.size;
  #endif
@@ -1629,6 +1647,84 @@ new file mode 100644
 +}
 +
 +} // namespace
+diff --git a/packages/core/tests/TextInputControllerTest.cpp b/packages/core/tests/TextInputControllerTest.cpp
+--- a/packages/core/tests/TextInputControllerTest.cpp
++++ b/packages/core/tests/TextInputControllerTest.cpp
+@@ -12,6 +12,7 @@
+ #include <memory>
+ #include <vector>
+ 
++#include <react/renderer/core/ConcreteState.h>
+ #include <react/renderer/core/State.h>
+ 
+ namespace {
+@@ -77,6 +78,20 @@
+         controller_->setFocusedNode(mountedField_);
+     }
+ 
++    void commitFieldProps(folly::dynamic props) {
++        const auto parsed = fieldDescriptor_.cloneProps(PropsParserContext{kSurfaceId, *contextContainer_},
++                                                        mountedField_->getProps(), RawProps{std::move(props)});
++        const auto field = mountedField_->clone(ShadowNodeFragment{.props = parsed});
++        shadowTree_->commit(
++            [field](const RootShadowNode& root) {
++                return react_native_linux::cloneRootWithChildren(root,
++                                                                 std::make_shared<const ChildList>(ChildList{field}));
++            },
++            ShadowTreeCommitOptions{.enableStateReconciliation = false, .mountSynchronously = true});
++        mountedField_ = newestFieldNode();
++        controller_->setMountedFields({mountedField_});
++    }
++
+     std::shared_ptr<const TextInputShadowNode> newestFieldNode() {
+         std::shared_ptr<const ShadowNode> fieldNode;
+ 
+@@ -174,6 +189,45 @@
+         {.tag = kFieldTag, .name = "setTextAndSelection", .args = folly::dynamic::array(1, nullptr, 0, 1)});
+     EXPECT_EQ(countRecorded(kSelectionChangeEvent), 1U);
+     EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++}
++
++TEST_F(TextInputControllerTest, NativeStateCountsCannotAcknowledgeStaleAuthoredText) {
++    commitTextInput(folly::dynamic::object("text", "modal雪"));
++    type("Q");
++    controller_->synchronize();
++
++    // An older React render arrives before the native state write, which retains that render's text.
++    commitFieldProps(folly::dynamic::object("text", "replacement")("mostRecentEventCount", 0));
++    auto nativeState = mountedField_->getStateData();
++    nativeState.mostRecentEventCount = 1;
++    const auto state = std::make_shared<const facebook::react::ConcreteState<facebook::react::TextInputState>>(
++        std::make_shared<const facebook::react::TextInputState>(nativeState), *mountedField_->getState());
++    const auto field = mountedField_->clone(ShadowNodeFragment{.state = state});
++    shadowTree_->commit(
++        [field](const RootShadowNode& root) {
++            return react_native_linux::cloneRootWithChildren(root, std::make_shared<const ChildList>(ChildList{field}));
++        },
++        ShadowTreeCommitOptions{.enableStateReconciliation = false, .mountSynchronously = true});
++    mountedField_ = newestFieldNode();
++    ASSERT_EQ(mountedField_->getStateData().mostRecentEventCount, 1);
++    ASSERT_EQ(mountedField_->getConcreteProps().mostRecentEventCount, 0);
++    controller_->setMountedFields({mountedField_});
++    controller_->synchronize();
++    EXPECT_EQ(copiedFieldText(), "modal雪Q");
++
++    // The same authored text becomes valid when React actually acknowledges the pending edit.
++    commitFieldProps(folly::dynamic::object("mostRecentEventCount", 1));
++    controller_->synchronize();
++    EXPECT_EQ(copiedFieldText(), "replacement");
++}
++
++TEST_F(TextInputControllerTest, AcknowledgingAnUnchangedPropDoesNotResetNativeEdits) {
++    commitTextInput(folly::dynamic::object());
++    type("Q");
++    controller_->synchronize();
++    commitFieldProps(folly::dynamic::object("mostRecentEventCount", 1));
++    controller_->synchronize();
++    EXPECT_EQ(copiedFieldText(), "Q");
+ }
+ 
+ TEST_F(TextInputControllerTest, InvalidCommandsAndUnmountedTargetsCannotChangeAField) {
 diff --git a/packages/core/tests/hermes/CMakeLists.txt b/packages/core/tests/hermes/CMakeLists.txt
 --- a/packages/core/tests/hermes/CMakeLists.txt
 +++ b/packages/core/tests/hermes/CMakeLists.txt
