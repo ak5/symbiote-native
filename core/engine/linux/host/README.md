@@ -19,6 +19,8 @@ preserves a selection when pasting empty clipboard text. Read-only text can be
 copied without deletion. The patch also adds native controller regression tests
 to the host's existing Hermes test target; CI builds it and runs the controller
 suite before application checks.
+Fork run `41002818528` passed all 21 native controller tests and the five-framework
+application and persistence matrix.
 
 This patch is preparation for system clipboard exchange. The host still uses
 its process-local clipboard; it does not yet exchange data with other clients.
