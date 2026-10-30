@@ -139,6 +139,20 @@ try {
   }
   Write-Host "PASS: native OS resize updated framework viewport $initialWidth -> $resizedWidth"
 
+  & "$PSScriptRoot/check-windows-display-scaling.ps1" -OutputDirectory "windows-display-$ApplicationProcessId" -Verify {
+    param([int]$ExpectedDpi)
+    $deadline = (Get-Date).AddSeconds(20)
+    do {
+      $actualDpi = [InputWindow]::GetDpiForWindow($app.MainWindowHandle)
+      if ($actualDpi -eq $ExpectedDpi) { break }
+      Start-Sleep -Milliseconds 100
+    } while ((Get-Date) -lt $deadline)
+    if ($actualDpi -ne $ExpectedDpi) { throw "Application window DPI remained $actualDpi, expected $ExpectedDpi" }
+    $viewport = Wait-CalibratedViewport
+    Write-Host "PASS: live framework viewport $($viewport.Width)x$($viewport.Height) scale $($viewport.Scale) at native DPI $actualDpi"
+  }
+  if (-not [InputWindow]::SetForegroundWindow($app.MainWindowHandle)) { throw 'Could not reactivate the native application after display scaling' }
+
   $scrollCondition = [System.Windows.Automation.PropertyCondition]::new(
     [System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'windows-scroll')
   $deadline = (Get-Date).AddSeconds(15)

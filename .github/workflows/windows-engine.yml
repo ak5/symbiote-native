@@ -332,6 +332,7 @@ jobs:
             windows-*-runtime.log
             windows-fabric.binlog
             windows-persistence-results/
+            windows-display-*/
             .windows-fabric-probe/windows/**/windows-fabric-runtime.log
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
