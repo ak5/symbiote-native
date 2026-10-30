@@ -31,3 +31,6 @@ can retain its vptr checks when linking the real window.
 Investigate native lifecycle races with an instrumented, checksum-pinned lavapipe
 build that retains observable synchronization and removes sanitizer exclusions.
 Verify the real window loaded that exact driver during the external client gate.
+
+Release owned C ABI action text, the Wayland activation proxy and process font
+resources during shutdown, retaining the real leak-detection gate.

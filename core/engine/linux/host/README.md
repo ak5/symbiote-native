@@ -19,6 +19,8 @@ git -C <host> apply --check "$PWD/core/engine/linux/host/accessibility.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/accessibility.patch"
 git -C <host> apply --check "$PWD/core/engine/linux/host/custom-actions.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/custom-actions.patch"
+git -C <host> apply --check "$PWD/core/engine/linux/host/lifecycle-cleanup.patch"
+git -C <host> apply "$PWD/core/engine/linux/host/lifecycle-cleanup.patch"
 ```
 
 `clipboard-safety.patch` prevents secure text from entering the clipboard,
@@ -117,5 +119,17 @@ are not reassigned to different names. The exact locked AT-SPI common crate is
 fetched by checksum and patched to enumerate and dispatch these actions; the C
 ABI manifest uses a sibling path override and its lockfile remains enforced.
 Three transport regressions fail before that patch, and all ten crate tests pass
-afterward. Native C++ and real client checks, including reordered handlers, remain
-required. Clean the generated build directory after editing dependency patches.
+afterward. Run `41063811774` passed the native C++ and real client checks,
+including reordered handlers. Clean the generated build directory after editing
+dependency patches.
+
+`lifecycle-cleanup.patch` releases resources exposed by the real native leak
+gate. The C ABI's optional action payload used `MaybeUninit`, so freeing its
+request did not destroy owned text. A real allocator-observation regression fails
+before the cleanup and passes afterward; the host runs it through its CMake
+ownership-test target. The native window also releases its Wayland activation
+proxy and registers Fontconfig finalization before constructing text-pipeline
+statics, so their font managers are destroyed first. Finalization belongs to the
+standalone executable; embedded hosts retain control of their process lifetime.
+Passing both full sanitized shutdown cycles remains required. Leak detection and
+halt-on-error remain enabled.

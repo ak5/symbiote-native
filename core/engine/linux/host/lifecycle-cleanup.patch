@@ -1,0 +1,162 @@
+diff --git a/packages/core/CMakeLists.txt b/packages/core/CMakeLists.txt
+--- a/packages/core/CMakeLists.txt
++++ b/packages/core/CMakeLists.txt
+@@ -1251,13 +1251,20 @@
+         GIT_REPOSITORY https://github.com/AccessKit/accesskit-c.git
+         GIT_TAG e9f6614309eeb820ff03cacd174b1dccee98250c
+         UPDATE_DISCONNECTED TRUE
+-        PATCH_COMMAND ${RNL_PATCH} -N -t -p1 -i ${CMAKE_CURRENT_SOURCE_DIR}/cmake/accesskit-c-lock.patch)
++        PATCH_COMMAND ${RNL_PATCH} -N -t -p1 -i ${CMAKE_CURRENT_SOURCE_DIR}/cmake/accesskit-c-lock.patch
++        COMMAND ${RNL_PATCH} -N -t -p1 -i ${CMAKE_CURRENT_SOURCE_DIR}/cmake/accesskit-owned-actions.patch)
+     FetchContent_MakeAvailable(accesskit_c)
+     corrosion_set_cargo_flags(accesskit --locked --jobs=2)
+ 
+     add_custom_target(rnl_accessibility_transport_tests
+-        COMMAND ${RNL_CARGO} test --locked --jobs 2 --manifest-path ${accesskit_atspi_common_SOURCE_DIR}/Cargo.toml -- --test-threads=1
++        COMMAND ${RNL_CARGO} test --locked --jobs 2 --target-dir ${CMAKE_BINARY_DIR}/accessibility-test-target --manifest-path ${accesskit_atspi_common_SOURCE_DIR}/Cargo.toml -- --test-threads=1
+         WORKING_DIRECTORY ${accesskit_atspi_common_SOURCE_DIR}
++        USES_TERMINAL
++        VERBATIM)
++
++    add_custom_target(rnl_accessibility_ownership_tests
++        COMMAND ${RNL_CARGO} test --locked --jobs 2 --target-dir ${CMAKE_BINARY_DIR}/accessibility-test-target --manifest-path ${accesskit_c_SOURCE_DIR}/Cargo.toml --lib request_free -- --test-threads=1
++        WORKING_DIRECTORY ${accesskit_c_SOURCE_DIR}
+         USES_TERMINAL
+         VERBATIM)
+ 
+diff --git a/packages/core/cmake/accesskit-owned-actions.patch b/packages/core/cmake/accesskit-owned-actions.patch
+new file mode 100644
+--- /dev/null
++++ b/packages/core/cmake/accesskit-owned-actions.patch
+@@ -0,0 +1,94 @@
++diff --git a/src/common.rs b/src/common.rs
++--- a/src/common.rs
+++++ b/src/common.rs
++@@ -1114,6 +1114,16 @@
++     pub data: opt_action_data,
++ }
++ 
+++impl Drop for action_request {
+++    fn drop(&mut self) {
+++        if self.data.has_value {
+++            // MaybeUninit does not drop the owned action payload automatically.
+++            unsafe { self.data.value.assume_init_drop() };
+++            self.data.has_value = false;
+++        }
+++    }
+++}
+++
++ impl From<ActionRequest> for action_request {
++     fn from(request: ActionRequest) -> action_request {
++         Self {
++@@ -1232,3 +1242,73 @@
++ /// This function can't return a null pointer. Ownership of the returned value will be transferred to the caller.
++ pub type tree_update_factory =
++     Option<extern "C" fn(tree_update_factory_userdata) -> *mut tree_update>;
+++
+++#[cfg(test)]
+++mod action_request_tests {
+++    use super::*;
+++    use std::alloc::{GlobalAlloc, Layout, System};
+++    use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+++
+++    struct TrackingAllocator;
+++    static WATCHED: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
+++    static FREED: AtomicBool = AtomicBool::new(false);
+++
+++    #[global_allocator]
+++    static ALLOCATOR: TrackingAllocator = TrackingAllocator;
+++
+++    unsafe impl GlobalAlloc for TrackingAllocator {
+++        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+++            unsafe { System.alloc(layout) }
+++        }
+++
+++        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+++            if pointer == WATCHED.load(Ordering::SeqCst) {
+++                FREED.store(true, Ordering::SeqCst);
+++            }
+++            unsafe { System.dealloc(pointer, layout) }
+++        }
+++    }
+++
+++    #[test]
+++    fn request_free_releases_the_owned_text_payload() {
+++        let request: action_request = ActionRequest {
+++            action: Action::SetValue,
+++            target_tree: TreeId::ROOT,
+++            target_node: NodeId(1),
+++            data: Some(ActionData::Value("café 雪 🐧".into())),
+++        }
+++        .into();
+++        assert!(request.data.has_value);
+++        let pointer = match unsafe { request.data.value.assume_init_ref() } {
+++            action_data::Value(pointer) => *pointer,
+++            _ => panic!("Expected the actual owned C string"),
+++        };
+++        WATCHED.store(pointer.cast(), Ordering::SeqCst);
+++        FREED.store(false, Ordering::SeqCst);
+++        accesskit_action_request_free(Box::into_raw(Box::new(request)));
+++        let freed = FREED.load(Ordering::SeqCst);
+++        WATCHED.store(ptr::null_mut(), Ordering::SeqCst);
+++        if !freed {
+++            accesskit_string_free(pointer);
+++        }
+++        assert!(freed, "request_free leaked the owned text payload");
+++    }
+++
+++    #[test]
+++    fn request_free_handles_absent_and_non_text_payloads() {
+++        for data in [
+++            None,
+++            Some(ActionData::NumericValue(42.0)),
+++            Some(ActionData::CustomAction(7)),
+++        ] {
+++            let request: action_request = ActionRequest {
+++                action: Action::SetValue,
+++                target_tree: TreeId::ROOT,
+++                target_node: NodeId(1),
+++                data,
+++            }
+++            .into();
+++            accesskit_action_request_free(Box::into_raw(Box::new(request)));
+++        }
+++    }
+++}
+diff --git a/packages/core/src/WaylandWindow.cpp b/packages/core/src/WaylandWindow.cpp
+--- a/packages/core/src/WaylandWindow.cpp
++++ b/packages/core/src/WaylandWindow.cpp
+@@ -201,6 +201,10 @@
+ 
+     if (textInputManager_ != nullptr) {
+         zwp_text_input_manager_v3_destroy(textInputManager_);
++    }
++
++    if (activation_ != nullptr) {
++        xdg_activation_v1_destroy(activation_);
+     }
+ 
+     if (presentation_ != nullptr) {
+diff --git a/packages/core/src/WindowMain.cpp b/packages/core/src/WindowMain.cpp
+--- a/packages/core/src/WindowMain.cpp
++++ b/packages/core/src/WindowMain.cpp
+@@ -43,6 +43,7 @@
+ #include <exception>
+ #include <filesystem>
+ #include <folly/json/dynamic.h>
++#include <fontconfig/fontconfig.h>
+ #include <fstream>
+ #include <functional>
+ #include <iostream>
+@@ -1240,6 +1241,11 @@
+ } // namespace
+ 
+ int main(int argc, char** argv) {
++    // Register before text-pipeline statics so their font managers are destroyed first.
++    if (std::atexit(FcFini) != 0) {
++        std::cerr << "[rnl-window] cannot register fontconfig cleanup" << std::endl;
++        return 1;
++    }
+     const std::span<char*> arguments(argv, static_cast<size_t>(argc));
+     const WindowArguments parsedArguments = parseArguments(arguments);
+ 

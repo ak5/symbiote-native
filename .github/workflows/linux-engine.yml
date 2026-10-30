@@ -52,6 +52,8 @@ jobs:
           git -C .linux-host apply "$PWD/core/engine/linux/host/accessibility.patch"
           git -C .linux-host apply --check "$PWD/core/engine/linux/host/custom-actions.patch"
           git -C .linux-host apply "$PWD/core/engine/linux/host/custom-actions.patch"
+          git -C .linux-host apply --check "$PWD/core/engine/linux/host/lifecycle-cleanup.patch"
+          git -C .linux-host apply "$PWD/core/engine/linux/host/lifecycle-cleanup.patch"
       - name: Check native accessibility source formatting
         run: |
           nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/AccessibilityBridge.cpp .linux-host/packages/core/src/AccessibilityBridge.h .linux-host/packages/core/src/EditorModel.cpp .linux-host/packages/core/src/EditorModel.h .linux-host/packages/core/src/RetainedScene.cpp .linux-host/packages/core/src/RetainedScene.h .linux-host/packages/core/src/LinuxMountingManager.cpp .linux-host/packages/core/src/LinuxMountingManager.h .linux-host/packages/core/src/InputDispatcher.cpp .linux-host/packages/core/src/InputDispatcher.h .linux-host/packages/core/src/FabricHost.h .linux-host/packages/core/src/WindowSession.cpp .linux-host/packages/core/src/WindowSession.h .linux-host/packages/core/src/WindowMain.cpp .linux-host/packages/core/tests/{AccessibilitySnapshotTest,NativeAccessibilityActionTest,EditorTest}.cpp
@@ -147,6 +149,7 @@ jobs:
           cargo --version
           nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_accessibility_transport_tests --parallel 2
+          nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_accessibility_ownership_tests --parallel 2
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_window rnl_inject --parallel 2
           # The host's existing e2e harness locates its executables under build/dev.
           ln -s symbiote .linux-host/build/dev
@@ -225,12 +228,12 @@ jobs:
           if [ "${{ matrix.sanitizer }}" = tsan ]; then
             # Match the shadow mapping used by the independent clipboard TSan gate.
             sudo sysctl -w vm.mmap_rnd_bits=28
-            sudo nice -n 10 apt-get install -y python3-venv python3-mako python3-yaml python3-packaging llvm-19-dev libdrm-dev libelf-dev libexpat1-dev libzstd-dev bison flex
+            sudo nice -n 10 apt-get install -y python3-venv python3-mako python3-yaml python3-packaging llvm-19-dev libdrm-dev libelf-dev libexpat1-dev libzstd-dev bison flex glslang-tools
           fi
       - name: Apply the pinned Linux host changes
         run: |
           test "$(git -C .linux-host rev-parse HEAD)" = 4db5e336b529c15628ffb8ba94cd6d880ff9a450
-          for patch in clipboard-safety system-clipboard layout-conformance accessibility custom-actions; do
+          for patch in clipboard-safety system-clipboard layout-conformance accessibility custom-actions lifecycle-cleanup; do
             git -C .linux-host apply --check "$PWD/core/engine/linux/host/$patch.patch"
             git -C .linux-host apply "$PWD/core/engine/linux/host/$patch.patch"
           done
