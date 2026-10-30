@@ -86,7 +86,7 @@ jobs:
         run: |
           set -o pipefail
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_core_hermes_tests --parallel 2
-          nice -n 10 timeout 60s .linux-host/build/symbiote/bin/rnl_core_hermes_tests --gtest_filter='TextInputControllerTest.*:ClipboardBackendTest.*:ClipboardTextTest.*:ClipboardModuleTest.*' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
+          nice -n 10 ctest --test-dir .linux-host/build/symbiote --verbose --output-on-failure --no-tests=error --timeout 60 -j 1 -R '^(TextInputControllerTest|ClipboardBackendTest|ClipboardTextTest|ClipboardModuleTest)\.' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
       - name: Exercise module initialization and Fabric commits in Hermes
         run: |
           set -o pipefail

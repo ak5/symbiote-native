@@ -23,7 +23,13 @@ implements a real data device, source/offer FD transfers and a private clipboard
 queue on the same window connection. Source acknowledgement, focus/serial checks,
 nonblocking input requests and late-result validation are required. ADR-0004
 records that thread contract. Native protocol and second-client verification are
-still pending; do not replace them with a green bundle or only registry tests. System clipboard, AT-SPI, modal,
+still pending; do not replace them with a green bundle or only registry tests.
+Run the native clipboard/controller/module cases through CTest, one case per
+process. Standalone controller cases read RN feature defaults; ReactHost must
+override flags before their first access. Combining both suites in a single
+GTest process prevents the later runtime fixture from initializing. Keep every
+case enabled and preserve the host's existing process isolation.
+System clipboard, AT-SPI, modal,
 refresh and layout-conformance behavior still need implementation and proof.
 
 The experimental engine target follows `react-native-linux/react-native-linux` at
