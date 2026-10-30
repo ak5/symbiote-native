@@ -143,3 +143,8 @@ persistence journeys. ASan no longer reported the owned-text or Wayland proxy
 allocations, but shutdown still reported 2,602 bytes in 59 Fontconfig allocations.
 Those allocations remain under investigation; process finalization alone did not
 remove them. Neither sanitizer gate is complete.
+
+The executable now purges Skia's global CPU font cache after its window/session
+locals are destroyed and before static font-manager teardown. This releases the
+font strikes that can retain matched system typefaces. The same strict two-cycle
+ASan shutdown check must verify this cleanup; no leak exclusions are added.

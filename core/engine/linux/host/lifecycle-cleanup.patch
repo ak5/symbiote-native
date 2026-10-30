@@ -140,15 +140,25 @@ diff --git a/packages/core/src/WaylandWindow.cpp b/packages/core/src/WaylandWind
 diff --git a/packages/core/src/WindowMain.cpp b/packages/core/src/WindowMain.cpp
 --- a/packages/core/src/WindowMain.cpp
 +++ b/packages/core/src/WindowMain.cpp
-@@ -43,6 +43,7 @@
+@@ -29,6 +29,7 @@
+ #include "WindowSession.h"
+ #include "include/core/SkCanvas.h"
+ #include "include/core/SkColor.h"
++#include "include/core/SkGraphics.h"
+ #include "include/core/SkPaint.h"
+ #include "include/core/SkRRect.h"
+ #include "include/core/SkRect.h"
+@@ -42,7 +43,9 @@
+ #include <ctime>
  #include <exception>
  #include <filesystem>
++#include <folly/ScopeGuard.h>
  #include <folly/json/dynamic.h>
 +#include <fontconfig/fontconfig.h>
  #include <fstream>
  #include <functional>
  #include <iostream>
-@@ -1240,6 +1241,11 @@
+@@ -1240,6 +1243,13 @@
  } // namespace
  
  int main(int argc, char** argv) {
@@ -157,6 +167,8 @@ diff --git a/packages/core/src/WindowMain.cpp b/packages/core/src/WindowMain.cpp
 +        std::cerr << "[rnl-window] cannot register fontconfig cleanup" << std::endl;
 +        return 1;
 +    }
++    // Release global font strikes after window/session teardown and before static font managers.
++    const auto fontCacheCleanup = folly::makeGuard([] { SkGraphics::PurgeFontCache(); });
      const std::span<char*> arguments(argv, static_cast<size_t>(argc));
      const WindowArguments parsedArguments = parseArguments(arguments);
  

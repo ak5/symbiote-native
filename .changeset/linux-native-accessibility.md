@@ -37,3 +37,6 @@ resources during shutdown, retaining the real leak-detection gate.
 
 Use atomic access for the pinned Mesa driver's shared fence-timeout cache after
 its fully instrumented native run exposed concurrent lazy initialization.
+
+Purge the standalone executable's global font strikes after local window teardown
+and before static font managers are destroyed.
