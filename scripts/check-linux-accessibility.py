@@ -95,6 +95,12 @@ def main():
     def named(root, name):
         return next((node for node in walk(root) if node.get_name() == name), None)
 
+    def wait_for_app_tree(root, alive):
+        # Startup and reload publish a native window before JavaScript commits its controls.
+        ready = {'accessibility': 'Native group', 'modal': 'Modal background',
+                 'refresh': 'Refresh draft'}[args.scenario]
+        until(lambda: named(root, ready), f'committed {args.scenario} app tree', alive, 60)
+
     def text(node):
         interface = node.get_text_iface()
         # GI's Accessible.get_text() is the deprecated interface getter, not Text.get_text().
@@ -243,6 +249,7 @@ def main():
             return candidate if candidate is not None and candidate != old_root else None
 
         root = until(replacement_root, 'modal runtime reload in the same native window', alive, 20)
+        wait_for_app_tree(root, alive)
         background = control('Modal background')
         until(lambda: text(background) == 'a雪b', 'fresh modal runtime library', alive)
         try:
@@ -399,6 +406,7 @@ def main():
             return candidate if candidate is not None and candidate != old_root else None
 
         root = until(replacement_root, 'new refresh runtime in the same native window', alive, 20)
+        wait_for_app_tree(root, alive)
         status('accept', 0, 0)
         fresh = control('Refresh draft')
         until(lambda: text(fresh) == 'a雪b', 'fresh refresh runtime draft', alive)
@@ -521,10 +529,7 @@ def main():
             alive = [compositor, window, keys]
             desktop = Atspi.get_desktop(0)
             root = until(lambda: named(desktop, title), 'real AT-SPI window', alive, 20)
-            # A native window is published before its instrumented JavaScript startup commits.
-            ready = {'accessibility': 'Native group', 'modal': 'Modal background',
-                     'refresh': 'Refresh draft'}[args.scenario]
-            until(lambda: named(root, ready), f'first committed {args.scenario} app tree', alive, 60)
+            wait_for_app_tree(root, alive)
             print(f'PASS native app first committed tree scenario={args.scenario} cycle={cycle}', flush=True)
             if environment.get('VK_DRIVER_FILES'):
                 driver = json.loads(Path(environment['VK_DRIVER_FILES']).read_text())
@@ -651,6 +656,7 @@ def main():
                     return candidate if candidate is not None and candidate != old_root else None
 
                 root = until(replaced_root, 'new AT-SPI adapter in the same process', alive)
+                wait_for_app_tree(root, alive)
                 replacement = until(lambda: named(root, 'Native editor'), 'new native editor', alive)
                 until(lambda: text(replacement) == 'é🐧z' and named(root, 'Native count 0'),
                       'fresh native session state', alive)
