@@ -13,7 +13,7 @@ at the same version as its React Native SDK; shared components use that peer
 package rather than installing a second SDK dependency.
 
 Apply the [pinned native host changes](./host/README.md) before configuring the
-host. CI checks the exact host revision and applies the same patch.
+host. CI checks the exact host revision and applies the same patch series.
 
 The Linux component map follows React Native's non-iOS wrappers: SafeAreaView
 renders a plain View, and InputAccessoryView omits its whole subtree. Each
@@ -60,8 +60,11 @@ AT-SPI client on a private Sway seat, covering opaque/transparent rendering,
 real window resizing, nested dialogs, editor state and in-process reload. These
 new modal runtime gates still require Linux verification.
 
-`PullToRefreshView` still requires a Linux implementation and native verification.
-Preserve unknown-component diagnostics while completing that work.
+The refresh patch supplies the stock `PullToRefreshView` descriptor, native
+pull/release handling, controlled refreshing, viewport indicator/title painting
+and accessible native activation. The workflow requires its 38 native cases and
+five-framework window journeys. These refresh runtime checks still require Linux
+verification; preserve unknown-component diagnostics for any unavailable control.
 
 The host patch uses React Native's existing `LayoutConformance` shadow node and
 Yoga strict/compatibility behavior. A Linux descriptor invalidates layout on

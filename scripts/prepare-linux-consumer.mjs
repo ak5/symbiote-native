@@ -157,6 +157,8 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
     'scroll-probe.d.ts',
     'modal-fixture.js',
     'modal-fixture.d.ts',
+    'refresh-fixture.js',
+    'refresh-fixture.d.ts',
   ])
     copyFileSync(
       join(repository, 'core/engine/linux/tests', file),
@@ -171,7 +173,11 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
       ['-p', 'tsconfig.angular.json'],
       app,
     );
-    for (const file of ['scroll-probe.js', 'modal-fixture.js']) {
+    for (const file of [
+      'scroll-probe.js',
+      'modal-fixture.js',
+      'refresh-fixture.js',
+    ]) {
       copyFileSync(join(app, file), join(app, 'build', file));
     }
   }
@@ -246,6 +252,30 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
   );
   process.stdout.write(
     `Linux modal bundle: ${join(app, 'modal.linux.bundle.js')}\n`,
+  );
+  run(
+    join(app, 'node_modules/.bin/metro'),
+    [
+      'build',
+      'refresh.js',
+      '--platform',
+      'linux',
+      '--dev',
+      'false',
+      '--out',
+      join(app, 'refresh.linux.bundle.js'),
+      '--source-map',
+      '--max-workers',
+      '1',
+    ],
+    app,
+  );
+  verifyLinuxConsumerBundle(
+    JSON.parse(readFileSync(join(app, 'refresh.linux.bundle.map'), 'utf8')),
+    framework,
+  );
+  process.stdout.write(
+    `Linux refresh bundle: ${join(app, 'refresh.linux.bundle.js')}\n`,
   );
 
   if (framework === 'react') {

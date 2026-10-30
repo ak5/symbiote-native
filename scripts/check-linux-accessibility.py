@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import subprocess
 import sys
 import tempfile
@@ -17,7 +18,7 @@ def main():
     parser.add_argument('executable', type=Path)
     parser.add_argument('bundle', type=Path)
     parser.add_argument('output', type=Path)
-    parser.add_argument('--scenario', choices=('accessibility', 'modal'), default='accessibility')
+    parser.add_argument('--scenario', choices=('accessibility', 'modal', 'refresh'), default='accessibility')
     parser.add_argument('--private-session', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     if sys.platform != 'linux':
@@ -47,10 +48,10 @@ def main():
     for name in ('WAYLAND_DISPLAY', 'SWAYSOCK', 'AT_SPI_BUS_ADDRESS'):
         environment.pop(name, None)
 
-    def start(command, label):
+    def start(command, label, stdin=subprocess.DEVNULL):
         log = (args.output / f'{label}.log').open('xb')
         streams.append(log)
-        process = subprocess.Popen(command, env=environment, stdin=subprocess.DEVNULL,
+        process = subprocess.Popen(command, env=environment, stdin=stdin,
                                    stdout=log, stderr=subprocess.STDOUT)
         processes.append(process)
         return process
@@ -109,9 +110,24 @@ def main():
         event_log.write(json.dumps(entry, ensure_ascii=False) + '\n')
         event_log.flush()
 
+    def capture_screenshot(cycle, label):
+        log = (args.output / f'native-{cycle}.log').read_text(errors='replace')
+        match = re.search(r'\[rnl-automation\] listening on ([^\n]+)', log)
+        assert match, 'Native automation socket was not published'
+        endpoint = Path(match.group(1)).resolve()
+        assert endpoint.parent == Path(environment['XDG_RUNTIME_DIR']).resolve()
+        path = (args.output / label).resolve()
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
+            channel.settimeout(5)
+            channel.connect(str(endpoint))
+            channel.sendall((json.dumps({'command': 'TakeScreenshot', 'path': str(path)}) + '\n').encode())
+            with channel.makefile('r', encoding='utf-8') as response:
+                result = json.loads(response.readline(65536))
+            assert result.get('ok') is True, result
+        return path
+
     def exercise_modal(root, desktop, window, alive, cycle):
         from PIL import Image
-        import socket
 
         def control(name):
             return until(lambda: named(root, name), name, alive)
@@ -127,19 +143,7 @@ def main():
             return node.get_component_iface().get_extents(Atspi.CoordType.WINDOW)
 
         def screenshot(mode):
-            log = (args.output / f'native-{cycle}.log').read_text(errors='replace')
-            match = re.search(r'\[rnl-automation\] listening on ([^\n]+)', log)
-            assert match, 'Native automation socket was not published'
-            endpoint = Path(match.group(1)).resolve()
-            assert endpoint.parent == Path(environment['XDG_RUNTIME_DIR']).resolve()
-            path = (args.output / f'modal-{cycle}-{mode}.png').resolve()
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
-                channel.settimeout(5)
-                channel.connect(str(endpoint))
-                channel.sendall((json.dumps({'command': 'TakeScreenshot', 'path': str(path)}) + '\n').encode())
-                with channel.makefile('r', encoding='utf-8') as response:
-                    result = json.loads(response.readline(65536))
-                assert result.get('ok') is True, result
+            path = capture_screenshot(cycle, f'modal-{cycle}-{mode}.png')
             with Image.open(path) as image:
                 window_bounds = bounds(root)
                 assert image.size == (window_bounds.width, window_bounds.height), (image.size, window_bounds)
@@ -245,6 +249,170 @@ def main():
               'old modal handles cannot mutate reloaded library', alive)
         print(f'PASS native modal in-process reload and stale editor handles cycle={cycle}', flush=True)
 
+    def exercise_refresh(root, desktop, window, alive, cycle):
+        from PIL import Image
+
+        def control(name):
+            return until(lambda: named(root, name), name, alive)
+
+        def activate(node):
+            action = node.get_action_iface()
+            assert action is not None and action.do_action(0), node.get_name()
+
+        def bounds(node):
+            return node.get_component_iface().get_extents(Atspi.CoordType.WINDOW)
+
+        def busy(node):
+            return node.get_state_set().contains(Atspi.StateType.BUSY)
+
+        def status(mode, accepted, rejected, refreshing=False, mounted=True):
+            expected = (f'Refresh state mode={mode} accepted={accepted} rejected={rejected} '
+                        f'refreshing={str(refreshing).lower()} mounted={str(mounted).lower()}')
+            until(lambda: named(root, expected), expected, alive)
+
+        def draft_preserved():
+            field = control('Refresh draft')
+            assert text(field) == 'kept雪', 'Refresh discarded the draft'
+            assert Atspi.Text.get_caret_offset(field) == 2, 'Refresh discarded the draft caret'
+            assert named(root, 'Refresh draft value: kept雪'), 'Framework draft differs from native text'
+
+        title = root.get_name()
+        replies = json.loads(command(['swaymsg', f'[title="{title}"]', 'fullscreen', 'enable']))
+        assert all(reply.get('success') for reply in replies), replies
+        until(lambda: bounds(root).width >= 1000 and bounds(root).height >= 700,
+              'private fullscreen client dimensions', alive)
+        status('accept', 0, 0)
+        field = control('Refresh draft')
+        assert field.get_editable_text_iface().set_text_contents('kept雪')
+        until(lambda: named(root, 'Refresh draft value: kept雪') and text(field) == 'kept雪',
+              'framework acknowledged refresh draft', alive)
+        assert field.get_component_iface().grab_focus()
+        assert Atspi.Text.set_caret_offset(field, 2)
+        until(lambda: Atspi.Text.get_caret_offset(field) == 2, 'initial refresh draft caret', alive)
+        refresh = control('Refresh library')
+        assert refresh.get_role() == Atspi.Role.PUSH_BUTTON, refresh.get_role_name()
+        assert not busy(refresh), 'Idle refresh control is busy'
+        scroll = control('Refresh scroll')
+        injector_path = args.executable.resolve().with_name('rnl_inject')
+        assert injector_path.is_file(), 'The actual Wayland input driver is required'
+        injector = start([str(injector_path)], f'refresh-input-{cycle}', stdin=subprocess.PIPE)
+        alive.append(injector)
+
+        def pan(delta):
+            rect = bounds(scroll)
+            x, y = rect.x + rect.width // 2, rect.y + rect.height // 2
+            script = f'move {x} {y}\nsleep 100\npan 0 {delta}\nsleep 100\npan_stop\n'
+            assert injector.poll() is None, 'Native Wayland injector exited'
+            injector.stdin.write(script.encode())
+            injector.stdin.flush()
+
+        pan(-160)
+        status('accept', 1, 0, True)
+        until(lambda: busy(control('Refresh library')), 'native accepted refresh busy state', alive)
+        path = capture_screenshot(cycle, f'refresh-{cycle}.png')
+        with Image.open(path) as image:
+            client = bounds(root)
+            assert image.size == (client.width, client.height), (image.size, client)
+            rect = bounds(control('Refresh library'))
+            pixels = image.convert('RGB').crop((rect.x, rect.y, rect.x + rect.width, rect.y + rect.height))
+            gold = sum(max(abs(actual - expected) for actual, expected in zip(pixel, (255, 221, 102))) < 20
+                       for pixel in pixels.getdata())
+            assert gold >= 4, f'Native refresh indicator was not painted: {gold} matching pixels'
+        draft_preserved()
+        print(f'PASS native refresh real Wayland pull, framework callback, busy state and indicator pixels cycle={cycle}', flush=True)
+
+        pending = refresh.get_action_iface()
+        try:
+            pending.do_action(0)
+        except GLib.Error:
+            pass
+        status('accept', 1, 0, True)
+        activate(control('Finish refresh'))
+        status('accept', 1, 0)
+        until(lambda: not busy(control('Refresh library')), 'controlled native refresh stop', alive)
+        assert control('Refresh library').get_component_iface().grab_focus()
+        command(['wtype', '-P', 'Return', '-p', 'Return'])
+        status('accept', 2, 0, True)
+        activate(control('Finish refresh'))
+        status('accept', 2, 0)
+        until(lambda: not busy(control('Refresh library')), 'keyboard refresh stopped', alive)
+        activate(control('Toggle refresh mode'))
+        status('reject', 2, 0)
+        pan(-160)
+        status('reject', 2, 1)
+        until(lambda: not busy(control('Refresh library')), 'rejected native refresh snapped back', alive)
+        draft_preserved()
+        print(f'PASS native refresh duplicate guard, keyboard activation and rejected controlled handshake cycle={cycle}', flush=True)
+
+        activate(control('Start refresh'))
+        status('reject', 2, 1, True)
+        until(lambda: busy(control('Refresh library')), 'programmatic native refresh', alive)
+        previous = control('Refresh library').get_action_iface()
+        activate(control('Toggle refresh control'))
+        status('reject', 2, 1, True, False)
+        until(lambda: named(root, 'Refresh library') is None, 'native refresh control removed', alive)
+        try:
+            previous.do_action(0)
+        except GLib.Error:
+            pass
+        activate(control('Finish refresh'))
+        status('reject', 2, 1, False, False)
+        activate(control('Toggle refresh control'))
+        status('reject', 2, 1)
+        until(lambda: not busy(control('Refresh library')), 'replacement native control is idle', alive)
+        activate(control('Toggle refresh mode'))
+        status('accept', 2, 1)
+        activate(control('Refresh library'))
+        status('accept', 3, 1, True)
+        activate(control('Finish refresh'))
+        status('accept', 3, 1)
+        draft_preserved()
+        print(f'PASS native refresh programmatic start, removal, stale actions and fresh control cycle={cycle}', flush=True)
+
+        background_action = control('Refresh library').get_action_iface()
+        activate(control('Open refresh modal'))
+        control('Refresh blocking modal')
+        assert named(root, 'Refresh library') is None, 'Background refresh leaked through modal scope'
+        try:
+            background_action.do_action(0)
+        except GLib.Error:
+            pass
+        command(['wtype', '-P', 'Escape', '-p', 'Escape'])
+        until(lambda: named(root, 'Refresh blocking modal') is None and named(root, 'Refresh library'),
+              'native refresh modal dismissal', alive)
+        status('accept', 3, 1)
+        draft_preserved()
+        print(f'PASS native refresh modal isolation and draft preservation cycle={cycle}', flush=True)
+
+        old_root = root
+        old_control = control('Refresh library').get_action_iface()
+        activate(control('Reload refresh runtime'))
+
+        def replacement_root():
+            candidate = named(desktop, title)
+            return candidate if candidate is not None and candidate != old_root else None
+
+        root = until(replacement_root, 'new refresh runtime in the same native window', alive, 20)
+        status('accept', 0, 0)
+        fresh = control('Refresh draft')
+        until(lambda: text(fresh) == 'a雪b', 'fresh refresh runtime draft', alive)
+        try:
+            old_control.do_action(0)
+        except GLib.Error:
+            pass
+        assert fresh.get_component_iface().grab_focus()
+        command(['wtype', 'R'])
+        until(lambda: text(fresh) == 'a雪bR' and named(root, 'Refresh draft value: a雪bR'),
+              'fresh framework draft remains independent of old refresh handles', alive)
+        status('accept', 0, 0)
+        assert not busy(control('Refresh library')), 'Old runtime action started a new library refresh'
+        print(f'PASS native refresh in-process reload and stale handles cycle={cycle}', flush=True)
+        injector.terminate()
+        injector.wait(timeout=5)
+        injector.stdin.close()
+        alive.remove(injector)
+
+
     runtime_directory = tempfile.TemporaryDirectory(prefix='symbiote-atspi-')
     try:
         directory = runtime_directory.name
@@ -284,7 +452,7 @@ def main():
             title = f'Native Accessibility {cycle}'
             window_command = [str(args.executable.resolve()), '--fabric', str(args.bundle.resolve()),
                               '--title', title, '--no-decorations']
-            if args.scenario == 'modal':
+            if args.scenario in ('modal', 'refresh'):
                 window_command.append('--automation')
             window = start(window_command, f'native-{cycle}')
             keys = start(['wtype', '-s', '300', '-P', 'Shift_L', '-p', 'Shift_L', '-s', '60000'],
@@ -300,6 +468,8 @@ def main():
                 print(f'PASS native Vulkan driver loaded: {library}', flush=True)
             if args.scenario == 'modal':
                 exercise_modal(root, desktop, window, alive, cycle)
+            elif args.scenario == 'refresh':
+                exercise_refresh(root, desktop, window, alive, cycle)
             else:
                 editor = until(lambda: named(root, 'Native editor'), 'native editor publication', alive)
                 until(lambda: text(editor) == 'é🐧z', 'Unicode editor value', alive)
@@ -433,12 +603,12 @@ def main():
             until(lambda: not named(desktop, title), 'AT-SPI session removal', [compositor], 10)
             keys.terminate()
             keys.wait(timeout=5)
-            label = 'AT-SPI' if args.scenario == 'accessibility' else 'modal'
+            label = 'AT-SPI' if args.scenario == 'accessibility' else args.scenario
             print(f'PASS native {label} graceful removal cycle={cycle}', flush=True)
         listener.deregister('object:state-changed')
         Atspi.exit()
     finally:
-        if args.scenario == 'modal' and 'root' in locals() and 'window' in locals() and window.poll() is None:
+        if args.scenario in ('modal', 'refresh') and 'root' in locals() and 'window' in locals() and window.poll() is None:
             try:
                 diagnostic = []
                 for node in walk(root):
@@ -453,7 +623,7 @@ def main():
                 (args.output / f'failure-tree-{cycle}.json').write_text(
                     json.dumps(diagnostic, ensure_ascii=False, indent=2) + '\n')
             except Exception as error:
-                print(f'Could not collect private modal diagnostics: {error}', file=sys.stderr)
+                print(f'Could not collect private native diagnostics: {error}', file=sys.stderr)
         for process in reversed(processes):
             if process.poll() is None:
                 process.terminate()
@@ -462,6 +632,12 @@ def main():
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait(timeout=3)
+        for process in processes:
+            if process.stdin is not None:
+                try:
+                    process.stdin.close()
+                except BrokenPipeError:
+                    pass
         for stream in streams:
             stream.close()
         runtime_directory.cleanup()

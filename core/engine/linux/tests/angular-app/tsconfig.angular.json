@@ -4,5 +4,5 @@
     "rootDir": ".",
     "outDir": "build"
   },
-  "files": ["App.ts", "ModalApp.ts"]
+  "files": ["App.ts", "ModalApp.ts", "RefreshApp.ts"]
 }

@@ -1,0 +1,1503 @@
+diff --git a/packages/core/CMakeLists.txt b/packages/core/CMakeLists.txt
+--- a/packages/core/CMakeLists.txt
++++ b/packages/core/CMakeLists.txt
+@@ -875,6 +875,7 @@
+     src/ScrollController.cpp
+     src/ScrollEventCadence.cpp
+     src/ScrollPhysics.cpp
++    src/RefreshGesture.cpp
+     src/StubMessageQueue.cpp
+     src/SwitchComponent.cpp
+     src/SwitchContent.cpp
+diff --git a/packages/core/src/FabricHost.cpp b/packages/core/src/FabricHost.cpp
+--- a/packages/core/src/FabricHost.cpp
++++ b/packages/core/src/FabricHost.cpp
+@@ -117,6 +117,7 @@
+     // `src/SwitchComponent.h` supplies the rest.
+     add(facebook::react::concreteComponentDescriptorProvider<
+         facebook::react::ActivityIndicatorViewComponentDescriptor>());
++    add(facebook::react::concreteComponentDescriptorProvider<facebook::react::PullToRefreshViewComponentDescriptor>());
+     add(facebook::react::concreteComponentDescriptorProvider<SwitchComponentDescriptor>());
+ 
+     for (const facebook::react::ComponentDescriptorProvider& provider : autolinkedComponentDescriptorProviders()) {
+diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDispatcher.cpp
+--- a/packages/core/src/InputDispatcher.cpp
++++ b/packages/core/src/InputDispatcher.cpp
+@@ -16,6 +16,7 @@
+ 
+ #include <react/renderer/components/FBReactNativeSpec/EventEmitters.h>
+ #include <react/renderer/components/FBReactNativeSpec/Props.h>
++#include <react/renderer/components/FBReactNativeSpec/ShadowNodes.h>
+ #include <react/renderer/components/modal/ModalHostViewShadowNode.h>
+ #include <react/renderer/components/scrollview/ScrollViewShadowNode.h>
+ #include <react/renderer/components/scrollview/ScrollViewState.h>
+@@ -166,7 +167,9 @@
+     const std::shared_ptr<const facebook::react::ViewProps> viewProps =
+         std::dynamic_pointer_cast<const facebook::react::ViewProps>(shadowNode.getProps());
+ 
+-    if (viewProps == nullptr || !viewProps->accessible) {
++    if (viewProps == nullptr ||
++        (!viewProps->accessible &&
++         dynamic_cast<const facebook::react::PullToRefreshViewShadowNode*>(&shadowNode) == nullptr)) {
+         return false;
+     }
+ 
+@@ -185,8 +188,10 @@
+     const std::shared_ptr<const facebook::react::ViewProps> viewProps =
+         std::dynamic_pointer_cast<const facebook::react::ViewProps>(shadowNode.getProps());
+ 
+-    return viewProps == nullptr ? std::string{}
+-                                : effectiveAccessibilityRole(viewProps->accessibilityRole, viewProps->role);
++    const auto role = viewProps == nullptr ? std::string{}
++                                           : effectiveAccessibilityRole(viewProps->accessibilityRole, viewProps->role);
++    return role.empty() && dynamic_cast<const facebook::react::PullToRefreshViewShadowNode*>(&shadowNode) ? "button"
++                                                                                                          : role;
+ }
+ 
+ /**
+@@ -613,7 +618,7 @@
+             emitPointerDispatch(*emitter, pointerDispatch);
+ 
+             if (pointerDispatch.type == PointerDispatchType::Click) {
+-                emitSwitchChange(*target.shadowNode);
++                activateNativeControl(*target.shadowNode);
+             }
+         }
+     }
+@@ -731,6 +736,10 @@
+ }
+ 
+ void InputDispatcher::emitActivation(const InputEvent& event) const {
++    if (dynamic_cast<const facebook::react::PullToRefreshViewShadowNode*>(focusedNode_.get())) {
++        activateNativeControl(*focusedNode_);
++        return;
++    }
+     const std::shared_ptr<const facebook::react::TouchEventEmitter> emitter =
+         std::dynamic_pointer_cast<const facebook::react::TouchEventEmitter>(focusedNode_->getEventEmitter());
+ 
+@@ -743,11 +752,11 @@
+ 
+     // The same click a press produces, and therefore the same toggle: Space and Enter on a focused switch go
+     // through one emission rather than through a keyboard path of their own.
+-    emitSwitchChange(*focusedNode_);
+-}
+-
+-/**
+- * The `onChange` a `<Switch>` fires when it is clicked or activated, carrying the value it would move to.
++    activateNativeControl(*focusedNode_);
++}
++
++/**
++ * Refresh requests use the mount command queue; switches emit the value they would move to.
+  *
+  * `!props.value` rather than a value this platform holds: the control is fully controlled, so the press is a
+  * request and the picture does not change until React commits the answer. That is what react-native-windows'
+@@ -756,7 +765,12 @@
+  *
+  * A disabled switch emits nothing. It is not focusable either, so this is the pointer half of one rule.
+  */
+-void InputDispatcher::emitSwitchChange(const facebook::react::ShadowNode& shadowNode) const {
++void InputDispatcher::activateNativeControl(const facebook::react::ShadowNode& shadowNode) const {
++    if (dynamic_cast<const facebook::react::PullToRefreshViewShadowNode*>(&shadowNode)) {
++        mountingManager_->dispatchCommand(facebook::react::ShadowView{shadowNode}, "requestRefresh",
++                                          folly::dynamic::array());
++        return;
++    }
+     const std::shared_ptr<const facebook::react::SwitchProps> switchProps =
+         std::dynamic_pointer_cast<const facebook::react::SwitchProps>(shadowNode.getProps());
+ 
+diff --git a/packages/core/src/InputDispatcher.h b/packages/core/src/InputDispatcher.h
+--- a/packages/core/src/InputDispatcher.h
++++ b/packages/core/src/InputDispatcher.h
+@@ -150,7 +150,7 @@
+     void emitKeyEvent(const InputEvent& event, bool isComposing) const;
+     void emitActivation(const InputEvent& event) const;
+     void emitFocusEvent(const facebook::react::ShadowNode& shadowNode, bool isFocused) const;
+-    void emitSwitchChange(const facebook::react::ShadowNode& shadowNode) const;
++    void activateNativeControl(const facebook::react::ShadowNode& shadowNode) const;
+ 
+     void syncFocusables();
+     void collectMountedFields(const facebook::react::ShadowNode& shadowNode);
+diff --git a/packages/core/src/LinuxMountingManager.cpp b/packages/core/src/LinuxMountingManager.cpp
+--- a/packages/core/src/LinuxMountingManager.cpp
++++ b/packages/core/src/LinuxMountingManager.cpp
+@@ -104,6 +104,15 @@
+     return changed;
+ }
+ 
++bool LinuxMountingManager::setRefreshControlState(facebook::react::Tag tag,
++                                                  const facebook::react::SharedEventEmitter& emitter, bool refreshing,
++                                                  double distance) {
++    const std::lock_guard<std::mutex> guard(sceneMutex_);
++    const bool changed = scene_.setRefreshControlState(tag, emitter, refreshing, distance);
++    hasPendingDamage_ = hasPendingDamage_ || changed;
++    return changed;
++}
++
+ void LinuxMountingManager::setFocus(facebook::react::Tag tag, bool isFocusVisible) {
+     const std::lock_guard<std::mutex> guard(sceneMutex_);
+ 
+@@ -294,7 +303,8 @@
+     const std::lock_guard<std::mutex> guard(sceneMutex_);
+ 
+     verifyTagIsKnown("Command", shadowView.tag);
+-    commands_.push_back(SceneCommand{.tag = shadowView.tag, .name = commandName, .args = args});
++    commands_.push_back(
++        SceneCommand{.tag = shadowView.tag, .name = commandName, .args = args, .emitter = shadowView.eventEmitter});
+ }
+ 
+ void LinuxMountingManager::synchronouslyUpdateViewOnUIThread(facebook::react::Tag tag, const folly::dynamic& props) {
+diff --git a/packages/core/src/LinuxMountingManager.h b/packages/core/src/LinuxMountingManager.h
+--- a/packages/core/src/LinuxMountingManager.h
++++ b/packages/core/src/LinuxMountingManager.h
+@@ -44,6 +44,7 @@
+     facebook::react::Tag tag{};
+     std::string name;
+     folly::dynamic args;
++    facebook::react::SharedEventEmitter emitter{};
+ };
+ 
+ /**
+@@ -194,6 +195,8 @@
+      * press is answered against the scene state one frame paints and never against half of two.
+      */
+     SceneHit findNodeAtPoint(facebook::react::SurfaceId surfaceId, facebook::react::Point surfacePoint) const;
++    bool setRefreshControlState(facebook::react::Tag tag, const facebook::react::SharedEventEmitter& emitter,
++                                bool refreshing, double distance);
+     SceneSnapshot snapshotScene() const;
+     std::string dumpScene() const;
+ 
+diff --git a/packages/core/src/RefreshGesture.cpp b/packages/core/src/RefreshGesture.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/src/RefreshGesture.cpp
+@@ -0,0 +1,55 @@
++#include "RefreshGesture.h"
++
++#include <algorithm>
++#include <cmath>
++
++namespace react_native_linux {
++
++double RefreshGesture::drag(double delta, bool atTop) {
++    if (!std::isfinite(delta)) {
++        return 0.0;
++    }
++    if (refreshing_) {
++        return delta;
++    }
++    if (!atTop) {
++        cancelPull();
++        return delta;
++    }
++    constexpr double resistance = 0.5;
++    if (delta < 0.0) {
++        distance_ = std::min(distance_ - delta * resistance, kRefreshTriggerDistance * 2.0);
++        return 0.0;
++    }
++    const double consumed = std::min(delta, distance_ / resistance);
++    distance_ -= consumed * resistance;
++    return delta - consumed;
++}
++
++bool RefreshGesture::release() {
++    const bool triggered = !refreshing_ && distance_ >= kRefreshTriggerDistance;
++    distance_ = 0.0;
++    refreshing_ = refreshing_ || triggered;
++    return triggered;
++}
++
++bool RefreshGesture::requestRefresh() {
++    if (refreshing_) {
++        return false;
++    }
++    setRefreshing(true);
++    return true;
++}
++
++void RefreshGesture::cancelPull() { distance_ = 0.0; }
++
++void RefreshGesture::setRefreshing(bool refreshing) {
++    refreshing_ = refreshing;
++    cancelPull();
++}
++
++bool RefreshGesture::isRefreshing() const noexcept { return refreshing_; }
++
++double RefreshGesture::distance() const noexcept { return distance_; }
++
++} // namespace react_native_linux
+diff --git a/packages/core/src/RefreshGesture.h b/packages/core/src/RefreshGesture.h
+new file mode 100644
+--- /dev/null
++++ b/packages/core/src/RefreshGesture.h
+@@ -0,0 +1,24 @@
++#pragma once
++
++namespace react_native_linux {
++
++inline constexpr double kRefreshTriggerDistance = 64.0;
++
++// One vertical smooth-scroll gesture at the top of a refresh-enabled ScrollView.
++class RefreshGesture final {
++public:
++    // Returns the delta ordinary scrolling must still consume.
++    double drag(double delta, bool atTop);
++    bool release();
++    bool requestRefresh();
++    void cancelPull();
++    void setRefreshing(bool refreshing);
++    bool isRefreshing() const noexcept;
++    double distance() const noexcept;
++
++private:
++    double distance_{0.0};
++    bool refreshing_{false};
++};
++
++} // namespace react_native_linux
+diff --git a/packages/core/src/RetainedScene.cpp b/packages/core/src/RetainedScene.cpp
+--- a/packages/core/src/RetainedScene.cpp
++++ b/packages/core/src/RetainedScene.cpp
+@@ -2,6 +2,7 @@
+ 
+ #include "ActivityIndicatorContent.h"
+ #include "ImageContent.h"
++#include "RefreshGesture.h"
+ #include "ScrollIndicator.h"
+ #include "SwitchContent.h"
+ #include "TextInputComponent.h"
+@@ -873,6 +874,35 @@
+  * animated `<Image>`'s does: `<ActivityIndicator>` re-renders for every reason its parent does, and an arc that
+  * jumped back to the top of the ring on each of them would be a spinner whose speed depended on React.
+  */
++void readRefreshControlContent(SceneNode& node, const facebook::react::ShadowView& shadowView) {
++    const auto props = std::dynamic_pointer_cast<const facebook::react::PullToRefreshViewProps>(shadowView.props);
++    if (!props) {
++        node.refreshControl.reset();
++        return;
++    }
++    const auto previous = node.refreshControl;
++    const bool preserve = previous && previous->committedRefreshing == props->refreshing;
++    node.refreshControl = SceneRefreshControlContent{
++        .committedRefreshing = props->refreshing,
++        .refreshing = preserve ? previous->refreshing : props->refreshing,
++        .distance = preserve ? previous->distance : 0.0,
++        .elapsedMilliseconds = previous ? previous->elapsedMilliseconds : 0.0,
++        .progressViewOffset = std::isfinite(props->progressViewOffset) ? props->progressViewOffset : 0,
++        .colorArgb = facebook::react::isColorMeaningful(props->tintColor) ? toArgb(props->tintColor, 1.0F)
++                                                                          : kActivityIndicatorDefaultColorArgb};
++    if (!props->title.empty()) {
++        facebook::react::TextAttributes attributes;
++        attributes.fontSize = 14;
++        attributes.alignment = facebook::react::TextAlignment::Center;
++        attributes.foregroundColor =
++            facebook::react::isColorMeaningful(props->titleColor) ? props->titleColor : props->tintColor;
++        auto title = std::make_shared<facebook::react::AttributedString>();
++        title->appendFragment(facebook::react::AttributedString::Fragment{
++            .string = props->title, .textAttributes = attributes, .parentShadowView = {}});
++        node.refreshControl->title = SceneTextContent{.attributedString = std::move(title)};
++    }
++}
++
+ void readActivityIndicatorContent(SceneNode& node, const facebook::react::ShadowView& shadowView) {
+     const std::optional<SceneActivityIndicatorContent> previousIndicator = node.activityIndicator;
+ 
+@@ -1124,6 +1154,48 @@
+  * `isOpacityLayer` is `opensOpacityLayer`'s answer when the walk paints: the node's own opacity is then applied by
+  * the painter's layer, so it is left out of every colour here and out of what its children inherit.
+  */
++facebook::react::Rect refreshIndicatorFrame(const SceneRefreshControlContent& refresh,
++                                            const facebook::react::Rect& viewport, bool focused) {
++    const auto height =
++        static_cast<facebook::react::Float>(refresh.refreshing || focused ? kRefreshTriggerDistance : refresh.distance);
++    return {.origin = {viewport.getCenter().x - 12, viewport.origin.y + refresh.progressViewOffset + height / 2 - 12},
++            .size = {24, 24}};
++}
++
++void appendRefreshPrimitives(SceneSnapshot& primitives, const SceneNode& node, const ScenePrimitive& viewport,
++                             const ScenePaintState& state, bool focused, bool focusVisible) {
++    const auto& refresh = *node.refreshControl;
++    if (!refresh.refreshing && refresh.distance == 0.0 && !focused) {
++        return;
++    }
++    const auto frame = refreshIndicatorFrame(refresh, viewport.frame, focused);
++    const float opacity =
++        state.opacity * node.opacity *
++        static_cast<float>(refresh.refreshing || focused ? 1.0
++                                                         : std::min(refresh.distance / kRefreshTriggerDistance, 1.0));
++    auto clips = state.clips;
++    clips.push_back(SceneClip{.frame = viewport.frame, .borderRadii = {}, .matrix = viewport.matrix});
++    ScenePrimitive indicator{.tag = node.tag,
++                             .frame = frame,
++                             .matrix = viewport.matrix,
++                             .clips = clips,
++                             .activityIndicator =
++                                 SceneActivityIndicatorContent{.isAnimating = true,
++                                                               .elapsedMilliseconds = refresh.elapsedMilliseconds,
++                                                               .colorArgb = scaleArgbAlpha(refresh.colorArgb, opacity)},
++                             .focusRing = focusVisible};
++    primitives.push_back(std::move(indicator));
++    if (refresh.title) {
++        const facebook::react::Rect titleFrame{.origin = {viewport.frame.origin.x, frame.origin.y + 26},
++                                               .size = {viewport.frame.size.width, 22}};
++        primitives.push_back(ScenePrimitive{.tag = node.tag,
++                                            .frame = titleFrame,
++                                            .matrix = viewport.matrix,
++                                            .clips = clips,
++                                            .text = resolveText(*refresh.title, {}, titleFrame, opacity)});
++    }
++}
++
+ SceneVisit visitNode(const SceneNode& node, const ScenePaintState& state, bool isOpacityLayer = false) {
+     const SceneNodeGeometry geometry = nodeGeometry(node, state);
+     const facebook::react::Rect& frame = geometry.frame;
+@@ -1226,6 +1298,16 @@
+  * What one primitive can dirty: its transformed frame, cut by every clip it inherited. Borders are inside the
+  * frame, so the frame is the whole extent.
+  */
++std::optional<SceneNodeGeometry> refreshControlGeometry(const SceneNodes& nodes, const SceneNode& node, bool focused) {
++    const auto parent = nodes.find(node.parentTag);
++    if (!node.refreshControl || parent == nodes.end()) {
++        return std::nullopt;
++    }
++    const auto viewport = nodeGeometry(parent->second, paintStateOfAncestors(nodes, node.parentTag));
++    return SceneNodeGeometry{.frame = refreshIndicatorFrame(*node.refreshControl, viewport.frame, focused),
++                             .matrix = viewport.matrix};
++}
++
+ facebook::react::Rect primitiveDamageBounds(const ScenePrimitive& primitive) {
+     facebook::react::Rect bounds = mappedBounds(shadowExtent(primitive.frame, primitive.shadows), primitive.matrix);
+ 
+@@ -1683,6 +1765,18 @@
+             }
+         }
+ 
++        if (node.refreshControl && node.refreshControl->refreshing) {
++            const auto parent = nodes_.find(node.parentTag);
++            if (parent != nodes_.end()) {
++                const auto bounds = clippedPrimitiveBounds(nodes_, node.parentTag, parent->second);
++                if (bounds) {
++                    node.refreshControl->elapsedMilliseconds += frameMilliseconds;
++                    addDamageRect(damage_, *bounds);
++                    hasAdvanced = true;
++                }
++            }
++        }
++
+         if (node.activityIndicator.has_value() && node.activityIndicator.value().isAnimating) {
+             // An indicator nobody can see does not accumulate elapsed time either, which is the pause an animated
+             // `<Image>` gets and for the same reason: a spinner off screen should schedule no frame.
+@@ -1724,6 +1818,26 @@
+     if (isFocusVisible) {
+         damageSubtree(tag);
+     }
++}
++
++bool RetainedScene::setRefreshControlState(facebook::react::Tag tag, const facebook::react::SharedEventEmitter& emitter,
++                                           bool refreshing, double distance) {
++    const auto found = nodes_.find(tag);
++    if (!emitter || found == nodes_.end() || found->second.accessibilityEmitter != emitter ||
++        !found->second.refreshControl || !std::isfinite(distance) || distance < 0.0) {
++        return false;
++    }
++    auto& node = found->second;
++    auto& refresh = *node.refreshControl;
++    distance = std::min(distance, kRefreshTriggerDistance * 2.0);
++    if (refresh.refreshing == refreshing && refresh.distance == distance) {
++        return false;
++    }
++    damageSubtree(node.parentTag);
++    refresh.refreshing = refreshing;
++    refresh.distance = distance;
++    damageSubtree(node.parentTag);
++    return true;
+ }
+ 
+ void RetainedScene::setEditorState(facebook::react::Tag tag, const SceneEditorState& editorState) {
+@@ -1908,6 +2022,21 @@
+     }
+     std::erase_if(snapshot.nodes, [&snapshot](const auto& entry) { return !snapshot.geometry.contains(entry.first); });
+     for (auto& [tag, node] : snapshot.nodes) {
++        if (node.refreshControl) {
++            node.accessibility.accessible = true;
++            if (node.accessibility.accessibilityRole.empty() &&
++                node.accessibility.role == facebook::react::Role::None) {
++                node.accessibility.accessibilityRole = "button";
++            }
++            if (node.accessibilityLabel.empty()) {
++                node.accessibilityLabel =
++                    node.refreshControl->title ? node.refreshControl->title->attributedString->getString() : "Refresh";
++            }
++            auto state = node.accessibility.state.value_or(facebook::react::AccessibilityState{});
++            state.busy = state.busy || node.refreshControl->refreshing;
++            state.disabled = state.disabled || node.refreshControl->refreshing;
++            node.accessibility.state = state;
++        }
+         std::erase_if(node.childTags, [&snapshot](auto child) { return !snapshot.nodes.contains(child); });
+         if (tag == activeModalTag_) {
+             node.parentTag = 0;
+@@ -1929,7 +2058,10 @@
+         return;
+     }
+     const auto& node = found->second;
+-    const auto geometry = nodeGeometry(node, state);
++    auto geometry = nodeGeometry(node, state);
++    if (const auto refresh = refreshControlGeometry(nodes_, node, true)) {
++        geometry = *refresh;
++    }
+     const auto bounds = mappedBounds(geometry.frame, geometry.matrix);
+     auto visibleBounds = bounds;
+     for (const auto& clip : state.clips) {
+@@ -1963,6 +2095,9 @@
+     SceneNode& node = nodes_[shadowView.tag];
+ 
+     node.tag = shadowView.tag;
++    if (node.accessibilityEmitter != shadowView.eventEmitter) {
++        node.refreshControl.reset();
++    }
+     node.accessibilityEmitter = shadowView.eventEmitter;
+     node.componentName = readComponentName(shadowView);
+     if (isModalHost(node)) {
+@@ -1979,6 +2114,7 @@
+                      pendingPlaceholderDecodeRequests_);
+     readSwitchContent(node, shadowView);
+     readActivityIndicatorContent(node, shadowView);
++    readRefreshControlContent(node, shadowView);
+     readScrollContent(node, shadowView);
+     rejectNonFiniteValues(node, rejectedNonFiniteProps_);
+ 
+@@ -2029,6 +2165,8 @@
+         }
+     }
+ 
++    const ScenePrimitive viewport{.frame = visit.primitive.frame, .matrix = visit.primitive.matrix};
++
+     // #49: the indicators go above the content, so they are appended after the children they overlay.
+     std::vector<ScenePrimitive> indicatorBars;
+ 
+@@ -2041,7 +2179,17 @@
+     }
+ 
+     for (facebook::react::Tag childTag : node.childTags) {
+-        appendPrimitives(primitives, childTag, visit.childState);
++        const auto child = nodes_.find(childTag);
++        if (child == nodes_.end() || !child->second.refreshControl) {
++            appendPrimitives(primitives, childTag, visit.childState);
++        }
++    }
++    for (facebook::react::Tag childTag : node.childTags) {
++        const auto child = nodes_.find(childTag);
++        if (child != nodes_.end() && child->second.refreshControl) {
++            appendRefreshPrimitives(primitives, child->second, viewport, visit.childState, focusedTag_ == childTag,
++                                    isFocusVisible_ && focusedTag_ == childTag);
++        }
+     }
+ 
+     primitives.insert(primitives.end(), indicatorBars.begin(), indicatorBars.end());
+@@ -2068,7 +2216,16 @@
+         return {};
+     }
+ 
+-    const SceneNodeGeometry geometry = nodeGeometry(node, state);
++    auto geometry = nodeGeometry(node, state);
++    if (node.refreshControl) {
++        const bool focused = focusedTag_ == tag;
++        if (!node.refreshControl->refreshing && node.refreshControl->distance == 0.0 && !focused) {
++            return {};
++        }
++        if (const auto refresh = refreshControlGeometry(nodes_, node, focused)) {
++            geometry = *refresh;
++        }
++    }
+     const SceneHit nodeHit{.tag = tag,
+                            .origin = mapPoint(geometry.matrix, geometry.frame.origin),
+                            .matrix = geometry.matrix,
+@@ -2131,6 +2288,11 @@
+ }
+ 
+ void RetainedScene::damageSubtree(facebook::react::Tag tag) {
++    const auto node = nodes_.find(tag);
++    if (node != nodes_.end() && node->second.refreshControl && node->second.parentTag != 0) {
++        damageSubtree(node->second.parentTag);
++        return;
++    }
+     const std::optional<facebook::react::Rect> extent = subtreeExtent(tag);
+ 
+     if (extent.has_value()) {
+diff --git a/packages/core/src/RetainedScene.h b/packages/core/src/RetainedScene.h
+--- a/packages/core/src/RetainedScene.h
++++ b/packages/core/src/RetainedScene.h
+@@ -529,6 +529,16 @@
+     bool operator==(const ModalPresentation&) const = default;
+ };
+ 
++struct SceneRefreshControlContent {
++    bool committedRefreshing{false};
++    bool refreshing{false};
++    double distance{0.0};
++    double elapsedMilliseconds{0.0};
++    facebook::react::Float progressViewOffset{0};
++    uint32_t colorArgb{};
++    std::optional<SceneTextContent> title;
++};
++
+ struct SceneNode {
+     uint64_t accessibilityId{};
+     facebook::react::SharedEventEmitter accessibilityEmitter;
+@@ -536,6 +546,7 @@
+     facebook::react::Tag parentTag{};
+     std::string componentName;
+     std::optional<ModalPresentation> modalPresentation;
++    std::optional<SceneRefreshControlContent> refreshControl;
+ 
+     /**
+      * The two identity props a react-native-windows tree snapshot asserts on, kept because the automation
+@@ -807,6 +818,8 @@
+      * field nobody is typing in from repainting every frame.
+      */
+     void setEditorState(facebook::react::Tag tag, const SceneEditorState& editorState);
++    bool setRefreshControlState(facebook::react::Tag tag, const facebook::react::SharedEventEmitter& emitter,
++                                bool refreshing, double distance);
+ 
+     /**
+      * Applies the non-layout props an animation frame changed, as `animationbackend::packAnimatedProps` packs
+diff --git a/packages/core/src/ScrollController.cpp b/packages/core/src/ScrollController.cpp
+--- a/packages/core/src/ScrollController.cpp
++++ b/packages/core/src/ScrollController.cpp
+@@ -297,8 +297,19 @@
+     : uiManager_(std::move(uiManager)), surfaceId_(surfaceId) {}
+ 
+ void ScrollController::setModalRoot(facebook::react::Tag tag, std::shared_ptr<LinuxMountingManager> mountingManager) {
++    const bool changed = modalRootTag_ != tag;
+     modalRootTag_ = tag;
+     mountingManager_ = std::move(mountingManager);
++    if (changed) {
++        const auto surface = rootShadowNode();
++        const auto active = tag == 0 ? surface : shadowNodeWithTag(surface, tag);
++        for (auto& [scrollTag, target] : targets_) {
++            if (!shadowNodeWithTag(active, scrollTag)) {
++                target.refreshGesture.cancelPull();
++                publishRefreshControl(target);
++            }
++        }
++    }
+ }
+ 
+ void ScrollController::dispatch(const std::vector<InputEvent>& events) {
+@@ -328,6 +339,7 @@
+         }
+ 
+         target.shadowNode = scrollView;
++        syncRefreshControl(target, *scrollView);
+         isScrolling = advanceTarget(target, *scrollView, elapsed) || isScrolling;
+         ++entry;
+     }
+@@ -374,14 +386,108 @@
+ 
+     ScrollTargetAxis& axis = event.scrollAxis == ScrollAxisKind::Horizontal ? target->horizontal : target->vertical;
+ 
++    syncRefreshControl(*target, *target->shadowNode);
+     if (event.kind == InputEventKind::PointerScrollDiscrete) {
++        target->refreshGesture.cancelPull();
++        publishRefreshControl(*target);
+         axis.pendingNotches += axisLock_.filter(event);
+ 
+         return;
+     }
+ 
+-    axis.pendingDrag += axisLock_.filter(event);
++    double delta = axisLock_.filter(event);
++    if (target->refreshControl && event.scrollAxis == ScrollAxisKind::Vertical) {
++        const ScrollAxisBounds bounds = axisBounds(readMetrics(*target->shadowNode), false);
++        const double offset = clampScrollOffset(axis.state.offset + axis.pendingDrag, bounds);
++        const double top = minimumScrollOffset(bounds);
++        // A single delta may both reach the top and continue into a pull.
++        const double toTop = delta < 0.0 ? std::max(delta, top - offset) : 0.0;
++        const bool atTop = offset + toTop <= top;
++        delta = toTop + target->refreshGesture.drag(delta - toTop, atTop);
++        publishRefreshControl(*target);
++    }
++    axis.pendingDrag += delta;
+     target->isFingerDown = true;
++}
++
++void ScrollController::syncRefreshControl(ScrollTarget& target,
++                                          const facebook::react::ScrollViewShadowNode& scrollView) {
++    std::shared_ptr<const facebook::react::PullToRefreshViewShadowNode> refresh;
++    for (const auto& child : scrollView.getChildren()) {
++        refresh = std::dynamic_pointer_cast<const facebook::react::PullToRefreshViewShadowNode>(child);
++        if (refresh) {
++            break;
++        }
++    }
++    const bool replaced =
++        !refresh || !target.refreshControl || &refresh->getFamily() != &target.refreshControl->getFamily();
++    if (replaced) {
++        target.refreshGesture = RefreshGesture{};
++        target.committedRefreshing = refresh && refresh->getConcreteProps().refreshing;
++        target.refreshGesture.setRefreshing(target.committedRefreshing);
++    } else if (refresh->getConcreteProps().refreshing != target.committedRefreshing) {
++        target.committedRefreshing = refresh->getConcreteProps().refreshing;
++        target.refreshGesture.setRefreshing(target.committedRefreshing);
++    }
++    target.refreshControl = std::move(refresh);
++    if (!scrollView.getConcreteProps().scrollEnabled ||
++        scrollView.getLayoutMetrics().displayType == facebook::react::DisplayType::None) {
++        target.refreshGesture.cancelPull();
++    }
++    publishRefreshControl(target);
++}
++
++void ScrollController::publishRefreshControl(const ScrollTarget& target) {
++    if (mountingManager_ && target.refreshControl) {
++        mountingManager_->setRefreshControlState(
++            target.refreshControl->getTag(), target.refreshControl->getEventEmitter(),
++            target.refreshGesture.isRefreshing(), target.refreshGesture.distance());
++    }
++}
++
++void ScrollController::routeRefreshCommand(const SceneCommand& command) {
++    const bool request = command.name == "requestRefresh";
++    if (!command.args.isArray() ||
++        (request ? !command.args.empty() : command.args.size() != 1 || !command.args[0].isBool())) {
++        return;
++    }
++    const auto root = rootShadowNode();
++    const auto node = std::dynamic_pointer_cast<const facebook::react::PullToRefreshViewShadowNode>(
++        shadowNodeWithTag(root, command.tag));
++    if (!node || !command.emitter || command.emitter != node->getEventEmitter()) {
++        return;
++    }
++    if (request && modalRootTag_ != 0 && !shadowNodeWithTag(shadowNodeWithTag(root, modalRootTag_), command.tag)) {
++        return;
++    }
++    const auto ancestors = node->getFamily().getAncestors(*root);
++    if (ancestors.empty()) {
++        return;
++    }
++    const auto scrollView = scrollViewWithTag(ancestors.back().first.get().getTag());
++    if (!scrollView ||
++        (request && (!scrollView->getConcreteProps().scrollEnabled ||
++                     scrollView->getLayoutMetrics().displayType == facebook::react::DisplayType::None))) {
++        return;
++    }
++    const auto props = std::dynamic_pointer_cast<const facebook::react::ViewProps>(node->getProps());
++    if (request && props && props->accessibilityState && props->accessibilityState->disabled) {
++        return;
++    }
++    auto& target = acquireMaintainedNode(scrollView);
++    syncRefreshControl(target, *scrollView);
++    if (target.refreshControl && &target.refreshControl->getFamily() == &node->getFamily()) {
++        if (request) {
++            if (!target.refreshGesture.requestRefresh()) {
++                return;
++            }
++            publishRefreshControl(target);
++            target.refreshControl->getConcreteEventEmitter().onRefresh({});
++        } else {
++            target.refreshGesture.setRefreshing(command.args[0].asBool());
++            publishRefreshControl(target);
++        }
++    }
+ }
+ 
+ void ScrollController::dispatchCommands(const std::vector<SceneCommand>& commands) {
+@@ -414,6 +520,10 @@
+  * third-party library should scroll to the origin, not take the frame thread down.
+  */
+ void ScrollController::routeCommand(const SceneCommand& command) {
++    if (command.name == "setNativeRefreshing" || command.name == "requestRefresh") {
++        routeRefreshCommand(command);
++        return;
++    }
+     const bool isScrollTo = command.name == "scrollTo";
+ 
+     if (!isScrollTo && command.name != "scrollToEnd") {
+@@ -459,7 +569,11 @@
+     const auto existing = targets_.find(scrollView->getTag());
+ 
+     if (existing != targets_.end()) {
+-        return existing->second;
++        if (&existing->second.shadowNode->getFamily() == &scrollView->getFamily()) {
++            existing->second.shadowNode = scrollView;
++            return existing->second;
++        }
++        targets_.erase(existing);
+     }
+ 
+     // Seeded from the state, so a ScrollView that JavaScript mounted at a non-zero `contentOffset` keeps it, and
+@@ -513,6 +627,12 @@
+     // The release is applied after the frame it arrived in has been dragged, so the velocity the last delta left
+     // behind is the velocity the fling starts with.
+     if (target.hasReleased) {
++        if (target.refreshControl && target.refreshGesture.release()) {
++            publishRefreshControl(target);
++            target.refreshControl->getConcreteEventEmitter().onRefresh({});
++        } else {
++            publishRefreshControl(target);
++        }
+         target.isFingerDown = false;
+         target.hasReleased = false;
+         target.isSettlingFromRelease = hasSnapPoints(metrics.snapping);
+diff --git a/packages/core/src/ScrollController.h b/packages/core/src/ScrollController.h
+--- a/packages/core/src/ScrollController.h
++++ b/packages/core/src/ScrollController.h
+@@ -2,6 +2,7 @@
+ 
+ #include "InputPipeline.h"
+ #include "LinuxMountingManager.h"
++#include "RefreshGesture.h"
+ #include "ScrollEventCadence.h"
+ #include "ScrollPhysics.h"
+ 
+@@ -10,6 +11,7 @@
+ #include <unordered_map>
+ #include <vector>
+ 
++#include <react/renderer/components/FBReactNativeSpec/ShadowNodes.h>
+ #include <react/renderer/components/scrollview/ScrollViewShadowNode.h>
+ #include <react/renderer/core/ReactPrimitives.h>
+ #include <react/renderer/graphics/Point.h>
+@@ -138,6 +140,9 @@
+         ScrollTargetAxis horizontal;
+         ScrollTargetAxis vertical;
+         ScrollEventCadence cadence;
++        std::shared_ptr<const facebook::react::PullToRefreshViewShadowNode> refreshControl;
++        RefreshGesture refreshGesture;
++        bool committedRefreshing{false};
+         bool isFingerDown{false};
+         bool hasReleased{false};
+         bool isMomentumRunning{false};
+@@ -149,6 +154,9 @@
+         bool isSettlingFromRelease{false};
+     };
+ 
++    void syncRefreshControl(ScrollTarget& target, const facebook::react::ScrollViewShadowNode& scrollView);
++    void publishRefreshControl(const ScrollTarget& target);
++    void routeRefreshCommand(const SceneCommand& command);
+     void route(const InputEvent& event);
+     void routeCommand(const SceneCommand& command);
+     ScrollTarget* acquire(facebook::react::Point surfacePoint);
+diff --git a/packages/core/tests/CMakeLists.txt b/packages/core/tests/CMakeLists.txt
+--- a/packages/core/tests/CMakeLists.txt
++++ b/packages/core/tests/CMakeLists.txt
+@@ -91,6 +91,7 @@
+     ${CMAKE_CURRENT_SOURCE_DIR}/../src/ScrollController.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/../src/ScrollEventCadence.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/../src/ScrollPhysics.cpp
++    ${CMAKE_CURRENT_SOURCE_DIR}/../src/RefreshGesture.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/../src/SeededTestScheduler.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/../src/StubMessageQueue.cpp
+     ${CMAKE_CURRENT_SOURCE_DIR}/../src/SingleInstanceActivation.cpp
+diff --git a/packages/core/tests/RefreshControllerTest.cpp b/packages/core/tests/RefreshControllerTest.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/tests/RefreshControllerTest.cpp
+@@ -0,0 +1,230 @@
++#include "InputDispatcher.h"
++#include "ScrollController.h"
++#include "ShadowTreeTestSupport.h"
++
++#include <react/renderer/components/FBReactNativeSpec/ComponentDescriptors.h>
++#include <react/renderer/components/modal/ModalHostViewComponentDescriptor.h>
++
++namespace react_native_linux {
++namespace {
++
++class RefreshControllerTest : public TextInputFieldFixture {
++protected:
++    using Node = std::shared_ptr<const facebook::react::ShadowNode>;
++    using Children = std::vector<Node>;
++
++    void SetUp() override {
++        TextInputFieldFixture::SetUp();
++        mountingManager_->startSurface(kSurfaceId, {400, 300});
++        controller_ = std::make_unique<ScrollController>(uiManager_, kSurfaceId);
++        controller_->setModalRoot(0, mountingManager_);
++    }
++
++    Node control(bool refreshing = false) {
++        return makeConfiguredShadowNode(refreshDescriptor_, 4, kSurfaceId, contextContainer_,
++                                        folly::dynamic::object("refreshing", refreshing)("collapsable", false)(
++                                            "accessibilityLabel", "Refresh data"),
++                                        std::make_shared<const Children>());
++    }
++
++    Node scroll(const Node& refresh, bool enabled = true) {
++        const auto content = makeConfiguredShadowNode(viewDescriptor_, 6, kSurfaceId, contextContainer_,
++                                                      folly::dynamic::object("width", 200)("height", 600),
++                                                      std::make_shared<const Children>());
++        return makeConfiguredShadowNode(scrollDescriptor_, 2, kSurfaceId, contextContainer_,
++                                        folly::dynamic::object("width", 200)("height", 160)("scrollEnabled", enabled),
++                                        std::make_shared<const Children>(Children{content, refresh}));
++    }
++
++    void commit(const Node& node) {
++        shadowTree_->commit(
++            [&](const facebook::react::RootShadowNode& root) {
++                const PropsParserContext context{kSurfaceId, *contextContainer_};
++                const auto sized = root.clone(context, exactSurfaceConstraints({400, 300}), LayoutContext{});
++                return cloneRootWithChildren(*sized, std::make_shared<const Children>(Children{node}));
++            },
++            facebook::react::ShadowTreeCommitOptions{.enableStateReconciliation = false, .mountSynchronously = true});
++        auto transaction = shadowTree_->getMountingCoordinator()->pullTransaction();
++        ASSERT_TRUE(transaction.has_value());
++        mountingManager_->executeMount(kSurfaceId, std::move(*transaction));
++    }
++
++    void pull(double delta, InputEventKind kind = InputEventKind::PointerScrollContinuous,
++              ScrollAxisKind axis = ScrollAxisKind::Vertical) {
++        controller_->dispatch(
++            {InputEvent{.kind = kind, .surfacePoint = {50, 50}, .scrollAxis = axis, .scrollAmount = delta}});
++    }
++
++    void release() {
++        controller_->dispatch({InputEvent{.kind = InputEventKind::PointerScrollStop}});
++        controller_->advance(16);
++    }
++
++    void command(const Node& node, std::string name, folly::dynamic args) {
++        controller_->dispatchCommands({SceneCommand{.tag = node->getTag(),
++                                                    .name = std::move(name),
++                                                    .args = std::move(args),
++                                                    .emitter = node->getEventEmitter()}});
++    }
++
++    size_t refreshEvents() const { return std::ranges::count(*recordedEventTypes_, "topRefresh"); }
++
++    facebook::react::PullToRefreshViewComponentDescriptor refreshDescriptor_{
++        {.eventDispatcher = eventDispatcher_, .contextContainer = contextContainer_, .flavor = nullptr}};
++    facebook::react::ScrollViewComponentDescriptor scrollDescriptor_{
++        {.eventDispatcher = eventDispatcher_, .contextContainer = contextContainer_, .flavor = nullptr}};
++    facebook::react::ViewComponentDescriptor viewDescriptor_{
++        {.eventDispatcher = eventDispatcher_, .contextContainer = contextContainer_, .flavor = nullptr}};
++    facebook::react::ModalHostViewComponentDescriptor modalDescriptor_{
++        {.eventDispatcher = eventDispatcher_, .contextContainer = contextContainer_, .flavor = nullptr}};
++    std::unique_ptr<ScrollController> controller_;
++};
++
++TEST_F(RefreshControllerTest, ARealTopEdgePullEmitsRefreshOnlyAfterRelease) {
++    const auto refresh = control();
++    commit(scroll(refresh));
++    pull(-128);
++    EXPECT_EQ(refreshEvents(), 0);
++    release();
++    EXPECT_EQ(refreshEvents(), 1);
++    const auto state = mountingManager_->accessibilitySnapshot();
++    ASSERT_TRUE(state.nodes.contains(4));
++    ASSERT_TRUE(state.nodes.at(4).accessibility.state.has_value());
++    EXPECT_TRUE(state.nodes.at(4).accessibility.state->busy);
++}
++
++TEST_F(RefreshControllerTest, WheelAndHorizontalInputDoNotRequestRefresh) {
++    commit(scroll(control()));
++    pull(-20, InputEventKind::PointerScrollDiscrete);
++    release();
++    pull(-200, InputEventKind::PointerScrollContinuous, ScrollAxisKind::Horizontal);
++    release();
++    EXPECT_EQ(refreshEvents(), 0);
++}
++
++TEST_F(RefreshControllerTest, BelowThresholdReleaseAndReversalCancelTheRequest) {
++    commit(scroll(control()));
++    pull(-100);
++    release();
++    EXPECT_EQ(refreshEvents(), 0);
++    pull(-160);
++    pull(100);
++    release();
++    EXPECT_EQ(refreshEvents(), 0);
++}
++
++TEST_F(RefreshControllerTest, ARejectedControlledRefreshCanBePulledAgain) {
++    const auto refresh = control();
++    commit(scroll(refresh));
++    pull(-128);
++    release();
++    ASSERT_EQ(refreshEvents(), 1);
++    command(refresh, "setNativeRefreshing", folly::dynamic::array(false));
++    pull(-128);
++    release();
++    EXPECT_EQ(refreshEvents(), 2);
++}
++
++TEST_F(RefreshControllerTest, ProgrammaticRefreshingAndRepeatedActionsNeverDuplicateRefresh) {
++    const auto refresh = control(true);
++    commit(scroll(refresh));
++    command(refresh, "requestRefresh", folly::dynamic::array());
++    pull(-200);
++    release();
++    EXPECT_EQ(refreshEvents(), 0);
++    command(refresh, "setNativeRefreshing", folly::dynamic::array(false));
++    command(refresh, "requestRefresh", folly::dynamic::array());
++    command(refresh, "requestRefresh", folly::dynamic::array());
++    EXPECT_EQ(refreshEvents(), 1);
++}
++
++TEST_F(RefreshControllerTest, ReplacingTheControlRevokesAnOldQueuedCommand) {
++    const auto original = control();
++    const auto parent = scroll(original);
++    commit(parent);
++    command(original, "requestRefresh", folly::dynamic::array());
++    ASSERT_EQ(refreshEvents(), 1);
++    const auto replacement = control();
++    auto children = parent->getChildren();
++    children.back() = replacement;
++    commit(parent->clone(ShadowNodeFragment{.children = std::make_shared<const Children>(std::move(children))}));
++    command(original, "requestRefresh", folly::dynamic::array());
++    EXPECT_EQ(refreshEvents(), 1);
++    command(replacement, "requestRefresh", folly::dynamic::array());
++    EXPECT_EQ(refreshEvents(), 2);
++}
++
++TEST_F(RefreshControllerTest, InvalidCommandArgumentsCannotChangeNativeRefreshState) {
++    const auto refresh = control();
++    commit(scroll(refresh));
++    command(refresh, "requestRefresh", folly::dynamic::array(true));
++    command(refresh, "setNativeRefreshing", folly::dynamic::array("true"));
++    command(refresh, "setNativeRefreshing", folly::dynamic::object());
++    EXPECT_EQ(refreshEvents(), 0);
++    command(refresh, "requestRefresh", folly::dynamic::array());
++    EXPECT_EQ(refreshEvents(), 1);
++}
++
++TEST_F(RefreshControllerTest, ADisabledScrollViewRejectsGesturesAndAccessibleRefreshRequests) {
++    const auto refresh = control();
++    commit(scroll(refresh, false));
++    pull(-200);
++    release();
++    command(refresh, "requestRefresh", folly::dynamic::array());
++    EXPECT_EQ(refreshEvents(), 0);
++}
++
++TEST_F(RefreshControllerTest, OpeningAModalCancelsABackgroundPullAndRejectsItsQueuedAction) {
++    const auto refresh = control();
++    const auto modal =
++        makeConfiguredShadowNode(modalDescriptor_, 8, kSurfaceId, contextContainer_,
++                                 folly::dynamic::object("visible", true), std::make_shared<const Children>());
++    const auto parent = makeConfiguredShadowNode(viewDescriptor_, 10, kSurfaceId, contextContainer_,
++                                                 folly::dynamic::object("width", 400)("height", 300),
++                                                 std::make_shared<const Children>(Children{scroll(refresh), modal}));
++    commit(parent);
++    pull(-160);
++    controller_->setModalRoot(8, mountingManager_);
++    release();
++    command(refresh, "requestRefresh", folly::dynamic::array());
++    EXPECT_EQ(refreshEvents(), 0);
++}
++
++TEST_F(RefreshControllerTest, KeyboardActivationUsesTheRealNativeRefreshCommandAndEmitter) {
++    const auto refresh = control();
++    commit(scroll(refresh));
++    InputDispatcher keyboard(uiManager_, mountingManager_, kSurfaceId);
++    keyboard.dispatchCommands({SceneCommand{.tag = 4, .name = "focus", .args = folly::dynamic::object()}});
++    keyboard.dispatch({InputEvent{.kind = InputEventKind::KeyPress, .key = "Enter"}});
++    controller_->dispatchCommands(mountingManager_->takeCommands());
++    EXPECT_EQ(refreshEvents(), 1);
++}
++
++TEST_F(RefreshControllerTest, ScreenReaderActivationUsesTheSameRevocableNativePath) {
++    const auto refresh = control();
++    commit(scroll(refresh));
++    InputDispatcher keyboard(uiManager_, mountingManager_, kSurfaceId);
++    keyboard.dispatchAccessibilityActions({NativeAccessibilityAction{.kind = NativeAccessibilityAction::Kind::Activate,
++                                                                     .tag = 4,
++                                                                     .emitter = refresh->getEventEmitter(),
++                                                                     .role = "button"}});
++    controller_->dispatchCommands(mountingManager_->takeCommands());
++    EXPECT_EQ(refreshEvents(), 1);
++}
++
++TEST_F(RefreshControllerTest, TheRevealedControlCanBeClickedWithoutLosingItsPointerTarget) {
++    const auto refresh = control();
++    commit(scroll(refresh));
++    InputDispatcher pointer(uiManager_, mountingManager_, kSurfaceId);
++    pointer.dispatchCommands({SceneCommand{.tag = 4, .name = "focus", .args = folly::dynamic::object()}});
++    const auto snapshot = mountingManager_->accessibilitySnapshot();
++    ASSERT_TRUE(snapshot.geometry.contains(4));
++    const auto point = snapshot.geometry.at(4).bounds.getCenter();
++    pointer.dispatch({InputEvent{.kind = InputEventKind::PointerButtonPress, .surfacePoint = point},
++                      InputEvent{.kind = InputEventKind::PointerButtonRelease, .surfacePoint = point}});
++    controller_->dispatchCommands(mountingManager_->takeCommands());
++    EXPECT_EQ(refreshEvents(), 1);
++}
++
++} // namespace
++} // namespace react_native_linux
+diff --git a/packages/core/tests/RefreshGestureTest.cpp b/packages/core/tests/RefreshGestureTest.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/tests/RefreshGestureTest.cpp
+@@ -0,0 +1,120 @@
++#include "RefreshGesture.h"
++
++#include <gtest/gtest.h>
++#include <limits>
++
++namespace react_native_linux {
++
++TEST(RefreshGestureTest, BelowThresholdReleaseCancelsWithoutRefreshing) {
++    RefreshGesture gesture;
++    EXPECT_DOUBLE_EQ(gesture.drag(-100.0, true), 0.0);
++    EXPECT_DOUBLE_EQ(gesture.distance(), 50.0);
++    EXPECT_FALSE(gesture.release());
++    EXPECT_DOUBLE_EQ(gesture.distance(), 0.0);
++    EXPECT_FALSE(gesture.isRefreshing());
++}
++
++TEST(RefreshGestureTest, ThresholdReleaseTriggersExactlyOnce) {
++    RefreshGesture gesture;
++    gesture.drag(-128.0, true);
++    EXPECT_TRUE(gesture.release());
++    EXPECT_TRUE(gesture.isRefreshing());
++    EXPECT_FALSE(gesture.release());
++    EXPECT_DOUBLE_EQ(gesture.drag(-200.0, true), -200.0);
++    EXPECT_FALSE(gesture.release());
++}
++
++TEST(RefreshGestureTest, ReversingDirectionCancelsThePullBeforeScrolling) {
++    RefreshGesture gesture;
++    gesture.drag(-160.0, true);
++    EXPECT_DOUBLE_EQ(gesture.drag(60.0, true), 0.0);
++    EXPECT_DOUBLE_EQ(gesture.distance(), 50.0);
++    EXPECT_FALSE(gesture.release());
++}
++
++TEST(RefreshGestureTest, ReturningThroughZeroPreservesTheRemainingScrollDelta) {
++    RefreshGesture gesture;
++    gesture.drag(-40.0, true);
++    EXPECT_DOUBLE_EQ(gesture.drag(100.0, true), 60.0);
++    EXPECT_DOUBLE_EQ(gesture.distance(), 0.0);
++    EXPECT_FALSE(gesture.release());
++}
++
++TEST(RefreshGestureTest, ScrollingAwayFromTheTopDoesNotStealInput) {
++    RefreshGesture gesture;
++    EXPECT_DOUBLE_EQ(gesture.drag(-200.0, false), -200.0);
++    EXPECT_FALSE(gesture.release());
++    gesture.drag(-200.0, true);
++    EXPECT_DOUBLE_EQ(gesture.drag(-20.0, false), -20.0);
++    EXPECT_FALSE(gesture.release());
++}
++
++TEST(RefreshGestureTest, ControlledStopAllowsAnotherIndependentRefresh) {
++    RefreshGesture gesture;
++    gesture.drag(-128.0, true);
++    ASSERT_TRUE(gesture.release());
++    gesture.setRefreshing(false);
++    EXPECT_FALSE(gesture.isRefreshing());
++    gesture.drag(-128.0, true);
++    EXPECT_TRUE(gesture.release());
++}
++
++TEST(RefreshGestureTest, ProgrammaticRefreshDoesNotGenerateAGestureEvent) {
++    RefreshGesture gesture;
++    gesture.setRefreshing(true);
++    EXPECT_TRUE(gesture.isRefreshing());
++    EXPECT_DOUBLE_EQ(gesture.distance(), 0.0);
++    EXPECT_FALSE(gesture.release());
++    gesture.setRefreshing(false);
++    EXPECT_FALSE(gesture.release());
++}
++
++TEST(RefreshGestureTest, AccessibleRequestsShareTheGestureDuplicateGuard) {
++    RefreshGesture gesture;
++    EXPECT_TRUE(gesture.requestRefresh());
++    EXPECT_FALSE(gesture.requestRefresh());
++    gesture.drag(-200, true);
++    EXPECT_FALSE(gesture.release());
++    gesture.setRefreshing(false);
++    EXPECT_TRUE(gesture.requestRefresh());
++}
++
++TEST(RefreshGestureTest, AccessibleRequestReplacesAnUnfinishedPull) {
++    RefreshGesture gesture;
++    gesture.drag(-100, true);
++    EXPECT_TRUE(gesture.requestRefresh());
++    EXPECT_DOUBLE_EQ(gesture.distance(), 0);
++    EXPECT_FALSE(gesture.release());
++}
++
++TEST(RefreshGestureTest, CancellationClearsPullButDoesNotStopAnActiveRefresh) {
++    RefreshGesture gesture;
++    gesture.drag(-200.0, true);
++    gesture.cancelPull();
++    EXPECT_FALSE(gesture.release());
++    gesture.setRefreshing(true);
++    gesture.cancelPull();
++    EXPECT_TRUE(gesture.isRefreshing());
++}
++
++TEST(RefreshGestureTest, InvalidDeltasCannotPoisonTheNextGesture) {
++    RefreshGesture gesture;
++    for (double delta : {std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
++                         std::numeric_limits<double>::quiet_NaN()}) {
++        EXPECT_DOUBLE_EQ(gesture.drag(delta, true), 0.0);
++        EXPECT_DOUBLE_EQ(gesture.distance(), 0.0);
++    }
++    gesture.drag(-128.0, true);
++    EXPECT_TRUE(gesture.release());
++}
++
++TEST(RefreshGestureTest, VeryLargeFinitePullIsBoundedAndCanBeCancelled) {
++    RefreshGesture gesture;
++    gesture.drag(-std::numeric_limits<double>::max(), true);
++    EXPECT_DOUBLE_EQ(gesture.distance(), kRefreshTriggerDistance * 2.0);
++    EXPECT_DOUBLE_EQ(gesture.drag(std::numeric_limits<double>::max(), true), std::numeric_limits<double>::max());
++    EXPECT_DOUBLE_EQ(gesture.distance(), 0.0);
++    EXPECT_FALSE(gesture.release());
++}
++
++} // namespace react_native_linux
+diff --git a/packages/core/tests/RefreshSceneTest.cpp b/packages/core/tests/RefreshSceneTest.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/tests/RefreshSceneTest.cpp
+@@ -0,0 +1,174 @@
++#include "RetainedScene.h"
++#include "SceneTestSupport.h"
++
++#include <algorithm>
++#include <gtest/gtest.h>
++#include <limits>
++
++#include <react/renderer/components/FBReactNativeSpec/EventEmitters.h>
++#include <react/renderer/components/FBReactNativeSpec/Props.h>
++
++namespace {
++
++using facebook::react::PullToRefreshViewEventEmitter;
++using facebook::react::PullToRefreshViewProps;
++
++ShadowView refreshView(bool refreshing = false) {
++    auto view = makeView(3, makeRect(0, 0, 0, 0));
++    view.componentName = "PullToRefreshView";
++    auto props = std::make_shared<PullToRefreshViewProps>();
++    props->refreshing = refreshing;
++    props->tintColor = red();
++    props->titleColor = blue();
++    props->title = "Refresh 雪";
++    props->progressViewOffset = 10;
++    view.props = props;
++    view.eventEmitter =
++        std::make_shared<PullToRefreshViewEventEmitter>(nullptr, facebook::react::EventDispatcher::Weak{});
++    return view;
++}
++
++RetainedScene refreshScene(const ShadowView& control) {
++    RetainedScene scene;
++    scene.createSurfaceRoot(kSurfaceTag, {400, 300});
++    auto scroll = makeScrollView(2, makeRect(20, 30, 200, 160), {0, 80}, makeRect(0, 0, 200, 600));
++    scroll.props = std::make_shared<ViewProps>();
++    addChild(scene, kSurfaceTag, scroll);
++    addChild(scene, 2, control);
++    scene.takeDamage();
++    return scene;
++}
++
++TEST(RefreshSceneTest, IdleControlDoesNotPaintAnIndicatorOrTitle) {
++    const auto scene = refreshScene(refreshView());
++    const auto snapshot = scene.snapshot();
++    EXPECT_TRUE(std::ranges::none_of(snapshot, [](const auto& primitive) { return primitive.tag == 3; }));
++}
++
++TEST(RefreshSceneTest, AccessibleControlHasNativeViewportGeometryAndBecomesBusyWhileRefreshing) {
++    const auto control = refreshView();
++    auto scene = refreshScene(control);
++    auto snapshot = scene.accessibilitySnapshot();
++    ASSERT_TRUE(snapshot.nodes.contains(3));
++    EXPECT_TRUE(snapshot.nodes.at(3).accessibility.accessible);
++    EXPECT_EQ(snapshot.nodes.at(3).accessibility.accessibilityRole, "button");
++    EXPECT_EQ(snapshot.nodes.at(3).accessibilityLabel, "Refresh 雪");
++    EXPECT_EQ(snapshot.geometry.at(3).bounds, makeRect(108, 60, 24, 24));
++    ASSERT_TRUE(snapshot.nodes.at(3).accessibility.state.has_value());
++    EXPECT_FALSE(snapshot.nodes.at(3).accessibility.state->busy);
++    scene.setRefreshControlState(3, control.eventEmitter, true, 0);
++    snapshot = scene.accessibilitySnapshot();
++    EXPECT_TRUE(snapshot.nodes.at(3).accessibility.state->busy);
++    EXPECT_TRUE(snapshot.nodes.at(3).accessibility.state->disabled);
++}
++
++TEST(RefreshSceneTest, KeyboardFocusRevealsAClippedControlAndItsVisibleFocusRing) {
++    auto scene = refreshScene(refreshView());
++    scene.setFocus(3, true);
++    const auto snapshot = scene.snapshot();
++    const auto indicator = std::ranges::find_if(
++        snapshot, [](const auto& primitive) { return primitive.tag == 3 && primitive.activityIndicator.has_value(); });
++    ASSERT_NE(indicator, snapshot.end());
++    EXPECT_TRUE(indicator->focusRing);
++    ASSERT_FALSE(indicator->clips.empty());
++    EXPECT_EQ(indicator->clips.back().frame, makeRect(20, 30, 200, 160));
++    EXPECT_EQ(scene.findNodeAtPoint(kSurfaceTag, {120, 72}).tag, 3);
++    scene.setFocus(3, false);
++    EXPECT_EQ(scene.findNodeAtPoint(kSurfaceTag, {120, 72}).tag, 3);
++}
++
++TEST(RefreshSceneTest, RefreshingDrawsTheIndicatorAndTitleAtTheViewportInsteadOfTheContentOffset) {
++    const auto scene = refreshScene(refreshView(true));
++    const auto snapshot = scene.snapshot();
++    const auto indicator = std::ranges::find_if(
++        snapshot, [](const auto& primitive) { return primitive.tag == 3 && primitive.activityIndicator.has_value(); });
++    ASSERT_NE(indicator, snapshot.end());
++    EXPECT_EQ(indicator->frame, makeRect(108, 60, 24, 24));
++    EXPECT_EQ(indicator->activityIndicator->colorArgb, kRedArgb);
++    const auto title = std::ranges::find_if(
++        snapshot, [](const auto& primitive) { return primitive.tag == 3 && primitive.text.has_value(); });
++    ASSERT_NE(title, snapshot.end());
++    EXPECT_EQ(title->text->attributedString->getString(), "Refresh 雪");
++    EXPECT_EQ(title->text->frame, makeRect(20, 86, 200, 22));
++    const auto& attributes = title->text->attributedString->getFragments().front().textAttributes;
++    EXPECT_EQ(attributes.foregroundColor, blue());
++}
++
++TEST(RefreshSceneTest, NativePullDamagesTheViewportAndControlledStopErasesIt) {
++    const auto control = refreshView();
++    auto scene = refreshScene(control);
++    EXPECT_TRUE(scene.setRefreshControlState(3, control.eventEmitter, false, 32));
++    EXPECT_FALSE(scene.takeDamage().empty());
++    EXPECT_TRUE(std::ranges::any_of(scene.snapshot(), [](const auto& primitive) {
++        return primitive.tag == 3 && primitive.activityIndicator.has_value();
++    }));
++    EXPECT_TRUE(scene.setRefreshControlState(3, control.eventEmitter, false, 0));
++    EXPECT_FALSE(scene.takeDamage().empty());
++    EXPECT_TRUE(std::ranges::none_of(scene.snapshot(), [](const auto& primitive) { return primitive.tag == 3; }));
++}
++
++TEST(RefreshSceneTest, RepeatingTheSameNativeStateCreatesNoNewDamage) {
++    const auto control = refreshView();
++    auto scene = refreshScene(control);
++    scene.setRefreshControlState(3, control.eventEmitter, true, 0);
++    scene.takeDamage();
++    EXPECT_FALSE(scene.setRefreshControlState(3, control.eventEmitter, true, 0));
++    EXPECT_TRUE(scene.takeDamage().empty());
++}
++
++TEST(RefreshSceneTest, UnrelatedCommitsRetainTheNativePullAndRefreshingState) {
++    auto control = refreshView();
++    auto scene = refreshScene(control);
++    scene.setRefreshControlState(3, control.eventEmitter, true, 0);
++    scene.updateNode(control);
++    EXPECT_TRUE(std::ranges::any_of(scene.snapshot(), [](const auto& primitive) {
++        return primitive.tag == 3 && primitive.activityIndicator.has_value();
++    }));
++    auto accepted = std::make_shared<PullToRefreshViewProps>();
++    accepted->refreshing = true;
++    control.props = accepted;
++    scene.updateNode(control);
++    control.props = std::make_shared<PullToRefreshViewProps>();
++    scene.updateNode(control);
++    EXPECT_FALSE(scene.takeDamage().empty());
++    EXPECT_TRUE(std::ranges::none_of(scene.snapshot(), [](const auto& primitive) { return primitive.tag == 3; }));
++}
++
++TEST(RefreshSceneTest, OldEmitterCannotChangeAReplacementControlOrTransferNativeState) {
++    const auto control = refreshView();
++    auto scene = refreshScene(control);
++    scene.setRefreshControlState(3, control.eventEmitter, true, 0);
++    scene.updateNode(refreshView());
++    EXPECT_FALSE(scene.setRefreshControlState(3, control.eventEmitter, true, 0));
++    EXPECT_TRUE(std::ranges::none_of(scene.snapshot(), [](const auto& primitive) { return primitive.tag == 3; }));
++}
++
++TEST(RefreshSceneTest, InvalidNativeDistancesAreRejectedWithoutChangingPixels) {
++    const auto control = refreshView();
++    auto scene = refreshScene(control);
++    for (double distance : {-1.0, std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()}) {
++        EXPECT_FALSE(scene.setRefreshControlState(3, control.eventEmitter, true, distance));
++    }
++    EXPECT_TRUE(scene.takeDamage().empty());
++    EXPECT_TRUE(std::ranges::none_of(scene.snapshot(), [](const auto& primitive) { return primitive.tag == 3; }));
++}
++
++TEST(RefreshSceneTest, OnlyAnActiveRefreshAdvancesTheNativeIndicatorClock) {
++    const auto control = refreshView();
++    auto scene = refreshScene(control);
++    scene.setRefreshControlState(3, control.eventEmitter, false, 40);
++    scene.takeDamage();
++    EXPECT_FALSE(scene.advanceControlAnimations(16));
++    EXPECT_TRUE(scene.takeDamage().empty());
++    scene.setRefreshControlState(3, control.eventEmitter, true, 0);
++    scene.takeDamage();
++    EXPECT_TRUE(scene.advanceControlAnimations(16));
++    EXPECT_FALSE(scene.takeDamage().empty());
++    const auto snapshot = scene.snapshot();
++    const auto indicator = std::ranges::find_if(
++        snapshot, [](const auto& primitive) { return primitive.tag == 3 && primitive.activityIndicator.has_value(); });
++    ASSERT_NE(indicator, snapshot.end());
++    EXPECT_DOUBLE_EQ(indicator->activityIndicator->elapsedMilliseconds, 16);
++}
++
++} // namespace
+diff --git a/packages/core/tests/hermes/CMakeLists.txt b/packages/core/tests/hermes/CMakeLists.txt
+--- a/packages/core/tests/hermes/CMakeLists.txt
++++ b/packages/core/tests/hermes/CMakeLists.txt
+@@ -102,6 +102,9 @@
+     ../EditorTest.cpp
+     ../AccessibilitySnapshotTest.cpp
+     ../NativeAccessibilityActionTest.cpp
++    ../RefreshGestureTest.cpp
++    ../RefreshSceneTest.cpp
++    ../RefreshControllerTest.cpp
+     ../ModalControllerTest.cpp
+     ../ModalSceneTest.cpp
+     ../ClipboardBackendTest.cpp
+@@ -110,6 +113,7 @@
+     ClipboardModuleTest.cpp
+     LayoutConformanceHostTest.cpp
+     ModalHostTest.cpp
++    RefreshHostTest.cpp
+     CrossThreadPromiseStressTest.cpp
+     FantomTesterTest.cpp
+     HotModuleReplacementSetupTest.cpp
+diff --git a/packages/core/tests/hermes/RefreshHostTest.cpp b/packages/core/tests/hermes/RefreshHostTest.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/tests/hermes/RefreshHostTest.cpp
+@@ -0,0 +1,146 @@
++#include "FantomTester.h"
++
++#include <algorithm>
++#include <gtest/gtest.h>
++
++namespace react_native_linux {
++namespace {
++
++constexpr char kRefreshSetup[] = R"JAVASCRIPT(
++if (!globalThis.__nativeComponentRegistry__hasComponent('PullToRefreshView')) {
++  throw new Error('PullToRefreshView has no native registration');
++}
++globalThis.fabric = globalThis.nativeFabricUIManager;
++globalThis.events = [];
++globalThis.mode = 'accept';
++globalThis.handles = [];
++globalThis.node = (tag, name, props) => {
++  const handle = {stateNode: {node: null}};
++  handles.push(handle);
++  handle.stateNode.node = fabric.createNode(tag, name, 1, props, handle);
++  return handle.stateNode.node;
++};
++fabric.registerEventHandler((target, type) => {
++  events.push(type);
++  if (type === 'topRefresh') {
++    if (mode === 'accept') {
++      subject = fabric.cloneNodeWithNewProps(subject, {refreshing: true});
++      commit();
++    } else {
++      fabric.dispatchCommand(subject, 'setNativeRefreshing', [false]);
++    }
++  }
++});
++globalThis.subject = node(4, 'PullToRefreshView', {
++  refreshing: false, onRefresh: true, collapsable: false,
++  tintColor: 0xffff0000, titleColor: 0xff0000ff,
++  title: 'Refresh 雪', progressViewOffset: 10,
++});
++globalThis.content = node(6, 'View', {
++  width: 200, height: 600, backgroundColor: 0xff142536, collapsable: false,
++});
++globalThis.scroll = node(2, 'ScrollView', {
++  left: 20, top: 30, width: 200, height: 160, collapsable: false,
++});
++globalThis.commit = () => {
++  scroll = fabric.cloneNodeWithNewChildren(scroll);
++  fabric.appendChild(scroll, content);
++  fabric.appendChild(scroll, subject);
++  const children = fabric.createChildSet();
++  fabric.appendChildToSet(children, scroll);
++  fabric.completeRoot(1, children);
++};
++commit();
++)JAVASCRIPT";
++
++bool hasRefreshIndicator(const FantomTester& tester) {
++    return std::ranges::any_of(tester.snapshotScene(), [](const auto& primitive) {
++        return primitive.tag == 4 && primitive.activityIndicator.has_value();
++    });
++}
++
++void pullAndRelease(FantomTester& tester, double delta) {
++    tester.advanceModalFrame(16, {
++                                     InputEvent{.kind = InputEventKind::PointerScrollContinuous,
++                                                .surfacePoint = {50, 50},
++                                                .scrollAmount = delta},
++                                     InputEvent{.kind = InputEventKind::PointerScrollStop},
++                                 });
++}
++
++TEST(RefreshHostTest, StockRegistrationAndCommandsPaintNativeIndicatorAndTitleWithoutAnEvent) {
++    FantomTester tester{{400, 300}};
++    tester.runTask(kRefreshSetup);
++    EXPECT_FALSE(hasRefreshIndicator(tester));
++    tester.runTask("fabric.dispatchCommand(subject, 'setNativeRefreshing', [true]);");
++    tester.advanceModalFrame(0);
++    const auto snapshot = tester.snapshotScene();
++    const auto indicator = std::ranges::find_if(
++        snapshot, [](const auto& primitive) { return primitive.tag == 4 && primitive.activityIndicator.has_value(); });
++    ASSERT_NE(indicator, snapshot.end());
++    EXPECT_EQ(indicator->frame, (facebook::react::Rect{{108, 60}, {24, 24}}));
++    EXPECT_EQ(indicator->activityIndicator->colorArgb, 0xFFFF0000U);
++    const auto title = std::ranges::find_if(
++        snapshot, [](const auto& primitive) { return primitive.tag == 4 && primitive.text.has_value(); });
++    ASSERT_NE(title, snapshot.end());
++    EXPECT_EQ(title->text->attributedString->getString(), "Refresh 雪");
++    tester.runTask(
++        "if (events.includes('topRefresh')) throw new Error('Programmatic refresh emitted a gesture event');");
++    tester.runTask("fabric.dispatchCommand(subject, 'setNativeRefreshing', [false]);");
++    tester.advanceModalFrame(0);
++    EXPECT_FALSE(hasRefreshIndicator(tester));
++    EXPECT_FALSE(tester.hasReportedFatalError());
++}
++
++TEST(RefreshHostTest, RealGestureReachesHermesAndTheControlledPropStopsTheNativeIndicator) {
++    FantomTester tester{{400, 300}};
++    tester.runTask(kRefreshSetup);
++    pullAndRelease(tester, -128);
++    EXPECT_TRUE(hasRefreshIndicator(tester));
++    tester.runTask(R"JAVASCRIPT(
++if (events.filter(type => type === 'topRefresh').length !== 1) throw new Error('Missing native refresh event');
++subject = fabric.cloneNodeWithNewProps(subject, {refreshing: false});
++commit();
++)JAVASCRIPT");
++    tester.advanceModalFrame(0);
++    EXPECT_FALSE(hasRefreshIndicator(tester));
++    pullAndRelease(tester, -128);
++    tester.runTask(
++        "if (events.filter(type => type === 'topRefresh').length !== 2) throw new Error('Next refresh was lost');");
++    EXPECT_FALSE(tester.hasReportedFatalError());
++}
++
++TEST(RefreshHostTest, ARejectedGestureStopsThroughTheRealFabricCommandAndCanBeRetried) {
++    FantomTester tester{{400, 300}};
++    tester.runTask(kRefreshSetup);
++    tester.runTask("mode = 'reject';");
++    pullAndRelease(tester, -128);
++    tester.advanceModalFrame(0);
++    EXPECT_FALSE(hasRefreshIndicator(tester));
++    pullAndRelease(tester, -128);
++    tester.advanceModalFrame(0);
++    EXPECT_FALSE(hasRefreshIndicator(tester));
++    tester.runTask("if (events.filter(type => type === 'topRefresh').length !== 2) throw new Error('Rejected handshake "
++                   "did not reset');");
++    EXPECT_FALSE(tester.hasReportedFatalError());
++}
++
++TEST(RefreshHostTest, AShortPullDoesNotRefreshAndUnmountRevokesQueuedCommands) {
++    FantomTester tester{{400, 300}};
++    tester.runTask(kRefreshSetup);
++    pullAndRelease(tester, -100);
++    EXPECT_FALSE(hasRefreshIndicator(tester));
++    tester.runTask(R"JAVASCRIPT(
++if (events.includes('topRefresh')) throw new Error('Short pull refreshed');
++fabric.dispatchCommand(subject, 'requestRefresh', []);
++const empty = fabric.createChildSet();
++fabric.completeRoot(1, empty);
++)JAVASCRIPT");
++    tester.advanceModalFrame(0);
++    EXPECT_FALSE(hasRefreshIndicator(tester));
++    tester.runTask("if (events.includes('topRefresh')) throw new Error('Unmounted refresh accepted an old command');");
++    EXPECT_FALSE(tester.hasReportedFatalError());
++}
++
++} // namespace
++} // namespace react_native_linux

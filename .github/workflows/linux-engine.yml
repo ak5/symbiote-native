@@ -56,11 +56,15 @@ jobs:
           git -C .linux-host apply "$PWD/core/engine/linux/host/lifecycle-cleanup.patch"
           git -C .linux-host apply --check "$PWD/core/engine/linux/host/modal.patch"
           git -C .linux-host apply "$PWD/core/engine/linux/host/modal.patch"
+          git -C .linux-host apply --check "$PWD/core/engine/linux/host/refresh.patch"
+          git -C .linux-host apply "$PWD/core/engine/linux/host/refresh.patch"
       - name: Check native accessibility source formatting
         run: |
           nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/AccessibilityBridge.cpp .linux-host/packages/core/src/AccessibilityBridge.h .linux-host/packages/core/src/EditorModel.cpp .linux-host/packages/core/src/EditorModel.h .linux-host/packages/core/src/RetainedScene.cpp .linux-host/packages/core/src/RetainedScene.h .linux-host/packages/core/src/LinuxMountingManager.cpp .linux-host/packages/core/src/LinuxMountingManager.h .linux-host/packages/core/src/InputDispatcher.cpp .linux-host/packages/core/src/InputDispatcher.h .linux-host/packages/core/src/FabricHost.h .linux-host/packages/core/src/WindowSession.cpp .linux-host/packages/core/src/WindowSession.h .linux-host/packages/core/src/WindowMain.cpp .linux-host/packages/core/tests/{AccessibilitySnapshotTest,NativeAccessibilityActionTest,EditorTest}.cpp
       - name: Check native modal source formatting
         run: nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/{ModalController.cpp,ModalController.h,ShadowNodeLookup.h,ScrollController.cpp,ScrollController.h,FantomTester.cpp,FantomTester.h} .linux-host/packages/core/tests/{ModalControllerTest.cpp,ModalSceneTest.cpp} .linux-host/packages/core/tests/hermes/ModalHostTest.cpp
+      - name: Check native refresh source formatting
+        run: nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/{RefreshGesture.cpp,RefreshGesture.h} .linux-host/packages/core/tests/{RefreshGestureTest.cpp,RefreshSceneTest.cpp,RefreshControllerTest.cpp} .linux-host/packages/core/tests/hermes/RefreshHostTest.cpp
       - name: Check the standalone clipboard backend
         run: |
           nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/{Clipboard.cpp,Clipboard.h,ClipboardText.h,WaylandClipboard.cpp,WaylandClipboard.h,WaylandSeat.cpp,WaylandSeat.h,WaylandWindow.cpp,WaylandWindow.h,TextInputController.cpp,TextInputController.h,TurboModuleRegistry.cpp,FabricHost.cpp,LayoutConformanceComponent.h} .linux-host/packages/core/tests/ClipboardBackendTest.cpp .linux-host/packages/core/tests/TextInputControllerTest.cpp .linux-host/packages/core/tests/hermes/{ClipboardModuleTest.cpp,LayoutConformanceHostTest.cpp}
@@ -122,7 +126,9 @@ jobs:
         run: |
           set -o pipefail
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_core_hermes_tests --parallel 2
-          nice -n 10 ctest --test-dir .linux-host/build/symbiote --verbose --output-on-failure --no-tests=error --timeout 60 -j 1 -R '^(TextInputControllerTest|ClipboardBackendTest|ClipboardTextTest|ClipboardModuleTest|LayoutConformanceHostTest|AccessibilitySnapshotTest|NativeAccessibilityActionTest|EditorModelTest|ModalControllerTest|ModalSceneTest|ModalHostTest)\.' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
+          nice -n 10 ctest --test-dir .linux-host/build/symbiote --show-only -R '^Refresh(Gesture|Scene|Controller|Host)Test\.' | tee .linux-host/symbiote-refresh-discovery.log
+          grep -Fx 'Total Tests: 38' .linux-host/symbiote-refresh-discovery.log
+          nice -n 10 ctest --test-dir .linux-host/build/symbiote --verbose --output-on-failure --no-tests=error --timeout 60 -j 1 -R '^(TextInputControllerTest|ClipboardBackendTest|ClipboardTextTest|ClipboardModuleTest|LayoutConformanceHostTest|AccessibilitySnapshotTest|NativeAccessibilityActionTest|EditorModelTest|ModalControllerTest|ModalSceneTest|ModalHostTest|RefreshGestureTest|RefreshSceneTest|RefreshControllerTest|RefreshHostTest)\.' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
       - name: Exercise module initialization and Fabric commits in Hermes
         run: |
           set -o pipefail
@@ -171,6 +177,14 @@ jobs:
             nice -n 10 /usr/bin/python3 scripts/check-linux-accessibility.py .linux-host/build/symbiote/bin/rnl_window ".linux-host/symbiote-app/$framework/modal.linux.bundle.js" ".linux-host/modal-$framework-results" --scenario modal 2>&1 | tee ".linux-host/symbiote-modal-$framework.log" || failed=1
           done
           exit "$failed"
+      - name: Verify native refresh in every framework
+        run: |
+          set -o pipefail
+          failed=0
+          for framework in react svelte vue solid angular; do
+            nice -n 10 /usr/bin/python3 scripts/check-linux-accessibility.py .linux-host/build/symbiote/bin/rnl_window ".linux-host/symbiote-app/$framework/refresh.linux.bundle.js" ".linux-host/refresh-$framework-results" --scenario refresh 2>&1 | tee ".linux-host/symbiote-refresh-$framework.log" || failed=1
+          done
+          exit "$failed"
       - name: Verify native library persistence across application relaunches
         run: |
           nice -n 10 node --test scripts/linux-persistence-probe.test.mjs
@@ -197,6 +211,7 @@ jobs:
             .linux-host/clipboard-protocol/results-*
             .linux-host/accessibility-results
             .linux-host/modal-*-results
+            .linux-host/refresh-*-results
           if-no-files-found: ignore
 
   accessibility-sanitizers:
@@ -246,7 +261,7 @@ jobs:
       - name: Apply the pinned Linux host changes
         run: |
           test "$(git -C .linux-host rev-parse HEAD)" = 4db5e336b529c15628ffb8ba94cd6d880ff9a450
-          for patch in clipboard-safety system-clipboard layout-conformance accessibility custom-actions lifecycle-cleanup modal; do
+          for patch in clipboard-safety system-clipboard layout-conformance accessibility custom-actions lifecycle-cleanup modal refresh; do
             git -C .linux-host apply --check "$PWD/core/engine/linux/host/$patch.patch"
             git -C .linux-host apply "$PWD/core/engine/linux/host/$patch.patch"
           done

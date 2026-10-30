@@ -23,6 +23,8 @@ git -C <host> apply --check "$PWD/core/engine/linux/host/lifecycle-cleanup.patch
 git -C <host> apply "$PWD/core/engine/linux/host/lifecycle-cleanup.patch"
 git -C <host> apply --check "$PWD/core/engine/linux/host/modal.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/modal.patch"
+git -C <host> apply --check "$PWD/core/engine/linux/host/refresh.patch"
+git -C <host> apply "$PWD/core/engine/linux/host/refresh.patch"
 ```
 
 `clipboard-safety.patch` prevents secure text from entering the clipboard,
@@ -161,3 +163,24 @@ tree. All five adapters retain Linux content until the native dismiss event.
 This implementation is under native verification. Its gate includes controller,
 scene and real Hermes/Fabric integration cases; the final window/AT-SPI journeys
 remain required before claiming complete modal support.
+
+`refresh.patch` registers the stock `PullToRefreshView` descriptor and uses its
+props, event emitter and `setNativeRefreshing` command. Smooth vertical pulls at
+the scroll view's top edge show native progress and request one refresh on
+release. Wheel and horizontal input retain their ordinary scroll behavior.
+Controlled rejection stops the indicator; accepted and programmatic refreshing
+share the same native state. Family/emitter checks reject stale commands, and a
+modal opening cancels a pending background pull.
+
+The scene draws the indicator and title through its existing painters, clips them
+to the scroll viewport, and publishes accessible geometry, labels and busy state.
+Keyboard, pointer and AT-SPI activation use the native command queue. Focus reveals
+an idle control and its focus ring, so keyboard activation has a visible target.
+
+The workflow requires discovery and execution of all 38 refresh regressions in
+its real Hermes test target. It also builds five packed framework applications
+and drives each twice under private Sway and D-Bus sessions. The client checks
+real Wayland pan input, controlled acceptance/rejection, native indicator pixels,
+keyboard/AT-SPI activation, draft preservation, removal, modal isolation and
+in-process reload. These new refresh runtime gates still require Linux results;
+local source and bundle checks do not establish native runtime support.
