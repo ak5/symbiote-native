@@ -1,5 +1,29 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import { verifyVueRuntime } from './vue-runtime.mjs';
+
+export function verifyLinuxConsumerSdk(app) {
+  const consumer = createRequire(join(app, 'package.json'));
+  const components = createRequire(
+    join(app, 'node_modules/@symbiote-native/components/package.json'),
+  );
+  const native = createRequire(consumer.resolve('react-native/package.json'));
+  const lists = '@react-native/virtualized-lists/package.json';
+  assert.equal(
+    components.resolve(lists),
+    native.resolve(lists),
+    'Shared components must use the host SDK Virtualized Lists package',
+  );
+  assert.equal(
+    JSON.parse(readFileSync(native.resolve(lists), 'utf8')).version,
+    JSON.parse(
+      readFileSync(consumer.resolve('react-native/package.json'), 'utf8'),
+    ).version,
+    'Virtualized Lists must match the host React Native version',
+  );
+}
 
 function sourcePaths(map) {
   return map.sections

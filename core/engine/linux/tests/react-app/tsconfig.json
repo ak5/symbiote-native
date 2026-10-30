@@ -8,5 +8,5 @@
     "target": "ES2022",
     "skipLibCheck": true
   },
-  "files": ["index.js", "accessibility.js"]
+  "files": ["index.js", "accessibility.js", "modal.js"]
 }

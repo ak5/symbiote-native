@@ -8,7 +8,9 @@ version call initializes the shared engine once per JavaScript runtime.
 
 The target compiles the same retained tree and prop rules as Android and iOS.
 React Native, Fabric and Yoga sources remain unchanged. Application bundles use
-Metro and ordinary installed packages.
+Metro and ordinary installed packages. The consumer installs Virtualized Lists
+at the same version as its React Native SDK; shared components use that peer
+package rather than installing a second SDK dependency.
 
 Apply the [pinned native host changes](./host/README.md) before configuring the
 host. CI checks the exact host revision and applies the same patch.
@@ -50,12 +52,16 @@ to overwrite an earlier result directory.
 
 ## Host limits
 
-The pinned host registers native view, text, image, scroll, text-input, switch
-and activity-indicator descriptors. It does not register `ModalHostView` or
-`PullToRefreshView`. Their shared component exports do
-not supply Linux native implementations. Preserve the host's unknown-component
-diagnostics; replacing these controls with an ordinary View would lose their
-behavior.
+The modal patch registers stock `ModalHostView` with native presentation,
+controlled close requests, animation, input isolation and focus restoration.
+The workflow requires its controller, scene and Hermes/Fabric regression cases.
+Each framework also runs a packed modal application through an independent
+AT-SPI client on a private Sway seat, covering opaque/transparent rendering,
+real window resizing, nested dialogs, editor state and in-process reload. These
+new modal runtime gates still require Linux verification.
+
+`PullToRefreshView` still requires a Linux implementation and native verification.
+Preserve unknown-component diagnostics while completing that work.
 
 The host patch uses React Native's existing `LayoutConformance` shadow node and
 Yoga strict/compatibility behavior. A Linux descriptor invalidates layout on

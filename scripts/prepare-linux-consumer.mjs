@@ -10,7 +10,10 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { verifyLinuxConsumerBundle } from './lib/linux-consumer-bundle.mjs';
+import {
+  verifyLinuxConsumerBundle,
+  verifyLinuxConsumerSdk,
+} from './lib/linux-consumer-bundle.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 const [hostArgument, appArgument] = process.argv.slice(2);
@@ -131,6 +134,8 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
         dependencies: {
           ...template.dependencies,
           ...template.devDependencies,
+          '@react-native/virtualized-lists':
+            template.dependencies['react-native'],
           '@types/react': reactExample.devDependencies['@types/react'],
           typescript: reactExample.devDependencies.typescript,
           ...appDependencies,
@@ -147,12 +152,18 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
   cpSync(join(repository, `core/engine/linux/tests/${framework}-app`), app, {
     recursive: true,
   });
-  for (const file of ['scroll-probe.js', 'scroll-probe.d.ts'])
+  for (const file of [
+    'scroll-probe.js',
+    'scroll-probe.d.ts',
+    'modal-fixture.js',
+    'modal-fixture.d.ts',
+  ])
     copyFileSync(
       join(repository, 'core/engine/linux/tests', file),
       join(app, file),
     );
   run('npm', ['install', '--no-audit', '--no-fund'], app);
+  verifyLinuxConsumerSdk(app);
 
   if (framework === 'angular') {
     run(
@@ -160,10 +171,9 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
       ['-p', 'tsconfig.angular.json'],
       app,
     );
-    copyFileSync(
-      join(app, 'scroll-probe.js'),
-      join(app, 'build/scroll-probe.js'),
-    );
+    for (const file of ['scroll-probe.js', 'modal-fixture.js']) {
+      copyFileSync(join(app, file), join(app, 'build', file));
+    }
   }
   if (framework === 'react') {
     run(
@@ -213,6 +223,31 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
   process.stdout.write(
     `Linux consumer bundle: ${join(app, 'index.linux.bundle.js')}\n`,
   );
+  run(
+    join(app, 'node_modules/.bin/metro'),
+    [
+      'build',
+      'modal.js',
+      '--platform',
+      'linux',
+      '--dev',
+      'false',
+      '--out',
+      join(app, 'modal.linux.bundle.js'),
+      '--source-map',
+      '--max-workers',
+      '1',
+    ],
+    app,
+  );
+  verifyLinuxConsumerBundle(
+    JSON.parse(readFileSync(join(app, 'modal.linux.bundle.map'), 'utf8')),
+    framework,
+  );
+  process.stdout.write(
+    `Linux modal bundle: ${join(app, 'modal.linux.bundle.js')}\n`,
+  );
+
   if (framework === 'react') {
     run(
       join(app, 'node_modules/.bin/metro'),

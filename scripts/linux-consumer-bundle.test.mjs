@@ -1,7 +1,46 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { verifyVueRuntime } from './lib/vue-runtime.mjs';
-import { verifyLinuxConsumerBundle } from './lib/linux-consumer-bundle.mjs';
+import {
+  verifyLinuxConsumerBundle,
+  verifyLinuxConsumerSdk,
+} from './lib/linux-consumer-bundle.mjs';
+
+test('requires one Virtualized Lists package matching the consumer SDK', t => {
+  const root = mkdtempSync(join(tmpdir(), 'symbiote-linux-sdk-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  function manifest(directory, version) {
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, 'package.json'), JSON.stringify({ version }));
+  }
+  for (const scenario of ['matching', 'wrong-version', 'nested']) {
+    const app = join(root, scenario);
+    manifest(app, '1.0.0');
+    manifest(join(app, 'node_modules/react-native'), '0.87.1');
+    manifest(join(app, 'node_modules/@symbiote-native/components'), '3.3.0');
+    manifest(
+      join(app, 'node_modules/@react-native/virtualized-lists'),
+      scenario === 'wrong-version' ? '0.86.0' : '0.87.1',
+    );
+    if (scenario === 'nested') {
+      manifest(
+        join(
+          app,
+          'node_modules/@symbiote-native/components/node_modules/@react-native/virtualized-lists',
+        ),
+        '0.86.0',
+      );
+      assert.throws(() => verifyLinuxConsumerSdk(app), /host SDK/);
+    } else if (scenario === 'wrong-version') {
+      assert.throws(() => verifyLinuxConsumerSdk(app), /match the host/);
+    } else {
+      verifyLinuxConsumerSdk(app);
+    }
+  }
+});
 
 const sources = [
   '/app/node_modules/@symbiote-native/engine/build/platform/index.linux.js',
