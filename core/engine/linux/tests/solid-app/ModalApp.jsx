@@ -56,12 +56,11 @@ export default function ModalApp() {
           setVisible(true);
         }),
       )}
-      <text accessibilityLabel="Background count" style={textStyle}>
-        {backgroundActions()}
-      </text>
-      <text accessibilityLabel="Modal lifecycle" style={textStyle}>
+      <text style={textStyle}>Background count {backgroundActions()}</text>
+      <text style={textStyle}>
         {modalLifecycle(shown(), dismissed(), requested(), nestedClosed())}
       </text>
+      <text style={textStyle}>Background draft: {background()}</text>
       <view style={clipStyle}>
         <Modal
           visible={visible()}
@@ -83,9 +82,8 @@ export default function ModalApp() {
               value={value()}
               onValueChange={event => setValue(event.text)}
             />
-            <text accessibilityLabel="Modal shown count" style={textStyle}>
-              {shown()}
-            </text>
+            <text style={textStyle}>Modal draft: {value()}</text>
+            <text style={textStyle}>Modal shown count {shown()}</text>
             {button('Open nested modal', () => {
               setNestedValue('');
               setNested(true);

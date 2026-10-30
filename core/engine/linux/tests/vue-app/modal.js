@@ -62,18 +62,23 @@ const App = {
         ),
         h(
           'text',
-          { accessibilityLabel: 'Background count', style: textStyle },
-          String(backgroundActions.value),
+          { style: textStyle },
+          `Background count ${backgroundActions.value}`,
         ),
         h(
           'text',
-          { accessibilityLabel: 'Modal lifecycle', style: textStyle },
+          { style: textStyle },
           modalLifecycle(
             shown.value,
             dismissed.value,
             requested.value,
             nestedClosed.value,
           ),
+        ),
+        h(
+          'text',
+          { style: textStyle },
+          `Background draft: ${background.value}`,
         ),
         h('view', { style: clipStyle }, [
           h(
@@ -99,10 +104,11 @@ const App = {
                   value: value.value,
                   onValueChange: event => (value.value = event.text),
                 }),
+                h('text', { style: textStyle }, `Modal draft: ${value.value}`),
                 h(
                   'text',
-                  { accessibilityLabel: 'Modal shown count', style: textStyle },
-                  String(shown.value),
+                  { style: textStyle },
+                  `Modal shown count ${shown.value}`,
                 ),
                 button('Open nested modal', () => {
                   nestedValue.value = '';

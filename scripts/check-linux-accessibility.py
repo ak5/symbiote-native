@@ -152,6 +152,7 @@ def main():
         background = control('Modal background')
         assert background.get_editable_text_iface().set_text_contents('kept雪')
         until(lambda: text(background) == 'kept雪', 'background draft before presentation', alive)
+        until(lambda: named(root, 'Background draft: kept雪'), 'app acknowledged background draft', alive)
         assert background.get_component_iface().grab_focus()
         assert Atspi.Text.set_caret_offset(background, 2)
         until(lambda: Atspi.Text.get_caret_offset(background) == 2, 'background caret before presentation', alive)
@@ -170,6 +171,7 @@ def main():
             until(lambda: text(editor) == 'modal雪', 'native modal editable text', alive)
             command(['wtype', 'Q'])
             until(lambda: text(editor) == 'modal雪Q', 'native keyboard reaches modal', alive)
+            until(lambda: named(root, 'Modal draft: modal雪Q'), 'app acknowledged modal draft', alive)
             assert Atspi.Text.set_caret_offset(editor, 2)
             until(lambda: Atspi.Text.get_caret_offset(editor) == 2, 'modal caret before nesting', alive)
             try:
@@ -185,8 +187,8 @@ def main():
                   abs(bounds(root).height - before_resize.height) >= 5, 'actual compositor resize', alive)
             until(lambda: (bounds(dialog).width, bounds(dialog).height) ==
                   (bounds(root).width, bounds(root).height), 'modal follows real window resize', alive)
-            assert text(editor) == 'modal雪Q', 'Resize discarded modal editor state'
-            until(lambda: text(control('Modal shown count')).strip() == str(index),
+            assert text(editor) == 'modal雪Q', f'Resize discarded modal editor state: {text(editor)!r}'
+            until(lambda: named(root, f'Modal shown count {index}'),
                   'native entrance animation completion', alive)
             assert bounds(dialog).x == 0 and bounds(dialog).y == 0, 'Modal inherited parent positioning'
             screenshot(mode)
@@ -215,9 +217,9 @@ def main():
             assert background.get_component_iface().grab_focus()
             until(lambda: focused(background) and text(background) == 'kept雪' and
                   Atspi.Text.get_caret_offset(background) == 2, 'background draft and caret preserved', alive)
-            until(lambda: text(control('Background count')).strip() == '0', 'background action stayed blocked', alive)
+            until(lambda: named(root, 'Background count 0'), 'background action stayed blocked', alive)
             expected = f'shown={index} dismissed={index} requested={index} nested={index}'
-            until(lambda: text(control('Modal lifecycle')).strip() == expected,
+            until(lambda: named(root, f'Modal lifecycle {expected}'),
                   'real adapter receives exactly one show/dismiss/close event', alive)
             print(f'PASS native modal {mode}: pixels, real resize, nested focus, editor state and controlled dismissal cycle={cycle}', flush=True)
 
@@ -436,6 +438,22 @@ def main():
         listener.deregister('object:state-changed')
         Atspi.exit()
     finally:
+        if args.scenario == 'modal' and 'root' in locals() and 'window' in locals() and window.poll() is None:
+            try:
+                diagnostic = []
+                for node in walk(root):
+                    try:
+                        component = node.get_component_iface()
+                        rect = component.get_extents(Atspi.CoordType.WINDOW) if component else None
+                        diagnostic.append({'name': node.get_name(), 'role': node.get_role_name(),
+                                           'text': text(node),
+                                           'bounds': [rect.x, rect.y, rect.width, rect.height] if rect else None})
+                    except GLib.Error:
+                        continue
+                (args.output / f'failure-tree-{cycle}.json').write_text(
+                    json.dumps(diagnostic, ensure_ascii=False, indent=2) + '\n')
+            except Exception as error:
+                print(f'Could not collect private modal diagnostics: {error}', file=sys.stderr)
         for process in reversed(processes):
             if process.poll() is None:
                 process.terminate()

@@ -86,16 +86,13 @@ function App() {
         setVisible(true);
       }),
     ),
+    h('text', { style: textStyle }, `Background count ${backgroundActions}`),
     h(
       'text',
-      { accessibilityLabel: 'Background count', style: textStyle },
-      String(backgroundActions),
-    ),
-    h(
-      'text',
-      { accessibilityLabel: 'Modal lifecycle', style: textStyle },
+      { style: textStyle },
       modalLifecycle(shown, dismissed, requested, nestedClosed),
     ),
+    h('text', { style: textStyle }, `Background draft: ${background}`),
     h(
       'view',
       { style: clipStyle },
@@ -117,11 +114,8 @@ function App() {
           'view',
           { style: cardStyle },
           h('text-input', modalInput),
-          h(
-            'text',
-            { accessibilityLabel: 'Modal shown count', style: textStyle },
-            String(shown),
-          ),
+          h('text', { style: textStyle }, `Modal draft: ${value}`),
+          h('text', { style: textStyle }, `Modal shown count ${shown}`),
           button('Open nested modal', () => {
             setNestedValue('');
             setNested(true);

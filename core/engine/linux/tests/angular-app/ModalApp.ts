@@ -49,12 +49,13 @@ import {
           <text [style]="textStyle">Open {{ animation }} modal</text>
         </pressable>
       }
-      <text accessibilityLabel="Background count" [style]="textStyle">{{
-        backgroundActions()
-      }}</text>
-      <text accessibilityLabel="Modal lifecycle" [style]="textStyle">{{
+      <text [style]="textStyle"
+        >Background count {{ backgroundActions() }}</text
+      >
+      <text [style]="textStyle">{{
         lifecycle(shown(), dismissed(), requested(), nestedClosed())
       }}</text>
+      <text [style]="textStyle">Background draft: {{ background() }}</text>
       <view [style]="clipStyle">
         <Modal
           [visible]="visible()"
@@ -73,9 +74,8 @@ import {
               [value]="value()"
               [onValueChange]="onValueChange"
             />
-            <text accessibilityLabel="Modal shown count" [style]="textStyle">{{
-              shown()
-            }}</text>
+            <text [style]="textStyle">Modal draft: {{ value() }}</text>
+            <text [style]="textStyle">Modal shown count {{ shown() }}</text>
             <pressable
               [accessible]="true"
               accessibilityRole="button"

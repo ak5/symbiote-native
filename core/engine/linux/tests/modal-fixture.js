@@ -40,7 +40,7 @@ export const textStyle = { height: 30, color: '#ffffff' };
 
 /** @param {number} shown @param {number} dismissed @param {number} requested @param {number} nested */
 export function modalLifecycle(shown, dismissed, requested, nested) {
-  return `shown=${shown} dismissed=${dismissed} requested=${requested} nested=${nested}`;
+  return `Modal lifecycle shown=${shown} dismissed=${dismissed} requested=${requested} nested=${nested}`;
 }
 
 export function reloadModalRuntime() {

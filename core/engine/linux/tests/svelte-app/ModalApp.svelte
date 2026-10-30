@@ -52,12 +52,13 @@
       visible = true;
     })}
   {/each}
-  <text accessibilityLabel="Background count" style={textStyle}>
-    {backgroundActions}
+  <text style={textStyle}>
+    Background count {backgroundActions}
   </text>
-  <text accessibilityLabel="Modal lifecycle" style={textStyle}>
+  <text style={textStyle}>
     {modalLifecycle(shown, dismissed, requested, nestedClosed)}
   </text>
+  <text style={textStyle}>Background draft: {background}</text>
   <view style={clipStyle}>
     <Modal
       {visible}
@@ -79,8 +80,9 @@
           {value}
           onValueChange={event => (value = event.text)}
         />
-        <text accessibilityLabel="Modal shown count" style={textStyle}>
-          {shown}
+        <text style={textStyle}>Modal draft: {value}</text>
+        <text style={textStyle}>
+          Modal shown count {shown}
         </text>
         {@render button('Open nested modal', () => {
           nestedValue = '';
