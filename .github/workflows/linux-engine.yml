@@ -46,9 +46,11 @@ jobs:
           git -C .linux-host apply "$PWD/core/engine/linux/host/clipboard-safety.patch"
           git -C .linux-host apply --check "$PWD/core/engine/linux/host/system-clipboard.patch"
           git -C .linux-host apply "$PWD/core/engine/linux/host/system-clipboard.patch"
+          git -C .linux-host apply --check "$PWD/core/engine/linux/host/layout-conformance.patch"
+          git -C .linux-host apply "$PWD/core/engine/linux/host/layout-conformance.patch"
       - name: Check the standalone clipboard backend
         run: |
-          nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/{Clipboard.cpp,Clipboard.h,ClipboardText.h,WaylandClipboard.cpp,WaylandClipboard.h,WaylandSeat.cpp,WaylandSeat.h,WaylandWindow.cpp,WaylandWindow.h,TextInputController.cpp,TextInputController.h,TurboModuleRegistry.cpp} .linux-host/packages/core/tests/ClipboardBackendTest.cpp .linux-host/packages/core/tests/TextInputControllerTest.cpp .linux-host/packages/core/tests/hermes/ClipboardModuleTest.cpp
+          nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/{Clipboard.cpp,Clipboard.h,ClipboardText.h,WaylandClipboard.cpp,WaylandClipboard.h,WaylandSeat.cpp,WaylandSeat.h,WaylandWindow.cpp,WaylandWindow.h,TextInputController.cpp,TextInputController.h,TurboModuleRegistry.cpp,FabricHost.cpp} .linux-host/packages/core/tests/ClipboardBackendTest.cpp .linux-host/packages/core/tests/TextInputControllerTest.cpp .linux-host/packages/core/tests/hermes/{ClipboardModuleTest.cpp,LayoutConformanceHostTest.cpp}
           nice -n 10 clang++-18 -std=c++20 -Wall -Wextra -Werror -pthread -I .linux-host/packages/core/src .linux-host/packages/core/src/Clipboard.cpp .linux-host/packages/core/src/WaylandClipboard.cpp .linux-host/packages/core/tests/ClipboardBackendTest.cpp -lwayland-client -lgtest -lgtest_main -o .linux-host/clipboard-checks
           nice -n 10 timeout 60s .linux-host/clipboard-checks
       - name: Verify clipboard exchange with independent native clients
@@ -103,11 +105,11 @@ jobs:
         run: |
           nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_ENABLE_SKIA=OFF -DRNL_AUTOLINKING_CMAKE="$PWD/.linux-host/symbiote-generated/rnl_autolinking.cmake"
           nice -n 10 cmake --build .linux-host/build/symbiote --target hello_react --parallel 2
-      - name: Verify native text clipboard safety
+      - name: Verify native text clipboard safety and layout boundaries
         run: |
           set -o pipefail
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_core_hermes_tests --parallel 2
-          nice -n 10 ctest --test-dir .linux-host/build/symbiote --verbose --output-on-failure --no-tests=error --timeout 60 -j 1 -R '^(TextInputControllerTest|ClipboardBackendTest|ClipboardTextTest|ClipboardModuleTest)\.' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
+          nice -n 10 ctest --test-dir .linux-host/build/symbiote --verbose --output-on-failure --no-tests=error --timeout 60 -j 1 -R '^(TextInputControllerTest|ClipboardBackendTest|ClipboardTextTest|ClipboardModuleTest|LayoutConformanceHostTest)\.' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
       - name: Exercise module initialization and Fabric commits in Hermes
         run: |
           set -o pipefail

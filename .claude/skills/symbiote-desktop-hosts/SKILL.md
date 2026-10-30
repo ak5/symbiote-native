@@ -22,15 +22,20 @@ The shortcut guards passed native run41002818528. The second host patch now
 implements a real data device, source/offer FD transfers and a private clipboard
 queue on the same window connection. Source acknowledgement, focus/serial checks,
 nonblocking input requests and late-result validation are required. ADR-0004
-records that thread contract. Native protocol and second-client verification are
-still pending; do not replace them with a green bundle or only registry tests.
+records that thread contract. Run41012824604 passed the full native host, all36
+clipboard/controller cases and the five-framework window/persistence matrix.
+The independent-client gate exchanges exact bytes with wl-copy/wl-paste under an
+isolated Sway seat, including stalled transfers and normal/ASan/UBSan/TSan builds.
+Do not replace that protocol gate with a green bundle or only registry tests.
 Run the native clipboard/controller/module cases through CTest, one case per
 process. Standalone controller cases read RN feature defaults; ReactHost must
 override flags before their first access. Combining both suites in a single
 GTest process prevents the later runtime fixture from initializing. Keep every
 case enabled and preserve the host's existing process isolation.
-System clipboard, AT-SPI, modal,
-refresh and layout-conformance behavior still need implementation and proof.
+AT-SPI, modal and refresh still need implementation and proof. The layout patch
+registers stock RN's LayoutConformance descriptor; native tests must prove strict
+and compatibility geometry, nested boundaries and mode changes before claiming
+support. It must not be replaced with an ordinary View.
 
 The experimental engine target follows `react-native-linux/react-native-linux` at
 `4db5e336b529c15628ffb8ba94cd6d880ff9a450`, which consumes React Native 0.87.1.
@@ -109,9 +114,9 @@ This is engine bring-up, not a completed Linux application target. Before claimi
 - Verify keyboard input, clipboard, resize, persistence, scrolling and accessibility on a real Linux host.
 - Audit companion native packages and state any unavailable capabilities explicitly.
 
-The pinned host's `Clipboard.h` explicitly limits copy/paste to its own process; it does not
-implement Wayland clipboard exchange with other applications. The text-input journey therefore
-does not prove system clipboard support, which still needs a real backend and a second-client test.
+The unpatched host's clipboard is process-local. The host patches provide the
+Wayland backend; the independent-client protocol gate is required to establish
+exchange with other applications. The text-input journey alone cannot prove it.
 
 The text-input clipboard journey does not establish `@symbiote-native/clipboard` support: that
 package resolves `ExpoClipboard` through `expo-modules-core`, while the pinned Linux host provides

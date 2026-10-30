@@ -51,11 +51,15 @@ to overwrite an earlier result directory.
 ## Host limits
 
 The pinned host registers native view, text, image, scroll, text-input, switch
-and activity-indicator descriptors. It does not register `ModalHostView`,
-`PullToRefreshView` or `LayoutConformance`. Their shared component exports do
+and activity-indicator descriptors. It does not register `ModalHostView` or
+`PullToRefreshView`. Their shared component exports do
 not supply Linux native implementations. Preserve the host's unknown-component
 diagnostics; replacing these controls with an ordinary View would lose their
 behavior.
+
+The host patch registers React Native's existing `LayoutConformance` descriptor,
+including its Yoga strict/compatibility behavior. Native validation of mode
+changes and nested boundaries remains pending.
 
 The pinned host's clipboard starts as process-local storage. The host patch adds
 a Wayland data-device backend; its native checks and second-client exchange

@@ -1,0 +1,126 @@
+--- a/packages/core/src/FabricHost.cpp
++++ b/packages/core/src/FabricHost.cpp
+@@ -32,6 +32,7 @@
+ #include <react/renderer/components/text/ParagraphComponentDescriptor.h>
+ #include <react/renderer/components/text/RawTextComponentDescriptor.h>
+ #include <react/renderer/components/text/TextComponentDescriptor.h>
++#include <react/renderer/components/view/LayoutConformanceComponentDescriptor.h>
+ #include <react/renderer/components/view/ViewComponentDescriptor.h>
+ #include <react/renderer/core/EventBeat.h>
+ #include <react/renderer/core/LayoutConstraints.h>
+@@ -100,6 +101,7 @@
+ 
+     add(facebook::react::concreteComponentDescriptorProvider<facebook::react::RootComponentDescriptor>());
+     add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ViewComponentDescriptor>());
++    add(facebook::react::concreteComponentDescriptorProvider<facebook::react::LayoutConformanceComponentDescriptor>());
+     add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ImageComponentDescriptor>());
+     add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ScrollViewComponentDescriptor>());
+     add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ParagraphComponentDescriptor>());
+--- a/packages/core/tests/hermes/CMakeLists.txt
++++ b/packages/core/tests/hermes/CMakeLists.txt
+@@ -103,6 +103,7 @@
+     ../TextInputControllerTest.cpp
+     AdditionalSurfaceTest.cpp
+     ClipboardModuleTest.cpp
++    LayoutConformanceHostTest.cpp
+     CrossThreadPromiseStressTest.cpp
+     FantomTesterTest.cpp
+     HotModuleReplacementSetupTest.cpp
+--- /dev/null
++++ b/packages/core/tests/hermes/LayoutConformanceHostTest.cpp
+@@ -0,0 +1,95 @@
++#include "FantomTester.h"
++
++#include <gtest/gtest.h>
++#include <string>
++
++namespace react_native_linux {
++namespace {
++
++constexpr char kSetup[] = R"JAVASCRIPT(
++if (!globalThis.__nativeComponentRegistry__hasComponent('LayoutConformance')) {
++  throw new Error('LayoutConformance has no native registration');
++}
++globalThis.fabric = globalThis.nativeFabricUIManager;
++globalThis.handles = [];
++let nextTag = 2;
++globalThis.node = (name, props, children = []) => {
++  const handle = {};
++  handles.push(handle);
++  const result = fabric.createNode(nextTag, name, 1, props, handle);
++  nextTag += 2;
++  for (const child of children) fabric.appendChild(result, child);
++  return result;
++};
++globalThis.panel = () => node('View', {width: 200, height: 100, padding: 20, collapsable: false}, [
++  node('View', {
++    position: 'absolute', left: 0, top: 0, width: '50%', height: '50%',
++    collapsable: false, testID: 'percent-child',
++  }),
++]);
++globalThis.commit = (root) => {
++  const set = fabric.createChildSet();
++  fabric.appendChildToSet(set, root);
++  fabric.completeRoot(1, set);
++};
++)JAVASCRIPT";
++
++void expectPercentSize(FantomTester& tester, bool strict) {
++    const std::string tree = tester.mountTreeText();
++    const std::string expected = strict ? "width:100,height:50}" : "width:80,height:30}";
++    EXPECT_NE(tree.find(expected + "\" testID=\"percent-child\""), std::string::npos) << tree;
++    EXPECT_EQ(tree.find("rn-layoutconformance"), std::string::npos) << "The wrapper must not form a native view";
++    EXPECT_FALSE(tester.hasReportedFatalError());
++}
++
++TEST(LayoutConformanceHostTest, RegisteredDescriptorAppliesStrictAndCompatibilityLayouts) {
++    FantomTester tester{{.width = 400, .height = 300}};
++    tester.runTask(kSetup);
++
++    for (const std::string mode : {"strict", "compatibility"}) {
++        SCOPED_TRACE(mode);
++        tester.runTask("commit(node('LayoutConformance', {mode: '" + mode + "'}, [panel()]));");
++        expectPercentSize(tester, mode == "strict");
++    }
++
++    tester.runTask("commit(node('LayoutConformance', {}, [panel()]));");
++    expectPercentSize(tester, true);
++}
++
++TEST(LayoutConformanceHostTest, NearestBoundaryOverridesItsAncestor) {
++    FantomTester tester{{.width = 400, .height = 300}};
++    tester.runTask(kSetup);
++
++    tester.runTask(R"JAVASCRIPT(
++commit(node('LayoutConformance', {mode: 'compatibility'}, [
++  node('LayoutConformance', {mode: 'strict'}, [panel()]),
++]));
++)JAVASCRIPT");
++    expectPercentSize(tester, true);
++
++    tester.runTask(R"JAVASCRIPT(
++commit(node('LayoutConformance', {mode: 'strict'}, [
++  node('LayoutConformance', {mode: 'compatibility'}, [panel()]),
++]));
++)JAVASCRIPT");
++    expectPercentSize(tester, false);
++}
++
++TEST(LayoutConformanceHostTest, ChangingModeRelayoutsTheExistingDescendants) {
++    FantomTester tester{{.width = 400, .height = 300}};
++    tester.runTask(kSetup);
++    tester.runTask(R"JAVASCRIPT(
++globalThis.subject = node('LayoutConformance', {mode: 'strict'}, [panel()]);
++commit(subject);
++)JAVASCRIPT");
++    expectPercentSize(tester, true);
++
++    for (const std::string mode : {"compatibility", "strict"}) {
++        SCOPED_TRACE(mode);
++        tester.runTask("subject = fabric.cloneNodeWithNewProps(subject, {mode: '" + mode + "'}); commit(subject);");
++        expectPercentSize(tester, mode == "strict");
++    }
++}
++
++} // namespace
++} // namespace react_native_linux

@@ -13,6 +13,8 @@ git -C <host> apply --check "$PWD/core/engine/linux/host/clipboard-safety.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/clipboard-safety.patch"
 git -C <host> apply --check "$PWD/core/engine/linux/host/system-clipboard.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/system-clipboard.patch"
+git -C <host> apply --check "$PWD/core/engine/linux/host/layout-conformance.patch"
+git -C <host> apply "$PWD/core/engine/linux/host/layout-conformance.patch"
 ```
 
 `clipboard-safety.patch` prevents secure text from entering the clipboard,
@@ -46,3 +48,9 @@ with the workflow artifacts. It does not access the user's desktop or clipboard.
 
 AT-SPI and the other missing native controls remain in scope. The host's MIT
 license is retained in `LICENSE`.
+
+`layout-conformance.patch` registers React Native's existing descriptor. Yoga's
+own strict/compatibility behavior applies to the subtree; the wrapper creates no
+native view. Its Hermes/Fabric tests check percentage sizing against a padded
+parent, nested boundaries and changing the mode without replacing descendants.
+Native validation of this patch remains pending.
