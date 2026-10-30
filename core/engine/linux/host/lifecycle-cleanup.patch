@@ -126,17 +126,72 @@ new file mode 100644
 diff --git a/packages/core/src/WaylandWindow.cpp b/packages/core/src/WaylandWindow.cpp
 --- a/packages/core/src/WaylandWindow.cpp
 +++ b/packages/core/src/WaylandWindow.cpp
-@@ -201,6 +201,10 @@
+@@ -163,6 +163,10 @@
  
-     if (textInputManager_ != nullptr) {
-         zwp_text_input_manager_v3_destroy(textInputManager_);
+ WaylandWindow::~WaylandWindow() noexcept {
+     destroyFrameCallback();
++    // A final content update may never receive its compositor outcome before shutdown.
++    for (struct wp_presentation_feedback* feedback : pendingPresentationFeedback_) {
++        wp_presentation_feedback_destroy(feedback);
 +    }
-+
-+    if (activation_ != nullptr) {
-+        xdg_activation_v1_destroy(activation_);
+     if (clipboard_ != nullptr) {
+         clipboard_->stop();
+         clipboard_.reset();
+@@ -203,6 +207,10 @@
+         zwp_text_input_manager_v3_destroy(textInputManager_);
      }
  
++    if (activation_ != nullptr) {
++        xdg_activation_v1_destroy(activation_);
++    }
++
      if (presentation_ != nullptr) {
+         wp_presentation_destroy(presentation_);
+     }
+@@ -349,8 +357,14 @@
+         return;
+     }
+ 
+-    struct wp_presentation_feedback* feedback = wp_presentation_feedback(presentation_, surface_);
+-    wp_presentation_feedback_add_listener(feedback, &kPresentationFeedbackListener, this);
++    std::unique_ptr<struct wp_presentation_feedback, decltype(&wp_presentation_feedback_destroy)> feedback{
++        wp_presentation_feedback(presentation_, surface_), &wp_presentation_feedback_destroy};
++    if (!feedback) {
++        throw std::runtime_error("cannot request presentation feedback");
++    }
++    wp_presentation_feedback_add_listener(feedback.get(), &kPresentationFeedbackListener, this);
++    pendingPresentationFeedback_.push_back(feedback.get());
++    feedback.release();
+ }
+ 
+ bool WaylandWindow::isPresentationSupported() const noexcept { return presentation_ != nullptr; }
+@@ -761,6 +775,7 @@
+     window->presentationEvents_.emplace_back(
+         window->frameTiming_.recordPresented(sequence, presentedNanoseconds, refresh, flags));
+     window->presentedFirstFrame_ = true;
++    std::erase(window->pendingPresentationFeedback_, feedback);
+     wp_presentation_feedback_destroy(feedback);
+ }
+ 
+@@ -773,6 +788,7 @@
+     // A discarded content update is owed no `wl_surface.frame` callback, so a client that only draws on one would
+     // stop here and show whatever the compositor last accepted, which after the first frame is nothing.
+     window->contentUpdateDiscarded_ = true;
++    std::erase(window->pendingPresentationFeedback_, feedback);
+     wp_presentation_feedback_destroy(feedback);
+ }
+ 
+diff --git a/packages/core/src/WaylandWindow.h b/packages/core/src/WaylandWindow.h
+--- a/packages/core/src/WaylandWindow.h
++++ b/packages/core/src/WaylandWindow.h
+@@ -403,6 +403,7 @@
+     wl_callback* frameCallback_{nullptr};
+     FrameTiming frameTiming_;
+     std::vector<PresentationEvent> presentationEvents_;
++    std::vector<struct wp_presentation_feedback*> pendingPresentationFeedback_;
+     std::optional<uint32_t> presentationClockId_;
+     WindowSize size_;
+     uint32_t preferredScale_{kFractionalScaleDenominator};
 diff --git a/packages/core/src/WindowMain.cpp b/packages/core/src/WindowMain.cpp
 --- a/packages/core/src/WindowMain.cpp
 +++ b/packages/core/src/WindowMain.cpp

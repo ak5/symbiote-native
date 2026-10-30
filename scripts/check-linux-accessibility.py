@@ -503,10 +503,11 @@ def main():
                      property_name, '<true>'])
         assert Atspi.init() == 0, 'AT-SPI initialization failed'
         Atspi.set_timeout(3000, 5000)
+        event_types = ('object:state-changed', 'object:text-caret-moved',
+                       'object:text-changed', 'object:property-change',
+                       'object:children-changed')
         listener = Atspi.EventListener.new(event_received, None)
-        for event_type in ('object:state-changed', 'object:text-caret-moved',
-                           'object:text-changed', 'object:property-change',
-                           'object:children-changed'):
+        for event_type in event_types:
             assert listener.register(event_type), f'Cannot register {event_type}'
 
         for cycle in range(2):
@@ -683,8 +684,6 @@ def main():
             keys.wait(timeout=5)
             label = 'AT-SPI' if args.scenario == 'accessibility' else args.scenario
             print(f'PASS native {label} graceful removal cycle={cycle}', flush=True)
-        listener.deregister('object:state-changed')
-        Atspi.exit()
     finally:
         if 'root' in locals() and 'window' in locals() and window.poll() is None:
             try:
@@ -710,6 +709,10 @@ def main():
                 capture_screenshot(cycle, f'failure-{cycle}.png')
             except Exception as error:
                 print(f'Could not collect native tree/screenshot: {error}', file=sys.stderr)
+        if 'listener' in locals():
+            for event_type in event_types:
+                listener.deregister(event_type)
+            Atspi.exit()
         for process in reversed(processes):
             if process.poll() is None:
                 process.terminate()
