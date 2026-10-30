@@ -5,151 +5,97 @@ description: Native desktop integration boundaries and verification for the ak5 
 
 # Desktop hosts
 
-Keep work in `ak5/symbiote-native`. Do not open PRs, issues or comments in the original project without explicit new approval.
-Keep macOS, Windows and Linux work on their respective `feat/catalyst`, `feat/windows` and `feat/linux` branches.
-The shared C++ engine remains the owner of the retained tree; adapters stay thin. Do not patch React Native or Yoga.
+Work stays in `ak5/symbiote-native`. Do not open PRs, issues or comments in the original project without explicit new approval.
+Keep macOS, Windows and Linux work on `feat/catalyst`, `feat/windows` and `feat/linux` respectively.
+The shared C++ engine owns the retained tree; adapters stay thin. Do not patch React Native, Fabric or Yoga.
+Use Metro for application bundles. Do not substitute Electron or Tauri.
 
-## Windows compatibility probe
+Read the platform README and workflow on the relevant branch for current build commands.
+A successful bundle does not prove native APIs are available. A compile-only check does not prove an application works.
 
-The Windows branch is not yet an application host. Its CI compiles and links the actual shared engine
-inside the released RNW SDK's standard native-library template. An exported function calls
-`symbiote::installBindings`, preventing an unused engine from making the link check falsely green.
-The SDK fixture is disposable and does not install `@symbiote-native/engine` with incompatible peers.
-Do not weaken the engine's peer range merely to make installation succeed.
+## Shared public Fabric boundary
 
-Verified source constraints on 2026-10-30:
+`SYMBIOTE_PUBLIC_FABRIC` selects the JSI-only boundary in the existing `SymbioteTree.cpp`.
+Retained nodes, mutation decoding, tag rules, dirty propagation, prop diffs and handle ownership stay shared.
+`SymbiotePublicFabric.h` holds a per-call runtime/binding pair, without a second tree or a global runtime cache.
+Opaque Fabric objects cross the SDK boundary without casting host objects or extracting private runtime pointers.
 
-- RNW 0.85.0 declares React Native `^0.85.0`; the fixture uses RN 0.85.3. Symbiote currently declares RN >=0.86.
-- RNW supports C++ TurboModules via `AddTurboModuleProvider`; see
-  [its integration test](https://github.com/microsoft/react-native-windows/blob/22f3d36d000a81ae3734a48c909a781a21a43511/vnext/Microsoft.ReactNative.IntegrationTests/JsiTurboModuleTests.cpp).
-- RNW's ABI runtime still aborts in `createArrayBuffer(MutableBuffer)` in both the
-  [0.85 source](https://github.com/microsoft/react-native-windows/blob/22f3d36d000a81ae3734a48c909a781a21a43511/vnext/Microsoft.ReactNative.Cxx/JSI/JsiAbiApi.cpp)
-  and inspected main revision `36a4425edd1667e38e7ba5a14cefce1a034567f3`.
-  The shared `allocInt32Array` now allocates via the runtime's `Int32Array` constructor instead.
-  `SymbioteBuffer.h` is used by both production bindings and the native probe; the probe checks zero
-  initialization, shared writes in both directions, zero length and rejection of invalid lengths.
-- Symbiote calls `UIManagerBinding::getBinding` and Fabric C++ methods directly. Native module registration
-  alone does not prove that these symbols link or that host objects survive the Windows ABI boundary.
-- The SDK probe reached the engine compiler in fork run `40917284480`; it stopped on private Fabric/Folly
-  headers. Adding include directories alone cannot establish runtime compatibility.
-- At the pinned RNW revision, `Microsoft.ReactNative.Cxx/JSI/JsiApiContext.cpp` constructs a per-DLL
-  `JsiAbiRuntime`, including the runtime supplied through C++ TurboModule CallInvokers. It is not the raw
-  Hermes runtime. `Microsoft.ReactNative/JsiApi.cpp`'s `GetHostObject` assumes its own ABI wrapper, while
-  the engine retrieves Fabric's C++ `UIManagerBinding` host object. This boundary needs a real native
-  probe before any shared-tree refactor; do not bypass it with private property-bag pointer casts.
+The public backend clones changed child sets and appends children through published Fabric methods.
+It cannot inspect Fabric's landed clones, so it does not use the direct backend's targeted replacement optimization.
+Interactive instance handles remain weak; raw text still needs an object handle for public `createNode`.
+Measurements and commands use public methods; bounding rectangles convert Fabric's tuple to the engine's object shape.
+`readSurfaceTelemetry` is absent, and `probeUIManager` throws an unsupported diagnostic instead of inventing telemetry.
 
-`core/engine/src/platform/index.windows.ts` follows RNW's Platform API: numeric Windows API contract
-version, separate RN/RNW version metadata, dev-gated testing and Windows/native/default selection.
-Its unit tests establish that JS contract only, not a functioning Windows engine or application.
+Both public and direct backends passed 317 real Fabric C++ tests, including 300 mutation programs.
+The public backend also passed 26 existing framework checks under Hermes.
+Use `-DSYMBIOTE_PUBLIC_FABRIC=ON` with the existing C++ harness and `SYMBIOTE_ITEST_BUILD=build-public` for its JS runner.
+Pass integration-test files individually to keep execution sequential. React reorder fails identically on both backends under JSC; use Hermes.
 
-The sequential `fabric-runtime` job in `windows-engine.yml` builds a stock RNW Win32 app with
-`core/engine/windows/tests/FabricProbe.h`. It tests public Fabric JSI calls from the SDK's ABI runtime,
-NativeState ownership and a Hermes-allocated command buffer. Fabric must create, clone, commit and
-measure a view at 120 then 240 pixels wide. It includes no private Fabric headers and changes no RN
-source. This is a boundary experiment, not a second retained tree or a production Windows backend.
-Fork run `40928140154` passed this actual Win32 runtime gate at `395ab84c`. The direct native
-engine compile still fails on private Fabric/Folly headers. A shared-tree backend using the public
-JSI boundary is therefore the next integration step; the successful probe is not that backend.
+## Windows integration
 
-Next gates: resolve compiler/linker failures without modifying RN core; prove the runtime boundary in a real
-Windows host; establish a tested React Native version contract; then add Metro application targets and test
-the existing adapters' keyboard, clipboard, resize, persistence, scrolling and accessibility journeys.
-Do not describe a compile-only probe as Windows application support.
+The verified combination is RNW 0.85.0, React Native 0.85.3 and React 19.2.3, installed without peer overrides.
+Pin virtualized-lists and the Metro Babel transformer to the app's RN version.
+RN remains an explicit top-level peer. Other SDK versions and architectures need their own checks.
 
-## Shared public Fabric backend
+RNW supplies a per-DLL ABI JSI runtime, including through TurboModule CallInvokers.
+Its `createArrayBuffer(MutableBuffer)` path is unsupported; `SymbioteBuffer.h` allocates through the runtime's Int32Array constructor.
+Do not add npm JSI headers alongside SDK JSI headers or reach into private Fabric/Folly headers to recover a raw Hermes runtime.
 
-`SYMBIOTE_PUBLIC_FABRIC` selects a JSI-only Fabric boundary in the existing `SymbioteTree.cpp`.
-The retained tree, mutation decoding, tag rules, dirty propagation, prop diffs and handle ownership
-stay shared. `SymbiotePublicFabric.h` holds only a per-call runtime/binding pair; it has no retained
-nodes or global runtime cache. Opaque Fabric objects cross the SDK boundary without host-object casts.
+`windows/SymbioteEngineModule.h` registers through the SDK's C++ TurboModule API.
+The synchronous version lookup installs bindings once per runtime; module instances can be recreated.
+Failed initialization must propagate before the JS resolver caches an engine.
+The production WinRT provider and `react-native.config.cjs` integrate with the official Windows autolinker.
 
-The public path clones changed child sets and appends children through Fabric's published methods.
-It cannot inspect Fabric's landed clones, so it does not use the direct backend's targeted replacement
-optimization. The direct path remains unchanged. Raw text still gets an object instance handle because
-public `createNode` requires one, even when the node has no event handlers. Instance handles on
-interactive elements remain weak, preserving the existing ownership rules.
+`windows/SymbioteEngine.props` is shared by the production library and SDK fixture configurator.
+It compiles the shared engine plus the app's unchanged RN `JSIDynamic.cpp`, exposing only its conversion header.
+Folly comes from the pinned vcpkg manifest with `x64-windows-static-md` to preserve the SDK DLL CRT contract.
+Use a short buildtrees root such as `C:/tbz-b` to keep generated object paths below Windows limits.
+Save partial dependency caches even after failure; use per-run keys with dependency-hash restore prefixes.
 
-The optional `readSurfaceTelemetry` binding is absent on this backend because public Fabric exposes
-no transaction telemetry. `probeUIManager` throws an explicit unsupported diagnostic instead of
-inventing a surface count. App-facing measurement, commands, responder and accessibility calls use
-the corresponding public methods; bounding rectangles are converted from Fabric's tuple to the
-engine's object shape.
+The application gate installs packed packages normally, autolinks the actual provider and builds a bundled Win32 SDK app.
+Its native module/ABI smoke checks shared buffers, NativeState and actual Fabric commits and measurements at 120 then 240 pixels.
+`scripts/prepare-windows-consumers.mjs` supplies normal installed React, Svelte, Vue, Solid and Angular apps, including Angular AOT.
+The standard CLI still generates mobile hosts; use the SDK application procedure in `core/engine/windows/README.md` for Windows.
 
-Local verification: both public and direct backends passed all 317 real Fabric C++ tests, including
-300 mutation programs. Under Hermes, 26 existing native adapter checks passed across React, Svelte,
-Vue, Solid and Angular, including actual reorder frames/mount commands, repeated state updates,
-controlled-input behavior and public host handles. The React reorder fixture fails identically on
-both backends under JavaScriptCore; use the project's normal Hermes runtime for adapter tests.
-This is not yet wired into the Windows SDK application: Folly/CSS dependencies, RN 0.85 compatibility,
-module registration and actual Windows app journeys still need integration and verification.
+TextInput uses the stock `WindowsTextInput` descriptor and SDK direct-event declarations.
+SafeAreaView maps to View; InputAccessoryView drops its whole subtree, following RNW's non-iOS contract.
+The stock app builder needs `SymbioteWindowMessages.h` around its blocking Start call to forward real resize notifications
+through DesktopWindowBridge. Keep its UI-thread lifetime, subclass cleanup and SWP_NOSIZE filter.
 
-Configure the existing harness with `-DSYMBIOTE_PUBLIC_FABRIC=ON` and build the same targets in
-`core/engine/cpp/tests/build-public`. Use `SYMBIOTE_ITEST_BUILD=build-public` for `scripts/run-itests.mjs`.
-Pass files individually for sequential execution; the script otherwise uses all available workers.
+Fork run `40975690998` at `4a5876ca` passed all five native framework journeys:
+layout updates, UI Automation focus/typing/controlled uppercase, native Ctrl+C with a separate OS clipboard client,
+external Unicode paste, real SetWindowPos resize reaching each framework's dimension hook, and OS wheel/native scroll callbacks.
+The ScrollView must remain accessible with its list role/label for UIA lookup. Do not remove accessibility to make tests pass.
+The runner attempts every framework, retains logs and fails if any journey fails.
+This default-scale resize result does not prove HiDPI or multi-monitor correctness.
 
-The Windows `native` CI job now selects `SYMBIOTE_PUBLIC_FABRIC` and consumes Folly through the
-pinned vcpkg manifest in `core/engine/windows/vcpkg.json`. The static-md triplet keeps the SDK's
-DLL CRT contract while avoiding a second set of dependency DLLs. Dependency builds use two workers
-and a binary cache. The fixture compiles the installed RN package's unchanged `JSIDynamic.cpp` and
-exposes only its conversion header in a generated include directory; it never adds npm's JSI
-include directory alongside the SDK's JSI. Actual Windows compile/link verification is pending.
+## Windows persistence gate
 
-`windows/SymbioteEngineModule.h` is the SDK C++ TurboModule, registered under `SymbioteEngine`.
-Its first synchronous `getVersion()` call installs the shared bindings; later lookups preserve them.
-The JS resolver uses the same synchronous initialization path as Linux and propagates failures
-before caching a result. Eight resolver regression tests pass. Module syntax is checked locally;
-actual RNW registration and runtime execution still need to be added to the application gate.
+The fixture installs AsyncStorage 3.1.1 as an application dependency, without adding it to the engine's runtime dependencies.
+Its public Windows JS API uses the autolinked RNCAsyncStorage module and SQLite backend, without React hooks.
+`PersistenceConfig.h` sets its documented CoreApplication database-path property before startup for the unpackaged fixture.
+Validate the environment path before passing it to the provider.
 
-The native `TreeTest.portableModuleInstallsBindingsAndPreservesThemAcrossLookups` test now exercises
-the production Windows module with a real JavaScriptCore/Fabric host: it installs absent bindings,
-commits a View, recreates the module and asserts binding identity is preserved. It passed locally
-with the public backend. This establishes module behavior, while the actual Windows SDK build
-and platform registration remain separate pending gates.
+The runner launches each framework in separate write/read processes against the same private database.
+The read phase cannot write; it must recover the exact Unicode snapshot and both phases must update the native framework UI.
+Retain phase logs and a diagnostic SQLite copy, wait for process exit, restore the original bundle and remove only owned temporary data.
+Do not replace native persistence with a JS map or direct test-side file writes.
 
-The `native` Windows gate now also builds a standard Win32 app with the actual engine and registers
-`SymbioteEngineModule`. `index-engine.windows.js` initializes it, runs `engine-smoke.js` through the
-production mutation buffer (create/commit/measure120→240), checks repeated module lookup preserves
-bindings, then runs the existing SDK-boundary probe. Its standalone tag uses a separate range to
-avoid colliding with the retained engine's allocator. The same smoke fixture passed locally under
-Hermes with real Fabric. Actual Windows execution remains pending.
+AsyncStorage ships an obsolete CppWinRT-only packages.config alongside its modern RNW PackageReferences.
+The App SDK checks that obsolete file even though restored project.assets.json already contains its complete dependency graph.
+The fixture validates and removes only that redundant configuration and its None entry. Keep dependency verification enabled.
+Native persistence verification is pending; inspect the exact current fork run before claiming it passes.
+The text-control and AsyncStorage checks do not establish ExpoClipboard or ExpoSQLite companion support.
 
-`scripts/configure-windows-engine.ps1` is shared by the library and application compile gates;
-both consume identical engine sources, dependencies and SDK-owned JSI headers. Run40937466948
-stopped before compilation because the vcpkg binary-cache setting used `files;path` instead of
-`files,path`; the corrected configuration still needs its Windows build result.
+## Other desktop branches
 
-The standalone SDK-only job is folded into the production-engine app gate: the same C++ boundary
-assertions still run after the real engine smoke passes, using the same installed dependencies.
-There is one sequential Windows job, avoiding duplicate SDK installations and a superseded probe
-holding the workflow concurrency slot after a failed production build.
+Catalyst uses UIKit/Fabric, not AppKit or react-native-macos. The Svelte example owns a dedicated Catalyst entry and scheme.
+Native run `39563584266` passed state/input remount, keyboard clipboard, settings persistence/relaunch, scrolling and window resizing.
+See `examples/svelte/README.md` on `feat/catalyst` for native commands.
 
-Save the Windows dependency binary cache immediately after successful installation, before compiling
-the engine. A later engine failure must not discard completed Folly builds. The workflow uses
-explicit cache restore/save steps and retains vcpkg build logs on failure.
-
-The public-backend sources `SymbioteTree.cpp`, `SymbioteFabricProps.cpp` and
-`SymbioteEngineBindings.cpp` also passed a local syntax check against the unmodified npm
-`react-native@0.85.3` headers. The check reused the native harness compiler settings, replacing
-only React Native include paths. This establishes source compatibility for those units; it does
-not establish SDK linking, Windows runtime behavior or the full JS peer contract. Keep the peer
-range unchanged until those gates pass.
-
-Run40938617795 failed in Folly's debug compilation before the engine: MSVC C1083 on
-`ExceptionCounterLibStaticRegistration.cpp.obj`. The resolved object path was longer than 260
-characters. Use vcpkg's short `--x-buildtrees-root=C:/tbz-b`; this keeps that same path below 260
-without changing dependency sources. Retain its build logs. Save partial binary caches even when
-an installation fails, using per-run keys and a dependency-hash restore prefix so later completed
-ports can extend the cache instead of being trapped behind an immutable partial entry.
-
-The package now has a prepared Windows x64 library project/solution and WinRT package provider,
-based on the pinned SDK cpp-lib template with its Microsoft MIT license retained. Its provider
-registers the actual C++ module. The normal Windows autolinker configuration names the project,
-WinRT header and provider explicitly. XML parsing, project input paths and autolink paths pass
-local structural checks; actual Windows compilation and autolink execution are still pending.
-
-`windows/SymbioteEngine.props` is the common engine/dependency build definition imported by both
-the production library and the SDK test configurator. It compiles the existing shared C++ sources,
-uses the SDK's JSI headers, prepares only JSIDynamic.h from the app's RN dependency, and diagnoses
-missing dependencies/platform mismatch. The SDK library gate retains an exported installation
-entry so the linker cannot discard an unused engine. Keep the new project local until the active
-Windows run completes; the peer-version and Windows runtime gates remain outstanding.
+Linux uses react-native-linux `4db5e336b529c15628ffb8ba94cd6d880ff9a450` with RN 0.87.1 and the host's C++ autolinker.
+Run `40975831910` on `feat/linux` passed all five native framework input, injected-resize and wheel journeys,
+plus ten fresh-process storage write/read windows through the host's RNAsyncStorage SQLite backend.
+Resize uses host-injected configure events under Cage; it is not a compositor-driven drag.
+The host clipboard is process-local and AT-SPI is unavailable. Do not describe its automation tree as a screen-reader bridge.
+Expo-backed companions need native providers and separate verification on each desktop host.
