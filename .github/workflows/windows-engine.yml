@@ -164,6 +164,22 @@ jobs:
           npx --no-install react-native init-windows --template cpp-app --name SymbioteFabricProbe --namespace SymbioteFabricProbe --overwrite
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Pop-Location
+      - name: Use the SDK PackageReferences for the storage provider
+        shell: pwsh
+        run: |
+          $directory = '.windows-fabric-probe/node_modules/@react-native-async-storage/async-storage/windows/ReactNativeAsyncStorage'
+          $configPath = Join-Path $directory 'packages.config'
+          $packages = @(([xml](Get-Content $configPath -Raw)).packages.package)
+          if ($packages.Count -ne 1 -or $packages[0].id -ne 'Microsoft.Windows.CppWinRT' -or $packages[0].version -ne '2.0.200316.3') {
+            throw 'Review the storage provider NuGet migration: packages.config changed'
+          }
+          $projectPath = Join-Path $directory 'ReactNativeAsyncStorage.vcxproj'
+          $project = Get-Content $projectPath -Raw
+          $entry = '<None Include="packages.config" />'
+          if (-not $project.Contains($entry)) { throw 'The storage provider project changed' }
+          # RNW already supplies CppWinRT and the full App SDK graph through PackageReference.
+          Set-Content $projectPath $project.Replace($entry, '')
+          Remove-Item $configPath
       - name: Register the SDK-only native probe
         shell: pwsh
         run: |

@@ -92,6 +92,13 @@ normal npm installation and the Windows autolinker. Its Windows backend uses one
 SQLite database per application; see the provider's documentation at
 https://react-native-async-storage.github.io/.
 
+The native fixture removes the provider's redundant CppWinRT-only
+`packages.config`; RNW's imported targets already supply CppWinRT and the Windows
+App SDK through `PackageReference`. Keeping both package formats makes the App
+SDK check the obsolete configuration instead of the restored dependency graph.
+The migration checks the original configuration before changing it and keeps
+dependency verification enabled.
+
 The persistence gate launches every framework twice. The first process writes a
 Unicode library snapshot into a fresh private database; a new process must
 restore the exact snapshot. Both phases must also mount and update the native
