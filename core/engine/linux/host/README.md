@@ -32,8 +32,17 @@ JavaScript promises settle on the JS thread. Late results cannot overwrite an
 intervening edit. The worker stops before its connection or seat is destroyed.
 The patch includes its threading decision in the host's ADR-0004.
 
-Native compile/runtime checks for this implementation are in progress. A second
-native client must verify system clipboard exchange before this capability is
-reported as complete. The earlier run above proves the shortcut safeguards and
-process-local clipboard journeys. AT-SPI and the other missing native controls
-remain in scope. The host's MIT license is retained in `LICENSE`.
+Fork run `41012824604` compiled this implementation and passed all 36 isolated
+native clipboard/controller cases, the five-framework window matrix and native
+persistence checks. Independent-client protocol verification remains required
+before reporting system clipboard exchange as complete.
+
+The protocol gate builds the actual backend with a small native Wayland window
+and exchanges exact bytes with `wl-copy` and `wl-paste` on an isolated headless
+Sway seat. It checks Unicode, transfers larger than a pipe buffer, invalid UTF-8,
+stalled owners, responsive input and shutdown with a pending read. Normal,
+ASan/UBSan and TSan builds run sequentially. Compositor and client logs are saved
+with the workflow artifacts. It does not access the user's desktop or clipboard.
+
+AT-SPI and the other missing native controls remain in scope. The host's MIT
+license is retained in `LICENSE`.
