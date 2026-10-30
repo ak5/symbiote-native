@@ -12,7 +12,7 @@
 // `componentNameByReactViewName` maps `ScrollContentView` to plain `View`, so the committed tree
 // cannot tell a content node from any other view by name at all.
 import '@angular/compiler';
-import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { STICKY_HEADER_TAG } from '@symbiote-native/components';
 import { childrenOf } from '@symbiote-native/engine';
@@ -106,6 +106,27 @@ class HorizontalFixture {}
 })
 class RefreshFixture {}
 
+const refreshMounted = signal(true);
+
+@Component({
+  selector: 'scroll-view-owner-conditional-refresh',
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  imports: [SymbioteHostPropsDirective],
+  template: `
+    <scroll-view>
+      @if (mounted()) {
+        <refresh-control [symbioteHostProps]="{ refreshing: false }" />
+        <text>conditional content</text>
+      }
+      <text>persistent content</text>
+    </scroll-view>
+  `,
+})
+class ConditionalRefreshFixture {
+  readonly mounted = refreshMounted;
+}
+
 // The behavior synthesizes a pin wrapper around a flagged paint child; a synthesized wrapper is a
 // node this template did not write, so the count has to survive it.
 @Component({
@@ -140,6 +161,44 @@ describe('the engine is the only builder of a ScrollView content node', () => {
     await tick();
     assertSingleContentNode('sv-r');
     expect(byViewName('PullToRefreshView').length).toBe(1);
+  });
+
+  it('keeps conditional refresh controls beside content through removal and remount', async () => {
+    refreshMounted.set(true);
+    mount(ROOT_TAG, ConditionalRefreshFixture);
+    await tick();
+    const owner = byViewName(SCROLL_VIEW)[0].handle;
+    const content = byViewName(CONTENT_VIEW)[0].handle;
+    const refreshes = () =>
+      childrenOf(owner).filter(node => node.component === 'PullToRefreshView');
+    const assertMounted = () => {
+      expect(refreshes()).toHaveLength(1);
+      expect(childrenOf(owner)[0]).toBe(refreshes()[0]);
+      expect(
+        childrenOf(content).some(
+          node => node.component === 'PullToRefreshView',
+        ),
+      ).toBe(false);
+      expect(
+        countUnder(content, node => node.props.text === 'conditional content'),
+      ).toBe(1);
+      expect(
+        countUnder(content, node => node.props.text === 'persistent content'),
+      ).toBe(1);
+    };
+    assertMounted();
+    refreshMounted.set(false);
+    await tick();
+    expect(refreshes()).toHaveLength(0);
+    expect(
+      countUnder(content, node => node.props.text === 'conditional content'),
+    ).toBe(0);
+    expect(
+      countUnder(content, node => node.props.text === 'persistent content'),
+    ).toBe(1);
+    refreshMounted.set(true);
+    await tick();
+    assertMounted();
   });
 
   it('scroll-view, a stickyHeaderIndices child adds no second content node', async () => {

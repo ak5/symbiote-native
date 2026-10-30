@@ -632,7 +632,11 @@ export class SymbioteRenderer implements Renderer2 {
   // ScrollView); Angular defers insertion on a null parent until projection resolves, so a
   // non-null fallback here breaks that. appendChild/insertBefore/insertAnchorNode skip null too.
   parentNode(node: IHostNode): IHostElement | null {
-    return parentOf(node) ?? null;
+    const parent = parentOf(node);
+    if (parent === undefined) return null;
+    // Embedded views must insert through the authored owner so its child claims still apply.
+    const owner = parentOf(parent);
+    return owner?.childHost === parent ? owner : parent;
   }
 
   nextSibling(node: IHostNode): IHostNode | null {
