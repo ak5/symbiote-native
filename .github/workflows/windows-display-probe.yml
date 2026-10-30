@@ -62,7 +62,7 @@ jobs:
           function Select-Scale([int]$Percent) {
             $combo = Get-ScaleCombo
             $selection = $combo.GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern)
-            $current = @($selection.GetCurrentSelection())
+            $current = @($selection.Current.GetSelection())
             $expand = $combo.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)
             if ($current.Count -eq 1 -and $current[0].Current.Name -cmatch "^$Percent%($|\s)") {
               $expand.Collapse()
@@ -147,7 +147,7 @@ jobs:
               $windowPattern.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Maximized)
             }
             $combo = Get-ScaleCombo
-            $selected = @($combo.GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern).GetCurrentSelection())
+            $selected = @($combo.GetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern).Current.GetSelection())
             if ($selected.Count -ne 1) { throw 'Windows did not expose one selected display scale' }
             if ($selected[0].Current.Name -match '^(\d+)%') { $originalPercent = [int]$Matches[1] }
             else { throw 'Cannot read the original Windows scale selection' }
