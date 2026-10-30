@@ -45,6 +45,7 @@ import {
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
+  supportsModalDismiss,
   warnAboutModalProps,
   type IAccessibilityProps,
   type IAriaProps,
@@ -56,7 +57,6 @@ import {
 } from '@symbiote-native/components';
 import {
   dlog,
-  Platform,
   type IClassNameValue,
   type IColorValue,
   type IStyleProp,
@@ -147,7 +147,7 @@ export function Modal(props: IModalProps): JSX.Element {
     createInitialModalState(isVisible()),
   );
 
-  // Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
+  // Arms the iOS and Linux keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
   // reducer is identity-stable, so the mount run writes the same object back.
   createEffect(() => {
     const action = modalVisibilityAction(isVisible());
@@ -155,9 +155,9 @@ export function Modal(props: IModalProps): JSX.Element {
       setState(current => modalReducer(current, action));
   });
 
-  // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
+  // Native dismissal releases the keep-alive before notifying the app.
   const handleDismiss = (): void => {
-    if (Platform.OS !== 'ios') return;
+    if (!supportsModalDismiss()) return;
     setState(current => modalReducer(current, { type: 'hide' }));
     local.onDismiss?.();
   };

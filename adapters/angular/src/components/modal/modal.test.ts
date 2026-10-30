@@ -11,6 +11,7 @@ import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   clearGlobalStyles,
+  Platform,
   parentOf,
   registerRules,
   type ISymbioteEvent,
@@ -20,6 +21,7 @@ import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 import { mount, unmount } from '../../render';
 import { Modal } from './index';
 
+const originalOS = Platform.OS;
 const ROOT_TAG = 912;
 const fabric = installRecordingFabric();
 const tick = (): Promise<void> =>
@@ -94,6 +96,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   unmount(ROOT_TAG);
+  Object.assign(Platform, { OS: originalOS });
   clearGlobalStyles();
 });
 
@@ -121,32 +124,39 @@ describe('Modal (no throwing path — see file header)', () => {
     expect(fabric.find(n => n.props.testID === 'modal')).toBeUndefined();
   });
 
-  it('holds the modal host through the hide and unmounts it on the native dismiss', async () => {
-    // why: Modal.js (iOS) drops the keep-alive ONLY in its onDismiss handler — the node stays
-    // mounted through the native exit animation, then goes.
-    mount(ROOT_TAG, ModalHostFixture);
-    await tick();
-    const modal = fabric.find(n => n.props.testID === 'modal');
-    expect(modal).toBeDefined();
-    if (modal === undefined) return;
+  it.each(['ios', 'linux'])(
+    'holds the %s modal host through the hide and unmounts it on native dismissal',
+    async os => {
+      Object.assign(Platform, { OS: os });
+      // why: Modal.js (iOS) drops the keep-alive ONLY in its onDismiss handler — the node stays
+      // mounted through the native exit animation, then goes.
+      mount(ROOT_TAG, ModalHostFixture);
+      await tick();
+      const modal = fabric.find(n => n.props.testID === 'modal');
+      expect(modal).toBeDefined();
+      if (modal === undefined) return;
 
-    if (!capturedHost) throw new Error('host was not captured');
-    capturedHost.visible.set(false);
-    await Promise.resolve();
-    await tick();
-    await tick();
+      if (!capturedHost) throw new Error('host was not captured');
+      capturedHost.visible.set(false);
+      await Promise.resolve();
+      await tick();
+      await tick();
 
-    // The recording host never forgets a node it once saw created, so residency is read off the
-    // engine's own live parent link — undefined once the node is actually detached — not off a
-    // search over the creation log, which would report this node resident forever.
-    expect(parentOf(modal.handle), 'held for the exit animation').toBeDefined();
+      // The recording host never forgets a node it once saw created, so residency is read off the
+      // engine's own live parent link — undefined once the node is actually detached — not off a
+      // search over the creation log, which would report this node resident forever.
+      expect(
+        parentOf(modal.handle),
+        'held for the exit animation',
+      ).toBeDefined();
 
-    fabric.fireEvent(modal.instanceHandle, 'topDismiss', {});
-    await Promise.resolve();
-    await tick();
-    await tick();
-    expect(parentOf(modal.handle)).toBeUndefined();
-  });
+      fabric.fireEvent(modal.instanceHandle, 'topDismiss', {});
+      await Promise.resolve();
+      await tick();
+      await tick();
+      expect(parentOf(modal.handle)).toBeUndefined();
+    },
+  );
 
   it('emits the raw ISymbioteEvent on orientationChange, orientation on nativeEvent', async () => {
     // why: orientationChange is the only Modal event carrying a payload, and Angular reaches it

@@ -36,7 +36,11 @@ import {
   unmount,
   type ISymbioteEvent,
 } from '@symbiote-native/vue';
-import { childrenOf, type ISymbioteNode } from '@symbiote-native/engine';
+import {
+  childrenOf,
+  Platform,
+  type ISymbioteNode,
+} from '@symbiote-native/engine';
 import {
   createLiveTree,
   installRecordingFabric,
@@ -44,6 +48,7 @@ import {
   type IAuthoredNode,
 } from '@symbiote-native/test-utils';
 
+const originalOS = Platform.OS;
 const ROOT_TAG = 421;
 
 const fabric = installRecordingFabric();
@@ -52,7 +57,10 @@ const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
-afterEach(() => unmount(ROOT_TAG));
+afterEach(() => {
+  unmount(ROOT_TAG);
+  Object.assign(Platform, { OS: originalOS });
+});
 
 function modalNode(): IAuthoredNode {
   const node = fabric.find(n => n.viewName === 'ModalHostView');
@@ -171,41 +179,45 @@ describe('Vue Modal on the engine', () => {
 
     // why: Modal.js (iOS) drops the keep-alive ONLY in its onDismiss handler — the node stays
     // mounted through the native exit animation, then unmounts, then the app hears `dismiss`.
-    it('holds the modal on iOS until the native dismiss, then unmounts and emits dismiss', async () => {
-      const visible = ref(true);
-      let dismissed = 0;
-      mount(
-        ROOT_TAG,
-        defineComponent({
-          setup: () => () =>
-            h(
-              Modal,
-              {
-                visible: visible.value,
-                onDismiss: () => (dismissed += 1),
-              },
-              () => h('view'),
-            ),
-        }),
-      );
-      await tick();
-      const host = modalNode().instanceHandle;
+    it.each(['ios', 'linux'])(
+      'holds the %s modal until native dismissal, then unmounts and emits dismiss',
+      async os => {
+        Object.assign(Platform, { OS: os });
+        const visible = ref(true);
+        let dismissed = 0;
+        mount(
+          ROOT_TAG,
+          defineComponent({
+            setup: () => () =>
+              h(
+                Modal,
+                {
+                  visible: visible.value,
+                  onDismiss: () => (dismissed += 1),
+                },
+                () => h('view'),
+              ),
+          }),
+        );
+        await tick();
+        const host = modalNode().instanceHandle;
 
-      visible.value = false;
-      await tick();
-      await tick();
-      expect(
-        live.findLive(live.appRoot(), n => n.viewName === 'ModalHostView'),
-      ).toBeDefined();
+        visible.value = false;
+        await tick();
+        await tick();
+        expect(
+          live.findLive(live.appRoot(), n => n.viewName === 'ModalHostView'),
+        ).toBeDefined();
 
-      fabric.fireEvent(host, 'topDismiss', {});
-      await tick();
-      await tick();
-      expect(
-        live.findLive(live.appRoot(), n => n.viewName === 'ModalHostView'),
-      ).toBeUndefined();
-      expect(dismissed).toBe(1);
-    });
+        fabric.fireEvent(host, 'topDismiss', {});
+        await tick();
+        await tick();
+        expect(
+          live.findLive(live.appRoot(), n => n.viewName === 'ModalHostView'),
+        ).toBeUndefined();
+        expect(dismissed).toBe(1);
+      },
+    );
 
     it('routes topShow to the show emit', async () => {
       // why: same direct-event contract as topRequestClose, for the native "modal finished

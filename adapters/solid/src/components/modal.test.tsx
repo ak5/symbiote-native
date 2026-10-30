@@ -22,6 +22,7 @@ import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   clearGlobalStyles,
+  Platform,
   registerRules,
   type ISymbioteEvent,
 } from '@symbiote-native/engine';
@@ -33,6 +34,7 @@ import {
 import { mount, unmount } from '../render';
 import { Modal } from './modal';
 
+const originalOS = Platform.OS;
 const ROOT_TAG = 818;
 const MODAL_VIEW = 'ModalHostView';
 const SHEET_FLEX = 1;
@@ -58,6 +60,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
+  Object.assign(Platform, { OS: originalOS });
   clearGlobalStyles();
 });
 
@@ -172,25 +175,32 @@ describe('Solid Modal on the engine', () => {
     // behind an invisible full-screen window.
     // Modal.js (iOS): the hide keeps the node through the native exit animation; only the native
     // dismiss drops it.
-    it('holds the node after a requestClose and drops it on the native dismiss', async () => {
-      const [visible, setVisible] = createSignal(true);
-      mount(ROOT_TAG, () => (
-        <Modal visible={visible()} onRequestClose={() => setVisible(false)}>
-          <view />
-        </Modal>
-      ));
-      await tick();
-      expect(findCommittedModal()).toBeDefined();
-      const handle = modalHandle();
+    it.each(['ios', 'linux'])(
+      'holds the %s node after a requestClose and drops it on native dismissal',
+      async os => {
+        Object.assign(Platform, { OS: os });
+        const [visible, setVisible] = createSignal(true);
+        mount(ROOT_TAG, () => (
+          <Modal visible={visible()} onRequestClose={() => setVisible(false)}>
+            <view />
+          </Modal>
+        ));
+        await tick();
+        expect(findCommittedModal()).toBeDefined();
+        const handle = modalHandle();
 
-      fabric.fireEvent(handle, 'topRequestClose', {});
-      await tick();
-      expect(findCommittedModal(), 'held for the exit animation').toBeDefined();
+        fabric.fireEvent(handle, 'topRequestClose', {});
+        await tick();
+        expect(
+          findCommittedModal(),
+          'held for the exit animation',
+        ).toBeDefined();
 
-      fabric.fireEvent(handle, 'topDismiss', {});
-      await tick();
-      expect(findCommittedModal()).toBeUndefined();
-    });
+        fabric.fireEvent(handle, 'topDismiss', {});
+        await tick();
+        expect(findCommittedModal()).toBeUndefined();
+      },
+    );
   });
 
   describe('Positive — node identity across updates (the Solid-only hazard)', () => {

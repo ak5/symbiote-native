@@ -5,6 +5,7 @@ import {
   modalReducer,
   modalVisibilityAction,
   shouldRenderModal,
+  supportsModalDismiss,
 } from './modal';
 
 // why: modalReducer has no throwing path — every action resolves to a state (guarded no-ops
@@ -46,6 +47,23 @@ describe('modalReducer — identity stability', () => {
 });
 
 describe('shouldRenderModal', () => {
+  it.each(['ios', 'linux'])('holds %s content until native dismissal', os => {
+    const state = createInitialModalState(true);
+    expect(supportsModalDismiss(os)).toBe(true);
+    expect(shouldRenderModal(false, state, os)).toBe(true);
+    expect(
+      shouldRenderModal(false, modalReducer(state, { type: 'hide' }), os),
+    ).toBe(false);
+  });
+
+  it.each(['android', 'windows'])(
+    'does not await an unsupported %s dismiss event',
+    os => {
+      expect(supportsModalDismiss(os)).toBe(false);
+      expect(shouldRenderModal(false, { isRendered: true }, os)).toBe(false);
+    },
+  );
+
   it('renders while visible, regardless of the keep-alive', () => {
     expect(shouldRenderModal(true, { isRendered: false })).toBe(true);
   });

@@ -21,6 +21,8 @@ git -C <host> apply --check "$PWD/core/engine/linux/host/custom-actions.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/custom-actions.patch"
 git -C <host> apply --check "$PWD/core/engine/linux/host/lifecycle-cleanup.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/lifecycle-cleanup.patch"
+git -C <host> apply --check "$PWD/core/engine/linux/host/modal.patch"
+git -C <host> apply "$PWD/core/engine/linux/host/modal.patch"
 ```
 
 `clipboard-safety.patch` prevents secure text from entering the clipboard,
@@ -148,3 +150,14 @@ The executable now purges Skia's global CPU font cache after its window/session
 locals are destroyed and before static font-manager teardown. This releases the
 font strikes that can retain matched system typefaces. The same strict two-cycle
 ASan shutdown check must verify this cleanup; no leak exclusions are added.
+
+`modal.patch` registers React Native's stock ModalHostView descriptor and state.
+The frame owner sizes its state, paints it in a separate layer, routes input to
+the top presentation and restores focus on dismissal. Fade and slide transitions
+complete through native show/dismiss events; Escape requests a controlled close
+and respects active text composition. The active modal also isolates the AT-SPI
+tree. All five adapters retain Linux content until the native dismiss event.
+
+This implementation is under native verification. Its gate includes controller,
+scene and real Hermes/Fabric integration cases; the final window/AT-SPI journeys
+remain required before claiming complete modal support.

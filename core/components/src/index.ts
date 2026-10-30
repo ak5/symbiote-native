@@ -168,6 +168,7 @@ export {
   isModalVisible,
   modalVisibilityAction,
   shouldRenderModal,
+  supportsModalDismiss,
 } from './state/modal';
 export type { IModalState, IModalAction } from './state/modal';
 

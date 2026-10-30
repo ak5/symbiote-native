@@ -59,7 +59,7 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import type { ISymbioteEvent } from '@symbiote-native/engine';
+import { Platform, type ISymbioteEvent } from '@symbiote-native/engine';
 import {
   createLiveTree,
   installRecordingFabric,
@@ -73,6 +73,7 @@ if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
+const originalOS = Platform.OS;
 const ROOT_TAG = 91_003;
 // Co-located with the real source (not an isolated temp dir) — same reason as
 // switch.smoke.test.ts: a compiled component's own relative imports resolve relative to where
@@ -98,6 +99,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount(ROOT_TAG);
+  Object.assign(Platform, { OS: originalOS });
   rmSync(MODAL_OUT, { force: true });
   rmSync(DISMISSIBLE_PARENT_OUT, { force: true });
   rmSync(HIDDEN_PARENT_OUT, { force: true });
@@ -213,33 +215,37 @@ describe('Modal (real compiled index.svelte)', () => {
     });
 
     // A native event reaches the parent's state, through the reducer, and drops the node
-    it('round-trips a native topRequestClose through the reducer and drops the node once it settles', async () => {
-      const Dismissible = await loadDismissible();
-      mount(ROOT_TAG, Dismissible);
-      await settle();
-      expect(
-        findInCommittedTree(n => n.viewName === 'ModalHostView'),
-      ).toBeDefined();
+    it.each(['ios', 'linux'])(
+      'holds the %s node after a native close request until native dismissal',
+      async os => {
+        Object.assign(Platform, { OS: os });
+        const Dismissible = await loadDismissible();
+        mount(ROOT_TAG, Dismissible);
+        await settle();
+        expect(
+          findInCommittedTree(n => n.viewName === 'ModalHostView'),
+        ).toBeDefined();
 
-      // Drive the native close exactly like React's DismissCase: topRequestClose -> the parent's
-      // own $state flips visible=false, which flows back down through the SAME onRequestClose bag
-      // entry the passthrough props wired onto the host node.
-      const host = committedModalNode().instanceHandle;
-      fabric.fireEvent(host, 'topRequestClose', {});
-      await settle();
+        // Drive the native close exactly like React's DismissCase: topRequestClose -> the parent's
+        // own $state flips visible=false, which flows back down through the SAME onRequestClose bag
+        // entry the passthrough props wired onto the host node.
+        const host = committedModalNode().instanceHandle;
+        fabric.fireEvent(host, 'topRequestClose', {});
+        await settle();
 
-      // Modal.js (iOS): held through the native exit animation…
-      expect(
-        findInCommittedTree(n => n.viewName === 'ModalHostView'),
-      ).toBeDefined();
+        // Modal.js (iOS): held through the native exit animation…
+        expect(
+          findInCommittedTree(n => n.viewName === 'ModalHostView'),
+        ).toBeDefined();
 
-      // …and dropped only by the native dismiss.
-      fabric.fireEvent(host, 'topDismiss', {});
-      await settle();
-      expect(
-        findInCommittedTree(n => n.viewName === 'ModalHostView'),
-      ).toBeUndefined();
-    });
+        // …and dropped only by the native dismiss.
+        fabric.fireEvent(host, 'topDismiss', {});
+        await settle();
+        expect(
+          findInCommittedTree(n => n.viewName === 'ModalHostView'),
+        ).toBeUndefined();
+      },
+    );
 
     // The handler gets the event wrapper, a bare `{ orientation }` signature would read `undefined`
     it('routes topOrientationChange to onOrientationChange with the orientation on nativeEvent', async () => {

@@ -1,6 +1,5 @@
-// Modal logic, framework-agnostic. On iOS RN keeps the modal mounted through its exit animation
-// until native onDismiss arrives (Modal.js _shouldShowModal); only that event drops the
-// keep-alive, then the app's onDismiss runs. Android has no dismiss event: `visible` alone.
+// iOS and Linux retain the modal until native onDismiss completes its exit animation.
+// Android shows on `visible` alone.
 
 import { Platform } from '@symbiote-native/engine';
 
@@ -41,18 +40,21 @@ export function modalReducer(
   }
 }
 
-// Modal.js `_shouldShowModal`: iOS keeps the node through its exit animation until the native
-// dismiss drops the keep-alive; Android shows on `visible` alone.
+export function supportsModalDismiss(os: string = Platform.OS): boolean {
+  return os === 'ios' || os === 'linux';
+}
+
+// Retain the node until its host reports the completed exit animation.
 export function shouldRenderModal(
   isVisible: boolean,
   state: IModalState,
   os: string = Platform.OS,
 ): boolean {
-  return os === 'ios' ? isVisible || state.isRendered : isVisible;
+  return supportsModalDismiss(os) ? isVisible || state.isRendered : isVisible;
 }
 
 // Modal.js componentDidUpdate: false->true arms the keep-alive; true->false does NOTHING — only the
-// native `onDismiss` (iOS) drops it, via `{type: 'hide'}` from the adapter's dismiss handler.
+// native `onDismiss` drops it, via `{type: 'hide'}` from the adapter's dismiss handler.
 export function modalVisibilityAction(
   isVisible: boolean,
 ): IModalAction | undefined {

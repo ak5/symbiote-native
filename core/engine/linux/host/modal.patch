@@ -1,0 +1,1726 @@
+diff --git a/packages/core/CMakeLists.txt b/packages/core/CMakeLists.txt
+--- a/packages/core/CMakeLists.txt
++++ b/packages/core/CMakeLists.txt
+@@ -867,6 +867,7 @@
+     src/JsErrorReporter.cpp
+     src/LinuxAnimationChoreographer.cpp
+     src/LinuxMountingManager.cpp
++    src/ModalController.cpp
+     src/PlatformColor.cpp
+     src/ReactHost.cpp
+     src/RetainedScene.cpp
+diff --git a/packages/core/src/AccessibilityBridge.cpp b/packages/core/src/AccessibilityBridge.cpp
+--- a/packages/core/src/AccessibilityBridge.cpp
++++ b/packages/core/src/AccessibilityBridge.cpp
+@@ -285,6 +285,9 @@
+         const auto role = roleOf(source, description["role"].asString());
+         NativeNode node(accesskit_node_new(role), accesskit_node_free);
+         accesskit_node_set_bounds(node.get(), boundsOf(geometry->second.bounds, publication_.window.contentOffsetY));
++        if (source.modalPresentation) {
++            accesskit_node_set_modal(node.get());
++        }
+         if (source.clipsChildren) {
+             accesskit_node_set_clips_children(node.get());
+         }
+diff --git a/packages/core/src/FabricHost.cpp b/packages/core/src/FabricHost.cpp
+--- a/packages/core/src/FabricHost.cpp
++++ b/packages/core/src/FabricHost.cpp
+@@ -28,6 +28,7 @@
+ #include <react/renderer/componentregistry/native/NativeComponentRegistryBinding.h>
+ #include <react/renderer/components/FBReactNativeSpec/ComponentDescriptors.h>
+ #include <react/renderer/components/image/ImageComponentDescriptor.h>
++#include <react/renderer/components/modal/ModalHostViewComponentDescriptor.h>
+ #include <react/renderer/components/root/RootComponentDescriptor.h>
+ #include <react/renderer/components/scrollview/ScrollViewComponentDescriptor.h>
+ #include <react/renderer/components/text/ParagraphComponentDescriptor.h>
+@@ -102,6 +103,7 @@
+     add(facebook::react::concreteComponentDescriptorProvider<facebook::react::RootComponentDescriptor>());
+     add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ViewComponentDescriptor>());
+     add(facebook::react::concreteComponentDescriptorProvider<LayoutConformanceComponentDescriptor>());
++    add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ModalHostViewComponentDescriptor>());
+     add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ImageComponentDescriptor>());
+     add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ScrollViewComponentDescriptor>());
+     add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ParagraphComponentDescriptor>());
+@@ -214,7 +216,9 @@
+     // The `AnimationBackend` the Scheduler built over the choreographer above. It is held weakly for the same
+     // reason `AnimationChoreographer` holds it weakly: the UIManager owns it, and this host outlives neither.
+     animationBackend_ = scheduler_->getUIManager()->unstable_getAnimationBackend();
+-    inputDispatcher_ = std::make_unique<InputDispatcher>(scheduler_->getUIManager(), mountingManager_, kSurfaceId);
++    modalController_ = std::make_unique<ModalController>(scheduler_->getUIManager(), kSurfaceId);
++    inputDispatcher_ = std::make_unique<InputDispatcher>(scheduler_->getUIManager(), mountingManager_, kSurfaceId,
++                                                         [this] { modalController_->requestClose(); });
+     scrollController_ = std::make_unique<ScrollController>(scheduler_->getUIManager(), kSurfaceId);
+ 
+     // `UIManager.hasViewManagerConfig` answers through this global, and a `dev=true` bundle asks it about
+@@ -405,6 +409,16 @@
+     return mountingManager_->advanceImageAnimations(frameMilliseconds);
+ }
+ 
++bool FabricHost::advanceModals(double frameMilliseconds) {
++    react_native_assert(std::this_thread::get_id() == owningThread_);
++    modalController_->advance(frameMilliseconds);
++    const bool changed =
++        mountingManager_->setModalPresentations(modalController_->presentations(), modalController_->activeTag());
++    inputDispatcher_->setModalRoot(modalController_->activeTag());
++    scrollController_->setModalRoot(modalController_->activeTag(), mountingManager_);
++    return changed || modalController_->isAnimating();
++}
++
+ bool FabricHost::advanceControlAnimations(double frameMilliseconds) {
+     react_native_assert(std::this_thread::get_id() == owningThread_);
+ 
+@@ -427,7 +441,7 @@
+     react_native_assert(std::this_thread::get_id() == owningThread_);
+ 
+     return mountingManager_->hasPendingDamage() || scrollController_->isScrollActive() ||
+-           animationChoreographer_->isActive();
++           animationChoreographer_->isActive() || modalController_->isAnimating();
+ }
+ 
+ SceneFrame FabricHost::takeFrame() {
+diff --git a/packages/core/src/FabricHost.h b/packages/core/src/FabricHost.h
+--- a/packages/core/src/FabricHost.h
++++ b/packages/core/src/FabricHost.h
+@@ -5,6 +5,7 @@
+ #include "InputPipeline.h"
+ #include "LinuxAnimationChoreographer.h"
+ #include "LinuxMountingManager.h"
++#include "ModalController.h"
+ #include "RetainedScene.h"
+ #include "ScrollController.h"
+ 
+@@ -154,6 +155,7 @@
+      * platform owns between commits, and the frame loop calls all three in one place for that reason.
+      */
+     bool advanceControlAnimations(double frameMilliseconds);
++    bool advanceModals(double frameMilliseconds);
+     void induceEventBeat();
+ 
+     /**
+@@ -203,6 +205,7 @@
+     std::unique_ptr<facebook::react::SurfaceManager> additionalSurfaces_;
+     std::unique_ptr<InputDispatcher> inputDispatcher_;
+     std::unique_ptr<ScrollController> scrollController_;
++    std::unique_ptr<ModalController> modalController_;
+     std::unique_ptr<facebook::react::SurfaceHandler> surfaceHandler_;
+ };
+ 
+diff --git a/packages/core/src/FantomTester.cpp b/packages/core/src/FantomTester.cpp
+--- a/packages/core/src/FantomTester.cpp
++++ b/packages/core/src/FantomTester.cpp
+@@ -40,6 +40,16 @@
+ 
+ std::string FantomTester::mountTreeText() const { return renderMountTree(fabricHost_->visualTreeNodes()); }
+ 
++void FantomTester::advanceModalFrame(double frameMilliseconds, const std::vector<InputEvent>& events) {
++    fabricHost_->advanceModals(frameMilliseconds);
++    fabricHost_->dispatchInput(events);
++    fabricHost_->advanceScroll(frameMilliseconds);
++    fabricHost_->induceEventBeat();
++    reactHost_.runUntilQuiescent(kQuiescenceBudget);
++}
++
++SceneSnapshot FantomTester::snapshotScene() const { return fabricHost_->snapshotScene(); }
++
+ bool FantomTester::hasReportedFatalError() const { return reactHost_.hasReportedFatalError(); }
+ 
+ void FantomTester::stopSurface() {
+diff --git a/packages/core/src/FantomTester.h b/packages/core/src/FantomTester.h
+--- a/packages/core/src/FantomTester.h
++++ b/packages/core/src/FantomTester.h
+@@ -6,6 +6,7 @@
+ #include <cstddef>
+ #include <memory>
+ #include <string>
++#include <vector>
+ 
+ #include <react/renderer/graphics/Size.h>
+ 
+@@ -47,6 +48,9 @@
+     /** The committed mount tree, rendered by `renderMountTree`. */
+     std::string mountTreeText() const;
+ 
++    void advanceModalFrame(double frameMilliseconds, const std::vector<InputEvent>& events = {});
++    SceneSnapshot snapshotScene() const;
++
+     bool hasReportedFatalError() const;
+ 
+     /**
+diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDispatcher.cpp
+--- a/packages/core/src/InputDispatcher.cpp
++++ b/packages/core/src/InputDispatcher.cpp
+@@ -1,7 +1,9 @@
+ #include "InputDispatcher.h"
+ 
++#include "ShadowNodeLookup.h"
+ #include "SwitchComponent.h"
+ 
++#include <algorithm>
+ #include <cstddef>
+ #include <folly/dynamic.h>
+ #include <iostream>
+@@ -14,6 +16,7 @@
+ 
+ #include <react/renderer/components/FBReactNativeSpec/EventEmitters.h>
+ #include <react/renderer/components/FBReactNativeSpec/Props.h>
++#include <react/renderer/components/modal/ModalHostViewShadowNode.h>
+ #include <react/renderer/components/scrollview/ScrollViewShadowNode.h>
+ #include <react/renderer/components/scrollview/ScrollViewState.h>
+ #include <react/renderer/components/view/TouchEvent.h>
+@@ -171,29 +174,6 @@
+ }
+ 
+ /**
+- * The committed shadow node a scene tag names. Node identity is the Fabric tag on both sides, so this is the whole
+- * translation from "what was painted here" to "what can receive an event"; a tag the scene holds and this tree
+- * does not is a node from another surface or from a revision this thread has not seen, and the caller falls back
+- * to the shadow-tree hit test for it.
+- */
+-std::shared_ptr<const facebook::react::ShadowNode>
+-shadowNodeWithTag(const std::shared_ptr<const facebook::react::ShadowNode>& shadowNode, facebook::react::Tag tag) {
+-    if (shadowNode->getTag() == tag) {
+-        return shadowNode;
+-    }
+-
+-    for (const std::shared_ptr<const facebook::react::ShadowNode>& child : shadowNode->getChildren()) {
+-        const std::shared_ptr<const facebook::react::ShadowNode> found = shadowNodeWithTag(child, tag);
+-
+-        if (found != nullptr) {
+-            return found;
+-        }
+-    }
+-
+-    return nullptr;
+-}
+-
+-/**
+  * The role a focused node declares, resolved through `effectiveAccessibilityRole` so `role="link"` and
+  * `accessibilityRole="link"` reach `isActivationKey` the same way (#320) — `AccessibilityProps`' constructor
+  * only ever populates the `accessibilityRole` string from the literal `accessibilityRole` raw prop (#259), so
+@@ -244,6 +224,9 @@
+ std::shared_ptr<const facebook::react::ScrollViewShadowNode>
+ firstScrollView(const facebook::react::ShadowNode& shadowNode) {
+     for (const std::shared_ptr<const facebook::react::ShadowNode>& child : shadowNode.getChildren()) {
++        if (std::dynamic_pointer_cast<const facebook::react::ModalHostViewShadowNode>(child)) {
++            continue;
++        }
+         const std::shared_ptr<const facebook::react::ScrollViewShadowNode> scrollView =
+             std::dynamic_pointer_cast<const facebook::react::ScrollViewShadowNode>(child);
+ 
+@@ -320,9 +303,9 @@
+ 
+ InputDispatcher::InputDispatcher(std::shared_ptr<facebook::react::UIManager> uiManager,
+                                  std::shared_ptr<LinuxMountingManager> mountingManager,
+-                                 facebook::react::SurfaceId surfaceId)
++                                 facebook::react::SurfaceId surfaceId, std::function<void()> requestModalClose)
+     : uiManager_(std::move(uiManager)), mountingManager_(std::move(mountingManager)), surfaceId_(surfaceId),
+-      textInputController_(uiManager_, mountingManager_, surfaceId) {}
++      requestModalClose_(std::move(requestModalClose)), textInputController_(uiManager_, mountingManager_, surfaceId) {}
+ 
+ void InputDispatcher::dispatch(const std::vector<InputEvent>& events) {
+     // Before the events rather than with them: a commit that unmounted the focused node has to blur it even on a
+@@ -370,6 +353,63 @@
+     }
+ }
+ 
++void InputDispatcher::setModalRoot(facebook::react::Tag tag) {
++    if (tag == 0 && modalRootTag_ == 0) {
++        return;
++    }
++    const auto root = surfaceRootShadowNode();
++    if (tag == modalRootTag_) {
++        const auto previous = std::ranges::find(modalFocus_, tag, &ModalFocus::modalTag);
++        const auto node = shadowNodeWithTag(root, tag);
++        if (tag == 0 || (previous != modalFocus_.end() && node && previous->emitter == node->getEventEmitter())) {
++            return;
++        }
++        applyFocusTransition(focusModel_.focusTag(kNoTag, FocusOrigin::Keyboard), true);
++    }
++    const InputEvent cancel{.kind = InputEventKind::PointerLeave};
++    dispatchPointerEvent(cancel);
++    cancelTouch(cancel);
++    router_ = PointerRouter{};
++    hoveredEmitter_.reset();
++    textInputController_.synchronize();
++    for (auto& entry : modalFocus_) {
++        if (entry.modalTag == modalRootTag_) {
++            entry.focusedTag = focusModel_.focusedTag();
++            entry.isFocusVisible = focusModel_.isFocusVisible();
++        }
++    }
++    std::erase_if(modalFocus_, [&root](const auto& entry) {
++        const auto node = shadowNodeWithTag(root, entry.modalTag);
++        return entry.modalTag != 0 && (!node || node->getEventEmitter() != entry.emitter);
++    });
++    if (modalRootTag_ == 0 && tag != 0) {
++        modalFocus_.push_back({.modalTag = 0,
++                               .focusedTag = focusModel_.focusedTag(),
++                               .isFocusVisible = focusModel_.isFocusVisible(),
++                               .emitter = {}});
++    }
++    const auto previous = std::ranges::find(modalFocus_, tag, &ModalFocus::modalTag);
++    const auto restore = previous == modalFocus_.end() ? std::nullopt : std::optional{*previous};
++    if (tag == 0) {
++        modalFocus_.clear();
++    } else if (!restore) {
++        const auto node = shadowNodeWithTag(root, tag);
++        modalFocus_.push_back({.modalTag = tag,
++                               .focusedTag = 0,
++                               .isFocusVisible = true,
++                               .emitter = node ? node->getEventEmitter() : nullptr});
++    }
++    modalRootTag_ = tag;
++    syncedRoot_.reset();
++    syncFocusables();
++    if (restore) {
++        applyFocusTransition(focusModel_.focusTagWithVisibility(restore->focusedTag, restore->isFocusVisible), true);
++    }
++    if (tag != 0 && (!restore || focusModel_.focusedTag() == kNoTag)) {
++        applyFocusTransition(focusModel_.move(FocusDirection::Forward), true);
++    }
++}
++
+ void InputDispatcher::dispatchAccessibilityActions(const std::vector<NativeAccessibilityAction>& actions) {
+     if (actions.empty()) {
+         return;
+@@ -385,9 +425,11 @@
+             accessibilityRoleOf(*target) != action.role) {
+             continue;
+         }
+-        const auto isPruned = [](const facebook::react::ShadowNode& node) {
++        const auto isPruned = [this](const facebook::react::ShadowNode& node) {
+             const auto props = std::dynamic_pointer_cast<const facebook::react::ViewProps>(node.getProps());
+-            return isDisplayNone(node) ||
++            return (dynamic_cast<const facebook::react::ModalHostViewShadowNode*>(&node) &&
++                    node.getTag() != modalRootTag_) ||
++                   isDisplayNone(node) ||
+                    (props && (props->accessibilityElementsHidden ||
+                               props->importantForAccessibility ==
+                                   facebook::react::ImportantForAccessibility::NoHideDescendants));
+@@ -470,7 +512,7 @@
+     return textInputController_.advanceCaretBlink(frameMilliseconds);
+ }
+ 
+-std::shared_ptr<const facebook::react::ShadowNode> InputDispatcher::rootShadowNode() const {
++std::shared_ptr<const facebook::react::ShadowNode> InputDispatcher::surfaceRootShadowNode() const {
+     std::shared_ptr<const facebook::react::ShadowNode> root;
+ 
+     uiManager_->getShadowTreeRegistry().visit(surfaceId_, [&root](const facebook::react::ShadowTree& shadowTree) {
+@@ -480,6 +522,15 @@
+     return root;
+ }
+ 
++std::shared_ptr<const facebook::react::ShadowNode> InputDispatcher::rootShadowNode() const {
++    const auto root = surfaceRootShadowNode();
++    if (root && modalRootTag_ != 0) {
++        return std::dynamic_pointer_cast<const facebook::react::ModalHostViewShadowNode>(
++            shadowNodeWithTag(root, modalRootTag_));
++    }
++    return root;
++}
++
+ PointerTarget InputDispatcher::resolveTarget(const InputEvent& event) const {
+     const std::shared_ptr<const facebook::react::ShadowNode> root = rootShadowNode();
+ 
+@@ -496,6 +547,9 @@
+                                  .offset = pointerOffsetWithinTarget(transformOfHit(paintedHit), event.surfacePoint)};
+         }
+ 
++        if (modalRootTag_ != 0) {
++            return PointerTarget{.shadowNode = root, .offset = {}};
++        }
+         const std::shared_ptr<const facebook::react::ShadowNode> hit =
+             uiManager_->findNodeAtPoint(root, event.surfacePoint);
+ 
+@@ -617,6 +671,13 @@
+         return;
+     }
+ 
++    if (modalRootTag_ != 0 && requestModalClose_ && event.key == "Escape") {
++        if (event.kind == InputEventKind::KeyPress && !event.repeat) {
++            requestModalClose_();
++        }
++        return;
++    }
++
+     const TextInputKeyResult editorResult = textInputController_.handleKey(event);
+ 
+     if (editorResult == TextInputKeyResult::ConsumedAndBlurred) {
+@@ -728,7 +789,7 @@
+ }
+ 
+ void InputDispatcher::syncFocusables() {
+-    const std::shared_ptr<const facebook::react::ShadowNode> root = rootShadowNode();
++    const std::shared_ptr<const facebook::react::ShadowNode> root = surfaceRootShadowNode();
+ 
+     if (root == syncedRoot_) {
+         return;
+@@ -739,7 +800,12 @@
+     textInputNodes_.clear();
+ 
+     if (root != nullptr) {
+-        collectFocusables(*root, false);
++        // A modal changes input eligibility, not the lifetime of background editors.
++        collectMountedFields(*root);
++        const auto activeRoot = modalRootTag_ == 0 ? root : shadowNodeWithTag(root, modalRootTag_);
++        if (activeRoot != nullptr) {
++            collectFocusables(*activeRoot, false);
++        }
+     }
+ 
+     // Before the focus transition below, so a commit that dropped the focused field finds the new field set
+@@ -771,20 +837,25 @@
+ 
+ void InputDispatcher::collectFocusables(const facebook::react::ShadowNode& shadowNode, bool isHidden) {
+     for (const std::shared_ptr<const facebook::react::ShadowNode>& child : shadowNode.getChildren()) {
++        if (std::dynamic_pointer_cast<const facebook::react::ModalHostViewShadowNode>(child)) {
++            continue;
++        }
+         const bool isChildHidden = isHidden || isDisplayNone(*child);
+ 
+         if (!isChildHidden && isFocusableNode(*child)) {
+             focusableNodes_.push_back(child);
+         }
+ 
+-        const std::shared_ptr<const TextInputShadowNode> textInput =
+-            std::dynamic_pointer_cast<const TextInputShadowNode>(child);
+-
+-        if (textInput != nullptr) {
+-            textInputNodes_.push_back(textInput);
+-        }
+-
+         collectFocusables(*child, isChildHidden);
++    }
++}
++
++void InputDispatcher::collectMountedFields(const facebook::react::ShadowNode& shadowNode) {
++    for (const auto& child : shadowNode.getChildren()) {
++        if (const auto field = std::dynamic_pointer_cast<const TextInputShadowNode>(child)) {
++            textInputNodes_.push_back(field);
++        }
++        collectMountedFields(*child);
+     }
+ }
+ 
+diff --git a/packages/core/src/InputDispatcher.h b/packages/core/src/InputDispatcher.h
+--- a/packages/core/src/InputDispatcher.h
++++ b/packages/core/src/InputDispatcher.h
+@@ -7,6 +7,7 @@
+ #include "ScrollPhysics.h"
+ #include "TextInputController.h"
+ 
++#include <functional>
+ #include <memory>
+ #include <optional>
+ #include <vector>
+@@ -108,9 +109,12 @@
+ class InputDispatcher final {
+ public:
+     InputDispatcher(std::shared_ptr<facebook::react::UIManager> uiManager,
+-                    std::shared_ptr<LinuxMountingManager> mountingManager, facebook::react::SurfaceId surfaceId);
++                    std::shared_ptr<LinuxMountingManager> mountingManager, facebook::react::SurfaceId surfaceId,
++                    std::function<void()> requestModalClose = {});
+ 
+     void dispatch(const std::vector<InputEvent>& events);
++
++    void setModalRoot(facebook::react::Tag tag);
+     void dispatchAccessibilityActions(const std::vector<NativeAccessibilityAction>& actions);
+ 
+     /**
+@@ -133,6 +137,7 @@
+     bool advanceCaretBlink(double frameMilliseconds);
+ 
+ private:
++    std::shared_ptr<const facebook::react::ShadowNode> surfaceRootShadowNode() const;
+     std::shared_ptr<const facebook::react::ShadowNode> rootShadowNode() const;
+     PointerTarget resolveTarget(const InputEvent& event) const;
+     facebook::react::Point absoluteOrigin(const facebook::react::ShadowNode& shadowNode) const;
+@@ -148,6 +153,7 @@
+     void emitSwitchChange(const facebook::react::ShadowNode& shadowNode) const;
+ 
+     void syncFocusables();
++    void collectMountedFields(const facebook::react::ShadowNode& shadowNode);
+     void collectFocusables(const facebook::react::ShadowNode& shadowNode, bool isHidden);
+     void applyFocusTransition(const FocusTransition& transition, bool preventScroll = false);
+     void updateTextInput();
+@@ -160,8 +166,19 @@
+     std::shared_ptr<facebook::react::UIManager> uiManager_;
+     std::shared_ptr<LinuxMountingManager> mountingManager_;
+     facebook::react::SurfaceId surfaceId_;
++    std::function<void()> requestModalClose_;
+     PointerRouter router_;
+     FocusModel focusModel_;
++
++    struct ModalFocus {
++        facebook::react::Tag modalTag;
++        facebook::react::Tag focusedTag;
++        bool isFocusVisible;
++        facebook::react::SharedEventEmitter emitter;
++    };
++
++    std::vector<ModalFocus> modalFocus_;
++    facebook::react::Tag modalRootTag_{0};
+     std::vector<std::shared_ptr<const facebook::react::ShadowNode>> focusableNodes_;
+     std::vector<std::shared_ptr<const TextInputShadowNode>> textInputNodes_;
+     std::shared_ptr<const facebook::react::ShadowNode> focusedNode_;
+diff --git a/packages/core/src/LinuxMountingManager.cpp b/packages/core/src/LinuxMountingManager.cpp
+--- a/packages/core/src/LinuxMountingManager.cpp
++++ b/packages/core/src/LinuxMountingManager.cpp
+@@ -96,6 +96,14 @@
+     return hasAdvanced;
+ }
+ 
++bool LinuxMountingManager::setModalPresentations(const std::vector<ModalPresentation>& presentations,
++                                                 facebook::react::Tag activeTag) {
++    const std::lock_guard<std::mutex> guard(sceneMutex_);
++    const bool changed = scene_.setModalPresentations(presentations, activeTag);
++    hasPendingDamage_ = hasPendingDamage_ || changed;
++    return changed;
++}
++
+ void LinuxMountingManager::setFocus(facebook::react::Tag tag, bool isFocusVisible) {
+     const std::lock_guard<std::mutex> guard(sceneMutex_);
+ 
+diff --git a/packages/core/src/LinuxMountingManager.h b/packages/core/src/LinuxMountingManager.h
+--- a/packages/core/src/LinuxMountingManager.h
++++ b/packages/core/src/LinuxMountingManager.h
+@@ -153,6 +153,7 @@
+      * dispatcher, which is the other thing besides a mutation that changes what the next frame paints.
+      */
+     void setFocus(facebook::react::Tag tag, bool isFocusVisible);
++    bool setModalPresentations(const std::vector<ModalPresentation>& presentations, facebook::react::Tag activeTag);
+ 
+     /**
+      * Publishes a `<TextInput>`'s caret, selection and composing run. Called from the frame thread by the text
+diff --git a/packages/core/src/ModalController.cpp b/packages/core/src/ModalController.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/src/ModalController.cpp
+@@ -0,0 +1,148 @@
++#include "ModalController.h"
++
++#include <algorithm>
++#include <cmath>
++#include <unordered_set>
++
++#include <react/renderer/core/LayoutableShadowNode.h>
++#include <react/renderer/mounting/ShadowTree.h>
++
++namespace react_native_linux {
++
++namespace {
++constexpr double kTransitionMilliseconds = 250;
++}
++
++ModalController::ModalController(std::shared_ptr<facebook::react::UIManager> uiManager,
++                                 facebook::react::SurfaceId surfaceId)
++    : uiManager_(std::move(uiManager)), surfaceId_(surfaceId) {}
++
++void ModalController::collect(const std::shared_ptr<const facebook::react::ShadowNode>& node, bool parentVisible,
++                              std::vector<facebook::react::Tag>& order) {
++    const auto* layoutable = dynamic_cast<const facebook::react::LayoutableShadowNode*>(node.get());
++    bool visible = parentVisible &&
++                   (!layoutable || layoutable->getLayoutMetrics().displayType != facebook::react::DisplayType::None);
++    if (const auto modal = std::dynamic_pointer_cast<const facebook::react::ModalHostViewShadowNode>(node)) {
++        visible = visible && modal->getConcreteProps().visible;
++        const auto tag = modal->getTag();
++        if (visible || entries_.contains(tag)) {
++            auto& entry = entries_[tag];
++            if (entry.node && entry.node->getEventEmitter() != modal->getEventEmitter()) {
++                entry = {};
++            }
++            entry.node = modal;
++            entry.requestedVisible = visible;
++            entry.needsDismiss = entry.needsDismiss || visible;
++            order.push_back(tag);
++        }
++    }
++    for (const auto& child : node->getChildren()) {
++        collect(child, visible, order);
++    }
++}
++
++bool ModalController::advance(double frameMilliseconds) {
++    std::shared_ptr<const facebook::react::RootShadowNode> root;
++    uiManager_->getShadowTreeRegistry().visit(
++        surfaceId_, [&](const facebook::react::ShadowTree& tree) { root = tree.getCurrentRevision().rootShadowNode; });
++    if (root != root_) {
++        root_ = root;
++        order_.clear();
++        if (root_) {
++            collect(root_, true, order_);
++        }
++        const std::unordered_set<facebook::react::Tag> mounted(order_.begin(), order_.end());
++        std::erase_if(entries_, [&](const auto& entry) { return !mounted.contains(entry.first); });
++    }
++
++    std::vector<ModalPresentation> next;
++    facebook::react::Tag active = 0;
++    isAnimating_ = false;
++    const auto size = root_ ? root_->getLayoutMetrics().frame.size : facebook::react::Size{};
++    const double step =
++        std::isfinite(frameMilliseconds) && frameMilliseconds > 0 ? frameMilliseconds / kTransitionMilliseconds : 0;
++    for (const auto tag : order_) {
++        auto& entry = entries_.at(tag);
++        const auto state = std::static_pointer_cast<const facebook::react::ModalHostViewShadowNode::ConcreteState>(
++            entry.node->getState());
++        const auto displaySize = state->getData().screenSize;
++        const bool ready = size.width > 0 && size.height > 0 && displaySize == size;
++        const bool canPresent = ready || (entry.progress > 0 && displaySize.width > 0 && displaySize.height > 0);
++        if ((entry.requestedVisible || entry.progress > 0) && !ready &&
++            (entry.requestedState != state || entry.requestedSize != size)) {
++            state->updateState(facebook::react::ModalHostViewState{size});
++            entry.requestedState = state;
++            entry.requestedSize = size;
++        }
++        if (ready) {
++            entry.requestedState.reset();
++        }
++        const auto& props = entry.node->getConcreteProps();
++        const auto& emitter = entry.node->getConcreteEventEmitter();
++        if (entry.requestedVisible && canPresent) {
++            const bool landscape = size.width > size.height;
++            if (ready && entry.landscape != landscape) {
++                emitter.onOrientationChange(
++                    {.orientation =
++                         landscape
++                             ? facebook::react::ModalHostViewEventEmitter::OnOrientationChangeOrientation::Landscape
++                             : facebook::react::ModalHostViewEventEmitter::OnOrientationChangeOrientation::Portrait});
++                entry.landscape = landscape;
++            }
++            entry.progress = props.animationType == facebook::react::ModalHostViewAnimationType::None
++                                 ? 1
++                                 : std::min(1.0, entry.progress + step);
++            if (entry.progress == 1 && !entry.didShow && ready) {
++                emitter.onShow({});
++                entry.didShow = true;
++            }
++        } else if (!entry.requestedVisible) {
++            entry.progress = props.animationType == facebook::react::ModalHostViewAnimationType::None
++                                 ? 0
++                                 : std::max(0.0, entry.progress - step);
++            if (entry.progress == 0 && entry.needsDismiss) {
++                emitter.onDismiss({});
++                entry.needsDismiss = false;
++                entry.didShow = false;
++                entry.landscape.reset();
++            }
++        }
++        if (entry.requestedVisible || entry.progress > 0) {
++            active = tag;
++        }
++        isAnimating_ = isAnimating_ || (entry.requestedVisible && canPresent && entry.progress < 1) ||
++                       (!entry.requestedVisible && entry.progress > 0);
++        if (canPresent && entry.progress > 0) {
++            next.push_back(
++                {.tag = tag,
++                 .size = displaySize,
++                 .opacity = props.animationType == facebook::react::ModalHostViewAnimationType::Fade
++                                ? static_cast<facebook::react::Float>(entry.progress)
++                                : 1,
++                 .translateY = props.animationType == facebook::react::ModalHostViewAnimationType::Slide
++                                   ? static_cast<facebook::react::Float>((1 - entry.progress) * displaySize.height)
++                                   : 0});
++        }
++    }
++    const bool changed = next != presentations_ || active != activeTag_;
++    presentations_ = std::move(next);
++    activeTag_ = active;
++    return changed;
++}
++
++bool ModalController::requestClose() {
++    const auto found = entries_.find(activeTag_);
++    if (found == entries_.end()) {
++        return false;
++    }
++    found->second.node->getConcreteEventEmitter().onRequestClose({});
++    return true;
++}
++
++bool ModalController::isAnimating() const noexcept { return isAnimating_; }
++
++facebook::react::Tag ModalController::activeTag() const noexcept { return activeTag_; }
++
++const std::vector<ModalPresentation>& ModalController::presentations() const noexcept { return presentations_; }
++
++} // namespace react_native_linux
+diff --git a/packages/core/src/ModalController.h b/packages/core/src/ModalController.h
+new file mode 100644
+--- /dev/null
++++ b/packages/core/src/ModalController.h
+@@ -0,0 +1,56 @@
++#pragma once
++
++#include "RetainedScene.h"
++
++#include <memory>
++#include <optional>
++#include <unordered_map>
++#include <vector>
++
++#include <react/renderer/components/modal/ModalHostViewShadowNode.h>
++#include <react/renderer/components/root/RootShadowNode.h>
++#include <react/renderer/uimanager/UIManager.h>
++
++namespace react_native_linux {
++
++/**
++ * The frame thread sizes stock Fabric modal state and advances presentation.
++ * State writes and events use React Native's own queued dispatch; no worker
++ * callback touches the controller. Removing a family revokes its presentation.
++ */
++class ModalController final {
++public:
++    ModalController(std::shared_ptr<facebook::react::UIManager> uiManager, facebook::react::SurfaceId surfaceId);
++
++    bool advance(double frameMilliseconds);
++    bool requestClose();
++    bool isAnimating() const noexcept;
++    facebook::react::Tag activeTag() const noexcept;
++    const std::vector<ModalPresentation>& presentations() const noexcept;
++
++private:
++    struct Entry {
++        std::shared_ptr<const facebook::react::ModalHostViewShadowNode> node;
++        facebook::react::State::Shared requestedState;
++        facebook::react::Size requestedSize{};
++        double progress{0};
++        bool requestedVisible{false};
++        bool needsDismiss{false};
++        bool didShow{false};
++        std::optional<bool> landscape;
++    };
++
++    void collect(const std::shared_ptr<const facebook::react::ShadowNode>& node, bool parentVisible,
++                 std::vector<facebook::react::Tag>& order);
++
++    std::shared_ptr<facebook::react::UIManager> uiManager_;
++    facebook::react::SurfaceId surfaceId_;
++    std::shared_ptr<const facebook::react::RootShadowNode> root_;
++    std::unordered_map<facebook::react::Tag, Entry> entries_;
++    std::vector<facebook::react::Tag> order_;
++    std::vector<ModalPresentation> presentations_;
++    facebook::react::Tag activeTag_{0};
++    bool isAnimating_{false};
++};
++
++} // namespace react_native_linux
+diff --git a/packages/core/src/RetainedScene.cpp b/packages/core/src/RetainedScene.cpp
+--- a/packages/core/src/RetainedScene.cpp
++++ b/packages/core/src/RetainedScene.cpp
+@@ -62,6 +62,8 @@
+     SceneMatrix matrix{};
+     float opacity{1.0F};
+     std::vector<SceneClip> clips{};
++    facebook::react::Tag presentedModalTag{0};
++    bool hidden{false};
+ };
+ 
+ /**
+@@ -78,6 +80,20 @@
+ }
+ 
+ namespace {
++
++bool isModalHost(const SceneNode& node) { return node.componentName == "ModalHostView"; }
++
++ScenePaintState modalPaintState(const SceneNode& node) {
++    if (!node.modalPresentation) {
++        return ScenePaintState{.hidden = true};
++    }
++    const auto& presentation = *node.modalPresentation;
++    return ScenePaintState{
++        .origin = {-node.layoutMetrics.frame.origin.x, -node.layoutMetrics.frame.origin.y},
++        .matrix = {.translateY = presentation.translateY},
++        .clips = {SceneClip{.frame = {.origin = {}, .size = presentation.size}, .borderRadii = {}, .matrix = {}}},
++        .presentedModalTag = node.tag};
++}
+ 
+ template <typename Nodes>
+ void eraseChildTag(Nodes& nodes, facebook::react::Tag parentTag, facebook::react::Tag childTag) {
+@@ -1092,7 +1108,9 @@
+     ScenePaintState childState{.origin = contentOrigin(node, geometry.frame.origin),
+                                .matrix = geometry.matrix,
+                                .opacity = opacity,
+-                               .clips = state.clips};
++                               .clips = state.clips,
++                               .presentedModalTag = state.presentedModalTag,
++                               .hidden = state.hidden};
+ 
+     if (node.clipsChildren) {
+         childState.clips.push_back(SceneClip{
+@@ -1157,8 +1175,12 @@
+  */
+ ScenePaintState paintStateOfAncestors(const SceneNodes& nodes, facebook::react::Tag tag) {
+     const auto entry = nodes.find(tag);
++    if (entry != nodes.end() && isModalHost(entry->second)) {
++        return modalPaintState(entry->second);
++    }
+     facebook::react::Tag current = entry == nodes.end() ? 0 : entry->second.parentTag;
+     std::vector<const SceneNode*> ancestors;
++    ScenePaintState state;
+ 
+     while (current != 0) {
+         const auto ancestor = nodes.find(current);
+@@ -1167,13 +1189,18 @@
+             break;
+         }
+ 
++        if (isModalHost(ancestor->second)) {
++            state = modalPaintState(ancestor->second);
++            if (!state.hidden) {
++                state = visitNode(ancestor->second, state).childState;
++            }
++            break;
++        }
+         ancestors.push_back(&ancestor->second);
+         current = ancestor->second.parentTag;
+     }
+ 
+     std::reverse(ancestors.begin(), ancestors.end());
+-
+-    ScenePaintState state;
+ 
+     for (const SceneNode* ancestor : ancestors) {
+         state = visitNode(*ancestor, state).childState;
+@@ -1221,8 +1248,11 @@
+  */
+ std::optional<facebook::react::Rect> clippedPrimitiveBounds(const SceneNodes& nodes, facebook::react::Tag tag,
+                                                             const SceneNode& node) {
+-    const facebook::react::Rect bounds =
+-        primitiveDamageBounds(visitNode(node, paintStateOfAncestors(nodes, tag)).primitive);
++    const auto state = paintStateOfAncestors(nodes, tag);
++    if (state.hidden) {
++        return std::nullopt;
++    }
++    const facebook::react::Rect bounds = primitiveDamageBounds(visitNode(node, state).primitive);
+ 
+     if (!hasArea(bounds)) {
+         return std::nullopt;
+@@ -1778,6 +1808,13 @@
+ }
+ 
+ SceneHit RetainedScene::findNodeAtPoint(facebook::react::Tag rootTag, facebook::react::Point surfacePoint) const {
++    if (activeModalTag_ != 0) {
++        const auto modal = nodes_.find(activeModalTag_);
++        if (modal == nodes_.end() || !modal->second.modalPresentation) {
++            return {};
++        }
++        return hitTestNode(activeModalTag_, surfacePoint, modalPaintState(modal->second));
++    }
+     return hitTestNode(rootTag, surfacePoint, ScenePaintState{});
+ }
+ 
+@@ -1806,6 +1843,29 @@
+     return std::nullopt;
+ }
+ 
++bool RetainedScene::setModalPresentations(const std::vector<ModalPresentation>& presentations,
++                                          facebook::react::Tag activeTag) {
++    if (presentations == modalPresentations_ && activeTag == activeModalTag_) {
++        return false;
++    }
++    for (const auto& previous : modalPresentations_) {
++        damageSubtree(previous.tag);
++    }
++    modalPresentations_ = presentations;
++    activeModalTag_ = activeTag;
++    for (auto& [tag, node] : nodes_) {
++        if (!isModalHost(node)) {
++            continue;
++        }
++        const auto found = std::ranges::find(modalPresentations_, tag, &ModalPresentation::tag);
++        node.modalPresentation = found == modalPresentations_.end() ? std::nullopt : std::optional{*found};
++    }
++    for (const auto& current : modalPresentations_) {
++        damageSubtree(current.tag);
++    }
++    return true;
++}
++
+ SceneSnapshot RetainedScene::snapshot() const {
+     SceneSnapshot primitives;
+     const ScenePaintState rootState{};
+@@ -1818,14 +1878,45 @@
+     for (facebook::react::Tag tag : sortedRootTags()) {
+         appendPrimitives(primitives, tag, rootState);
+     }
++    for (const auto& presentation : modalPresentations_) {
++        const auto modal = nodes_.find(presentation.tag);
++        if (modal == nodes_.end() || !isModalHost(modal->second)) {
++            continue;
++        }
++        const auto first = primitives.size();
++        appendPrimitives(primitives, presentation.tag, modalPaintState(modal->second));
++        if (primitives.size() > first && presentation.opacity < 1) {
++            primitives[first].opensLayers.insert(primitives[first].opensLayers.begin(), presentation.opacity);
++            ++primitives.back().closesLayers;
++        }
++    }
+ 
+     return primitives;
+ }
+ 
+ SceneAccessibilitySnapshot RetainedScene::accessibilitySnapshot() const {
+     SceneAccessibilitySnapshot snapshot{.nodes = nodes_, .geometry = {}, .focusedTag = focusedTag_};
+-    for (const auto tag : sortedRootTags()) {
+-        appendAccessibilityGeometry(snapshot, tag, ScenePaintState{});
++    if (activeModalTag_ != 0) {
++        const auto modal = nodes_.find(activeModalTag_);
++        if (modal != nodes_.end()) {
++            appendAccessibilityGeometry(snapshot, activeModalTag_, modalPaintState(modal->second));
++        }
++    } else {
++        for (const auto tag : sortedRootTags()) {
++            appendAccessibilityGeometry(snapshot, tag, ScenePaintState{});
++        }
++    }
++    std::erase_if(snapshot.nodes, [&snapshot](const auto& entry) { return !snapshot.geometry.contains(entry.first); });
++    for (auto& [tag, node] : snapshot.nodes) {
++        std::erase_if(node.childTags, [&snapshot](auto child) { return !snapshot.nodes.contains(child); });
++        if (tag == activeModalTag_) {
++            node.parentTag = 0;
++            node.accessibility.accessible = true;
++            node.accessibility.accessibilityRole = "dialog";
++        }
++    }
++    if (activeModalTag_ != 0 && !snapshot.nodes.contains(snapshot.focusedTag)) {
++        snapshot.focusedTag = 0;
+     }
+     return snapshot;
+ }
+@@ -1833,7 +1924,8 @@
+ void RetainedScene::appendAccessibilityGeometry(SceneAccessibilitySnapshot& snapshot, facebook::react::Tag tag,
+                                                 const ScenePaintState& state) const {
+     const auto found = nodes_.find(tag);
+-    if (found == nodes_.end() || found->second.layoutMetrics.displayType == facebook::react::DisplayType::None) {
++    if (state.hidden || found == nodes_.end() || (isModalHost(found->second) && tag != state.presentedModalTag) ||
++        found->second.layoutMetrics.displayType == facebook::react::DisplayType::None) {
+         return;
+     }
+     const auto& node = found->second;
+@@ -1873,6 +1965,12 @@
+     node.tag = shadowView.tag;
+     node.accessibilityEmitter = shadowView.eventEmitter;
+     node.componentName = readComponentName(shadowView);
++    if (isModalHost(node)) {
++        const auto modal = std::ranges::find(modalPresentations_, node.tag, &ModalPresentation::tag);
++        node.modalPresentation = modal == modalPresentations_.end() ? std::nullopt : std::optional{*modal};
++    } else {
++        node.modalPresentation.reset();
++    }
+     node.layoutMetrics = shadowView.layoutMetrics;
+     readPaintProps(node, shadowView);
+     readTextContent(node, shadowView);
+@@ -1914,6 +2012,9 @@
+     }
+ 
+     const SceneNode& node = entry->second;
++    if (state.hidden || (isModalHost(node) && tag != state.presentedModalTag)) {
++        return;
++    }
+     const bool isOpacityLayer = opensOpacityLayer(node);
+     const size_t firstPrimitive = primitives.size();
+     SceneVisit visit = visitNode(node, state, isOpacityLayer);
+@@ -1963,6 +2064,9 @@
+     }
+ 
+     const SceneNode& node = entry->second;
++    if (state.hidden || (isModalHost(node) && tag != state.presentedModalTag)) {
++        return {};
++    }
+ 
+     const SceneNodeGeometry geometry = nodeGeometry(node, state);
+     const SceneHit nodeHit{.tag = tag,
+diff --git a/packages/core/src/RetainedScene.h b/packages/core/src/RetainedScene.h
+--- a/packages/core/src/RetainedScene.h
++++ b/packages/core/src/RetainedScene.h
+@@ -520,12 +520,22 @@
+     std::optional<facebook::react::Point> adoptedOffset;
+ };
+ 
++struct ModalPresentation {
++    facebook::react::Tag tag;
++    facebook::react::Size size;
++    facebook::react::Float opacity{1};
++    facebook::react::Float translateY{0};
++
++    bool operator==(const ModalPresentation&) const = default;
++};
++
+ struct SceneNode {
+     uint64_t accessibilityId{};
+     facebook::react::SharedEventEmitter accessibilityEmitter;
+     facebook::react::Tag tag{};
+     facebook::react::Tag parentTag{};
+     std::string componentName;
++    std::optional<ModalPresentation> modalPresentation;
+ 
+     /**
+      * The two identity props a react-native-windows tree snapshot asserts on, kept because the automation
+@@ -835,6 +845,7 @@
+      * animated to `opacity: 0` — see *Hit-testing under animation* in docs/cpp-toolchain.md.
+      */
+     SceneHit findNodeAtPoint(facebook::react::Tag rootTag, facebook::react::Point surfacePoint) const;
++    bool setModalPresentations(const std::vector<ModalPresentation>& presentations, facebook::react::Tag activeTag);
+     SceneSnapshot snapshot() const;
+     SceneAccessibilitySnapshot accessibilitySnapshot() const;
+ 
+@@ -877,6 +888,8 @@
+     void appendAccessibilityGeometry(SceneAccessibilitySnapshot& snapshot, facebook::react::Tag tag,
+                                      const ScenePaintState& state) const;
+ 
++    std::vector<ModalPresentation> modalPresentations_;
++    facebook::react::Tag activeModalTag_{0};
+     uint64_t nextAccessibilityId_{2};
+     SceneNodes nodes_;
+     std::vector<RejectedNonFiniteProp> rejectedNonFiniteProps_;
+diff --git a/packages/core/src/ScrollController.cpp b/packages/core/src/ScrollController.cpp
+--- a/packages/core/src/ScrollController.cpp
++++ b/packages/core/src/ScrollController.cpp
+@@ -1,5 +1,6 @@
+ #include "ScrollController.h"
+ 
++#include "ShadowNodeLookup.h"
+ #include "TextInputComponent.h"
+ 
+ #include <algorithm>
+@@ -295,6 +296,11 @@
+                                    facebook::react::SurfaceId surfaceId)
+     : uiManager_(std::move(uiManager)), surfaceId_(surfaceId) {}
+ 
++void ScrollController::setModalRoot(facebook::react::Tag tag, std::shared_ptr<LinuxMountingManager> mountingManager) {
++    modalRootTag_ = tag;
++    mountingManager_ = std::move(mountingManager);
++}
++
+ void ScrollController::dispatch(const std::vector<InputEvent>& events) {
+     for (const InputEvent& event : events) {
+         if (isScrollEvent(event)) {
+@@ -560,30 +566,7 @@
+     return target.isFingerDown || target.isMomentumRunning || target.isSettlingFromRelease;
+ }
+ 
+-namespace {
+-
+-/**
+- * The `<ScrollView>` with this tag anywhere under `node`, or nothing. A command names a tag rather than a point,
+- * so this is the lookup `scrollViewUnderPointer` is for a press.
+- */
+-std::shared_ptr<const facebook::react::ScrollViewShadowNode>
+-findScrollViewWithTag(const std::shared_ptr<const facebook::react::ShadowNode>& node, facebook::react::Tag tag) {
+-    if (node->getTag() == tag) {
+-        return std::dynamic_pointer_cast<const facebook::react::ScrollViewShadowNode>(node);
+-    }
+-
+-    for (const std::shared_ptr<const facebook::react::ShadowNode>& child : node->getChildren()) {
+-        const std::shared_ptr<const facebook::react::ScrollViewShadowNode> found = findScrollViewWithTag(child, tag);
+-
+-        if (found != nullptr) {
+-            return found;
+-        }
+-    }
+-
+-    return nullptr;
+-}
+-
+-} // namespace
++namespace {} // namespace
+ 
+ /**
+  * The surface's current root, which both lookups below start from: one walks it for a tag and the other hit-tests
+@@ -603,19 +586,21 @@
+ ScrollController::scrollViewWithTag(facebook::react::Tag tag) const {
+     const std::shared_ptr<const facebook::react::ShadowNode> rootNode = rootShadowNode();
+ 
+-    return rootNode == nullptr ? nullptr : findScrollViewWithTag(rootNode, tag);
++    return std::dynamic_pointer_cast<const facebook::react::ScrollViewShadowNode>(shadowNodeWithTag(rootNode, tag));
+ }
+ 
+ std::shared_ptr<const facebook::react::ScrollViewShadowNode>
+ ScrollController::scrollViewUnderPointer(facebook::react::Point surfacePoint) const {
+-    const std::shared_ptr<const facebook::react::ShadowNode> rootNode = rootShadowNode();
++    const auto surfaceRoot = rootShadowNode();
++    const auto rootNode = modalRootTag_ == 0 ? surfaceRoot : shadowNodeWithTag(surfaceRoot, modalRootTag_);
+ 
+     if (rootNode == nullptr) {
+         return nullptr;
+     }
+ 
+-    const std::shared_ptr<const facebook::react::ShadowNode> hitNode =
+-        uiManager_->findNodeAtPoint(rootNode, surfacePoint);
++    const auto hitNode =
++        mountingManager_ ? shadowNodeWithTag(rootNode, mountingManager_->findNodeAtPoint(surfaceId_, surfacePoint).tag)
++                         : uiManager_->findNodeAtPoint(rootNode, surfacePoint);
+ 
+     if (hitNode == nullptr) {
+         return nullptr;
+diff --git a/packages/core/src/ScrollController.h b/packages/core/src/ScrollController.h
+--- a/packages/core/src/ScrollController.h
++++ b/packages/core/src/ScrollController.h
+@@ -96,6 +96,7 @@
+      * `scrollToDestination`.
+      */
+     void dispatchCommands(const std::vector<SceneCommand>& commands);
++    void setModalRoot(facebook::react::Tag tag, std::shared_ptr<LinuxMountingManager> mountingManager);
+ 
+     /**
+      * Adopts the offsets a mounting transaction moved maintaining `<ScrollView>`s to, so the position this class
+@@ -168,6 +169,8 @@
+ 
+     std::shared_ptr<facebook::react::UIManager> uiManager_;
+     facebook::react::SurfaceId surfaceId_;
++    std::shared_ptr<LinuxMountingManager> mountingManager_;
++    facebook::react::Tag modalRootTag_{0};
+     std::unordered_map<facebook::react::Tag, ScrollTarget> targets_;
+     ScrollAxisLock axisLock_;
+     bool hasDispatchedScrollEvent_{false};
+diff --git a/packages/core/src/ShadowNodeLookup.h b/packages/core/src/ShadowNodeLookup.h
+new file mode 100644
+--- /dev/null
++++ b/packages/core/src/ShadowNodeLookup.h
+@@ -0,0 +1,22 @@
++#pragma once
++
++#include <memory>
++
++#include <react/renderer/core/ShadowNode.h>
++
++namespace react_native_linux {
++
++inline std::shared_ptr<const facebook::react::ShadowNode>
++shadowNodeWithTag(const std::shared_ptr<const facebook::react::ShadowNode>& node, facebook::react::Tag tag) {
++    if (!node || node->getTag() == tag) {
++        return node;
++    }
++    for (const auto& child : node->getChildren()) {
++        if (const auto found = shadowNodeWithTag(child, tag)) {
++            return found;
++        }
++    }
++    return nullptr;
++}
++
++} // namespace react_native_linux
+diff --git a/packages/core/src/WindowSession.cpp b/packages/core/src/WindowSession.cpp
+--- a/packages/core/src/WindowSession.cpp
++++ b/packages/core/src/WindowSession.cpp
+@@ -106,6 +106,7 @@
+     fabricHost_->advanceCaretBlink(frameMilliseconds);
+     fabricHost_->advanceImageAnimations(frameMilliseconds);
+     fabricHost_->advanceControlAnimations(frameMilliseconds);
++    fabricHost_->advanceModals(frameMilliseconds);
+     fabricHost_->dispatchAccessibilityActions(accessibility_.takeActions());
+     fabricHost_->dispatchInput(events);
+     fabricHost_->advanceScroll(frameMilliseconds);
+diff --git a/packages/core/tests/ModalControllerTest.cpp b/packages/core/tests/ModalControllerTest.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/tests/ModalControllerTest.cpp
+@@ -0,0 +1,360 @@
++#include "ModalController.h"
++
++#include "InputDispatcher.h"
++#include "ScrollController.h"
++#include "ShadowTreeTestSupport.h"
++
++#include <algorithm>
++#include <functional>
++#include <limits>
++
++#include <react/renderer/components/modal/ModalHostViewComponentDescriptor.h>
++#include <react/renderer/components/scrollview/ScrollViewComponentDescriptor.h>
++#include <react/renderer/mounting/ShadowViewMutation.h>
++
++namespace react_native_linux {
++namespace {
++
++class ModalTextInputSink final : public TextInputFocusSink {
++public:
++    void focusField(int32_t, TextInputContentPurpose) override {}
++
++    void blurField() override {}
++
++    void setSurroundingText(std::string value, int32_t cursor, int32_t anchor) override {
++        text = std::move(value);
++        cursorByte = cursor;
++        anchorByte = anchor;
++    }
++
++    void setCursorRectangle(int32_t, int32_t, int32_t, int32_t) override {}
++
++    void flushTextInput() override {}
++
++    std::string text;
++    int32_t cursorByte{0};
++    int32_t anchorByte{0};
++};
++
++class ModalControllerTest : public TextInputFieldFixture {
++protected:
++    using ModalNode = facebook::react::ModalHostViewShadowNode;
++
++    std::shared_ptr<const facebook::react::ShadowNode> modal(folly::dynamic props, facebook::react::Tag tag = 2,
++                                                             facebook::react::Size size = {400, 300}) {
++        const auto node = makeConfiguredShadowNode(
++            descriptor_, tag, kSurfaceId, contextContainer_, std::move(props),
++            std::make_shared<const std::vector<std::shared_ptr<const facebook::react::ShadowNode>>>());
++        return descriptor_.cloneShadowNode(
++            *node, facebook::react::ShadowNodeFragment{
++                       .state = std::make_shared<const ModalNode::ConcreteState>(
++                           std::make_shared<const facebook::react::ModalHostViewState>(size), *node->getState())});
++    }
++
++    std::shared_ptr<const facebook::react::ShadowNode>
++    visible(const std::shared_ptr<const facebook::react::ShadowNode>& node, bool value) {
++        const facebook::react::PropsParserContext context{kSurfaceId, *contextContainer_};
++        return descriptor_.cloneShadowNode(
++            *node,
++            facebook::react::ShadowNodeFragment{
++                .props = descriptor_.cloneProps(context, node->getProps(),
++                                                facebook::react::RawProps{folly::dynamic::object("visible", value)})});
++    }
++
++    std::shared_ptr<const facebook::react::ShadowNode>
++    children(const std::shared_ptr<const facebook::react::ShadowNode>& node,
++             std::vector<std::shared_ptr<const facebook::react::ShadowNode>> descendants) {
++        return descriptor_.cloneShadowNode(
++            *node,
++            facebook::react::ShadowNodeFragment{
++                .children = std::make_shared<const std::vector<std::shared_ptr<const facebook::react::ShadowNode>>>(
++                    std::move(descendants))});
++    }
++
++    void commit(std::vector<std::shared_ptr<const facebook::react::ShadowNode>> children,
++                facebook::react::Size size = {400, 300}) {
++        shadowTree_->commit(
++            [&](const facebook::react::RootShadowNode& root) {
++                const facebook::react::PropsParserContext context{kSurfaceId, *contextContainer_};
++                const auto resized =
++                    root.clone(context, exactSurfaceConstraints(size), facebook::react::LayoutContext{});
++                return cloneRootWithChildren(
++                    *resized,
++                    std::make_shared<const std::vector<std::shared_ptr<const facebook::react::ShadowNode>>>(children));
++            },
++            facebook::react::ShadowTreeCommitOptions{.enableStateReconciliation = false, .mountSynchronously = true});
++    }
++
++    size_t events(const std::string& name) const { return std::ranges::count(*recordedEventTypes_, name); }
++
++    facebook::react::ModalHostViewComponentDescriptor descriptor_{facebook::react::ComponentDescriptorParameters{
++        .eventDispatcher = eventDispatcher_, .contextContainer = contextContainer_, .flavor = nullptr}};
++    facebook::react::ViewComponentDescriptor viewDescriptor_{facebook::react::ComponentDescriptorParameters{
++        .eventDispatcher = eventDispatcher_, .contextContainer = contextContainer_, .flavor = nullptr}};
++};
++
++TEST_F(ModalControllerTest, EmptySurfaceHasNoModalOrCloseHandler) {
++    commit({});
++    ModalController controller(uiManager_, kSurfaceId);
++    EXPECT_FALSE(controller.advance(0));
++    EXPECT_EQ(controller.activeTag(), 0);
++    EXPECT_TRUE(controller.presentations().empty());
++    EXPECT_FALSE(controller.requestClose());
++    EXPECT_FALSE(controller.isAnimating());
++}
++
++TEST_F(ModalControllerTest, StockModalStateProducesOneShowAndOrientationEvent) {
++    commit({modal(folly::dynamic::object("visible", true))});
++    ModalController controller(uiManager_, kSurfaceId);
++    ASSERT_TRUE(controller.advance(0));
++    ASSERT_EQ(controller.presentations().size(), 1);
++    EXPECT_EQ(controller.activeTag(), 2);
++    EXPECT_EQ(controller.presentations().front().size, (facebook::react::Size{400, 300}));
++    EXPECT_EQ(controller.presentations().front().opacity, 1);
++    EXPECT_EQ(events("topShow"), 1);
++    EXPECT_EQ(events("topOrientationChange"), 1);
++    EXPECT_FALSE(controller.isAnimating());
++    EXPECT_FALSE(controller.advance(50));
++    EXPECT_EQ(events("topShow"), 1);
++}
++
++TEST_F(ModalControllerTest, CloseRequestsReachTheRealEmitterWithoutHidingControlledContent) {
++    commit({modal(folly::dynamic::object("visible", true))});
++    ModalController controller(uiManager_, kSurfaceId);
++    controller.advance(0);
++    EXPECT_TRUE(controller.requestClose());
++    EXPECT_EQ(events("topRequestClose"), 1);
++    EXPECT_EQ(controller.activeTag(), 2);
++    EXPECT_EQ(controller.presentations().size(), 1);
++    EXPECT_EQ(events("topDismiss"), 0);
++}
++
++TEST_F(ModalControllerTest, FadeCanReverseBeforeShowAndReleasesTheNativeKeepAlive) {
++    const auto node = modal(folly::dynamic::object("visible", true)("animationType", "fade"));
++    commit({node});
++    ModalController controller(uiManager_, kSurfaceId);
++    controller.advance(0);
++    EXPECT_TRUE(controller.isAnimating());
++    controller.advance(62.5);
++    ASSERT_EQ(controller.presentations().size(), 1);
++    EXPECT_FLOAT_EQ(controller.presentations().front().opacity, 0.25);
++    EXPECT_EQ(events("topShow"), 0);
++    commit({visible(node, false)});
++    controller.advance(62.5);
++    EXPECT_TRUE(controller.presentations().empty());
++    EXPECT_EQ(controller.activeTag(), 0);
++    EXPECT_EQ(events("topDismiss"), 1);
++    EXPECT_FALSE(controller.isAnimating());
++    controller.advance(100);
++    EXPECT_EQ(events("topDismiss"), 1);
++}
++
++TEST_F(ModalControllerTest, InvalidClockStepsCannotCompleteOrReverseTheNativeAnimation) {
++    commit({modal(folly::dynamic::object("visible", true)("animationType", "slide"))});
++    ModalController controller(uiManager_, kSurfaceId);
++    controller.advance(125);
++    ASSERT_EQ(controller.presentations().size(), 1);
++    EXPECT_FLOAT_EQ(controller.presentations().front().translateY, 150);
++    EXPECT_TRUE(controller.isAnimating());
++    controller.advance(std::numeric_limits<double>::quiet_NaN());
++    controller.advance(-100);
++    EXPECT_FLOAT_EQ(controller.presentations().front().translateY, 150);
++    controller.advance(125);
++    EXPECT_EQ(controller.presentations().front().translateY, 0);
++    EXPECT_FALSE(controller.isAnimating());
++    EXPECT_EQ(events("topShow"), 1);
++}
++
++TEST_F(ModalControllerTest, RemovedFamilyRevokesItsPresentationAndCloseEmitter) {
++    commit({modal(folly::dynamic::object("visible", true))});
++    ModalController controller(uiManager_, kSurfaceId);
++    controller.advance(0);
++    commit({});
++    EXPECT_TRUE(controller.advance(0));
++    EXPECT_TRUE(controller.presentations().empty());
++    EXPECT_EQ(controller.activeTag(), 0);
++    EXPECT_FALSE(controller.requestClose());
++    EXPECT_EQ(events("topRequestClose"), 0);
++}
++
++TEST_F(ModalControllerTest, ResizingKeepsThePresentedModalWhileItsStockStateUpdateIsPending) {
++    const auto node = modal(folly::dynamic::object("visible", true));
++    commit({node});
++    ModalController controller(uiManager_, kSurfaceId);
++    controller.advance(0);
++    commit({node}, {600, 500});
++    controller.advance(0);
++    ASSERT_EQ(controller.presentations().size(), 1);
++    EXPECT_EQ(controller.presentations().front().size, (facebook::react::Size{400, 300}));
++    EXPECT_EQ(controller.activeTag(), 2);
++    EXPECT_EQ(events("topShow"), 1);
++}
++
++TEST_F(ModalControllerTest, ModalFocusRejectsBackgroundCommandsAndRestoresThePreviousField) {
++    const auto background = makeField(4, folly::dynamic::object("width", 100)("height", 40));
++    const auto field = makeField(6, folly::dynamic::object("width", 100)("height", 40));
++    commit({background, children(modal(folly::dynamic::object("visible", true)), {field})});
++    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    const SceneCommand focus{.tag = 4, .name = "focus", .args = folly::dynamic::object()};
++    dispatcher.dispatchCommands({focus});
++    ASSERT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 4);
++    dispatcher.setModalRoot(2);
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 6);
++    dispatcher.dispatchCommands({focus});
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 6);
++    dispatcher.setModalRoot(0);
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 4);
++}
++
++TEST_F(ModalControllerTest, NestedModalFocusReturnsThroughItsParentBeforeRestoringTheBackground) {
++    const auto background = makeField(4, folly::dynamic::object("width", 100)("height", 40));
++    const auto parentField = makeField(6, folly::dynamic::object("width", 100)("height", 40));
++    const auto childField = makeField(10, folly::dynamic::object("width", 100)("height", 40));
++    const auto child = children(modal(folly::dynamic::object("visible", true), 8), {childField});
++    commit({background, children(modal(folly::dynamic::object("visible", true)), {parentField, child})});
++    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    dispatcher.dispatchCommands({SceneCommand{.tag = 4, .name = "focus", .args = folly::dynamic::object()}});
++    dispatcher.setModalRoot(2);
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 6);
++    dispatcher.setModalRoot(8);
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 10);
++    dispatcher.setModalRoot(2);
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 6);
++    dispatcher.setModalRoot(0);
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 4);
++}
++
++TEST_F(ModalControllerTest, AModalPreservesTheBackgroundEditorsLocalTextAndCaret) {
++    const auto background = makeField(4, folly::dynamic::object("width", 100)("height", 40));
++    const auto field = makeField(6, folly::dynamic::object("width", 100)("height", 40));
++    commit({background, children(modal(folly::dynamic::object("visible", true)), {field})});
++    ModalTextInputSink sink;
++    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    dispatcher.setTextInputFocusSink(&sink);
++    dispatcher.dispatchCommands({SceneCommand{.tag = 4, .name = "focus", .args = folly::dynamic::object()}});
++    dispatcher.dispatch({InputEvent{.kind = InputEventKind::KeyPress, .key = "a"},
++                         InputEvent{.kind = InputEventKind::KeyPress, .key = "b"},
++                         InputEvent{.kind = InputEventKind::KeyPress, .key = "ArrowLeft"}});
++    ASSERT_EQ(sink.text, "ab");
++    ASSERT_EQ(sink.cursorByte, 1);
++    dispatcher.setModalRoot(2);
++    dispatcher.dispatch({InputEvent{.kind = InputEventKind::KeyPress, .key = "m"}});
++    ASSERT_EQ(sink.text, "m");
++    dispatcher.setModalRoot(0);
++    dispatcher.dispatch({});
++    EXPECT_EQ(sink.text, "ab");
++    EXPECT_EQ(sink.cursorByte, 1);
++    EXPECT_EQ(sink.anchorByte, 1);
++    dispatcher.dispatch({InputEvent{.kind = InputEventKind::KeyPress, .key = "x"}});
++    EXPECT_EQ(sink.text, "axb");
++}
++
++TEST_F(ModalControllerTest, ReplacingAModalFamilyResetsItsFocusAndPreservesTheBackgroundAnchor) {
++    const auto background = makeField(4, folly::dynamic::object("width", 100)("height", 40));
++    const auto original = makeField(6, folly::dynamic::object("width", 100)("height", 40));
++    commit({background, children(modal(folly::dynamic::object("visible", true)), {original})});
++    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    dispatcher.dispatchCommands({SceneCommand{.tag = 4, .name = "focus", .args = folly::dynamic::object()}});
++    dispatcher.setModalRoot(2);
++    ASSERT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 6);
++    const auto replacement = makeField(10, folly::dynamic::object("width", 100)("height", 40));
++    commit({background, children(modal(folly::dynamic::object("visible", true)), {replacement})});
++    dispatcher.setModalRoot(2);
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 10);
++    dispatcher.setModalRoot(0);
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 4);
++}
++
++TEST_F(ModalControllerTest, AQueuedActionCannotReachAnInactiveNestedModal) {
++    const auto custom = makeConfiguredShadowNode(
++        viewDescriptor_, 12, kSurfaceId, contextContainer_,
++        folly::dynamic::object("accessible", true)("accessibilityRole", "button")("onAccessibilityAction", true)(
++            "accessibilityActions", folly::dynamic::array(folly::dynamic::object("name", "archive"))),
++        std::make_shared<const std::vector<std::shared_ptr<const facebook::react::ShadowNode>>>());
++    const NativeAccessibilityAction action{.kind = NativeAccessibilityAction::Kind::Custom,
++                                           .tag = 12,
++                                           .emitter = custom->getEventEmitter(),
++                                           .role = "button",
++                                           .actionName = "archive"};
++    commit({custom});
++    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    dispatcher.dispatchAccessibilityActions({action});
++    ASSERT_EQ(events("topAccessibilityAction"), 1);
++    const auto hidden = children(modal(folly::dynamic::object("visible", false), 8), {custom});
++    commit({children(modal(folly::dynamic::object("visible", true)), {hidden})});
++    dispatcher.setModalRoot(2);
++    dispatcher.dispatchAccessibilityActions({action});
++    EXPECT_EQ(events("topAccessibilityAction"), 1);
++}
++
++TEST_F(ModalControllerTest, EscapeCannotCloseAModalWhileEarlierInputInTheFrameStartedComposition) {
++    const auto field = makeField(6, folly::dynamic::object("width", 100)("height", 40));
++    commit({children(modal(folly::dynamic::object("visible", true)), {field})});
++    int closeRequests = 0;
++    InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId, [&] { ++closeRequests; });
++    dispatcher.setModalRoot(2);
++    dispatcher.dispatch({InputEvent{.kind = InputEventKind::ImePreedit, .text = "ni", .preeditCursorEnd = 2},
++                         InputEvent{.kind = InputEventKind::KeyPress, .key = "Escape"}});
++    EXPECT_EQ(closeRequests, 0);
++    dispatcher.dispatch({InputEvent{.kind = InputEventKind::ImePreedit, .text = ""},
++                         InputEvent{.kind = InputEventKind::KeyPress, .key = "Escape"},
++                         InputEvent{.kind = InputEventKind::KeyPress, .key = "Escape", .repeat = true},
++                         InputEvent{.kind = InputEventKind::KeyRelease, .key = "Escape"}});
++    EXPECT_EQ(closeRequests, 1);
++}
++
++TEST_F(ModalControllerTest, ScrollInputUsesThePresentedModalAndCannotReachTheBackground) {
++    facebook::react::ScrollViewComponentDescriptor scrollDescriptor{facebook::react::ComponentDescriptorParameters{
++        .eventDispatcher = eventDispatcher_, .contextContainer = contextContainer_, .flavor = nullptr}};
++    const auto content = makeConfiguredShadowNode(
++        viewDescriptor_, 26, kSurfaceId, contextContainer_, folly::dynamic::object("width", 100)("height", 600),
++        std::make_shared<const std::vector<std::shared_ptr<const facebook::react::ShadowNode>>>());
++    const auto scroll = makeConfiguredShadowNode(
++        scrollDescriptor, 24, kSurfaceId, contextContainer_, folly::dynamic::object("width", 100)("height", 100),
++        std::make_shared<const std::vector<std::shared_ptr<const facebook::react::ShadowNode>>>(
++            std::vector<std::shared_ptr<const facebook::react::ShadowNode>>{content}));
++    commit({children(modal(folly::dynamic::object("visible", true)), {scroll})});
++    facebook::react::ShadowViewMutationList mutations;
++    std::function<void(const facebook::react::ShadowNode&)> mount = [&](const auto& parent) {
++        int index = 0;
++        for (const auto& child : parent.getChildren()) {
++            const facebook::react::ShadowView view{*child};
++            mutations.push_back(facebook::react::ShadowViewMutation::CreateMutation(view));
++            mutations.push_back(facebook::react::ShadowViewMutation::InsertMutation(parent.getTag(), view, index++));
++            mount(*child);
++        }
++    };
++    uiManager_->getShadowTreeRegistry().visit(
++        kSurfaceId, [&](const auto& tree) { mount(*tree.getCurrentRevision().rootShadowNode); });
++    mountingManager_->startSurface(kSurfaceId, {400, 300});
++    mountingManager_->executeMount(kSurfaceId,
++                                   facebook::react::MountingTransaction{kSurfaceId, 1, std::move(mutations),
++                                                                        facebook::react::TransactionTelemetry{}});
++    InputDispatcher keyboard(uiManager_, mountingManager_, kSurfaceId);
++    const InputEvent pageDown{.kind = InputEventKind::KeyPress, .key = "PageDown"};
++    keyboard.dispatch({pageDown});
++    EXPECT_TRUE(mountingManager_->takeCommands().empty());
++    keyboard.setModalRoot(2);
++    keyboard.dispatch({pageDown});
++    const auto commands = mountingManager_->takeCommands();
++    ASSERT_EQ(commands.size(), 1);
++    EXPECT_EQ(commands.front().tag, 24);
++    mountingManager_->setModalPresentations({{.tag = 2, .size = {400, 300}, .translateY = 100}}, 2);
++    const InputEvent wheel{
++        .kind = InputEventKind::PointerScrollContinuous, .surfacePoint = {10, 110}, .scrollAmount = 50};
++    ScrollController controller(uiManager_, kSurfaceId);
++    controller.setModalRoot(2, mountingManager_);
++    controller.dispatch({wheel});
++    controller.advance(16);
++    EXPECT_TRUE(controller.hasDispatchedScrollEvent());
++    ScrollController blocked(uiManager_, kSurfaceId);
++    blocked.setModalRoot(2, mountingManager_);
++    auto outside = wheel;
++    outside.surfacePoint = {10, 10};
++    blocked.dispatch({outside});
++    blocked.advance(16);
++    EXPECT_FALSE(blocked.hasDispatchedScrollEvent());
++}
++
++} // namespace
++} // namespace react_native_linux
+diff --git a/packages/core/tests/ModalSceneTest.cpp b/packages/core/tests/ModalSceneTest.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/tests/ModalSceneTest.cpp
+@@ -0,0 +1,104 @@
++#include "RetainedScene.h"
++#include "SceneTestSupport.h"
++
++#include <algorithm>
++#include <gtest/gtest.h>
++
++namespace {
++
++ShadowView modalView(Tag tag, Rect frame) {
++    auto modal = makeView(tag, frame);
++    modal.componentName = "ModalHostView";
++    return modal;
++}
++
++RetainedScene modalScene() {
++    RetainedScene scene;
++    scene.createSurfaceRoot(kSurfaceTag, {300, 200});
++    addChild(scene, kSurfaceTag, makePaintedView(2, makeRect(0, 0, 300, 200), blue()));
++    auto parentProps = propsWithBackground(red());
++    parentProps->opacity = 0.1;
++    parentProps->yogaStyle.setOverflow(facebook::yoga::Overflow::Hidden);
++    auto parent = makeStyledView(3, makeRect(100, 100, 5, 5), parentProps);
++    addChild(scene, kSurfaceTag, parent);
++    addChild(scene, 3, modalView(4, makeRect(30, 40, 300, 200)));
++    addChild(scene, 4, makePaintedView(5, makeRect(10, 20, 40, 30), blue()));
++    scene.takeDamage();
++    return scene;
++}
++
++TEST(ModalSceneTest, UnpresentedModalsAreAbsentFromPaintingHitsAndAccessibility) {
++    auto scene = modalScene();
++    const auto snapshot = scene.snapshot();
++    EXPECT_TRUE(std::ranges::none_of(snapshot, [](const auto& primitive) { return primitive.tag == 5; }));
++    EXPECT_EQ(scene.findNodeAtPoint(kSurfaceTag, {15, 25}).tag, 2);
++    const auto accessible = scene.accessibilitySnapshot();
++    EXPECT_TRUE(accessible.nodes.contains(2));
++    EXPECT_FALSE(accessible.nodes.contains(4));
++    EXPECT_FALSE(accessible.nodes.contains(5));
++}
++
++TEST(ModalSceneTest, PresentationEscapesParentGeometryAndFadesAsOneCompositedLayer) {
++    auto scene = modalScene();
++    scene.setModalPresentations({{.tag = 4, .size = {300, 200}, .opacity = 0.5, .translateY = 50}}, 4);
++    const auto snapshot = scene.snapshot();
++    ASSERT_FALSE(snapshot.empty());
++    const auto& field = snapshot.back();
++    EXPECT_EQ(field.tag, 5);
++    EXPECT_EQ(field.frame, makeRect(10, 20, 40, 30));
++    EXPECT_EQ(field.matrix.translateY, 50);
++    EXPECT_EQ(field.backgroundColorArgb, kBlueArgb);
++    EXPECT_EQ(field.opensLayers, std::vector<float>{0.5});
++    EXPECT_EQ(field.closesLayers, 1);
++    ASSERT_EQ(field.clips.size(), 1);
++    EXPECT_EQ(field.clips.front().frame, makeRect(0, 0, 300, 200));
++    EXPECT_EQ(scene.findNodeAtPoint(kSurfaceTag, {15, 75}).tag, 5);
++    EXPECT_NE(scene.findNodeAtPoint(kSurfaceTag, {15, 25}).tag, 2);
++    EXPECT_EQ(scene.findNodeAtPoint(kSurfaceTag, {15, 205}).tag, 0);
++    const auto accessible = scene.accessibilitySnapshot();
++    EXPECT_EQ(accessible.nodes.size(), 2);
++    EXPECT_EQ(accessible.nodes.at(4).parentTag, 0);
++    EXPECT_EQ(accessible.nodes.at(4).accessibility.accessibilityRole, "dialog");
++    EXPECT_EQ(accessible.geometry.at(5).bounds, makeRect(10, 70, 40, 30));
++}
++
++TEST(ModalSceneTest, NestedModalsPaintOnceAndOnlyTheTopModalReceivesInputOrAccessibility) {
++    auto scene = modalScene();
++    addChild(scene, 4, modalView(6, makeRect(60, 60, 300, 200)));
++    addChild(scene, 6, makePaintedView(7, makeRect(10, 20, 40, 30), red()));
++    scene.setModalPresentations({{.tag = 4, .size = {300, 200}}, {.tag = 6, .size = {300, 200}}}, 6);
++    const auto snapshot = scene.snapshot();
++    EXPECT_EQ(std::ranges::count(snapshot, 5, &ScenePrimitive::tag), 1);
++    EXPECT_EQ(std::ranges::count(snapshot, 7, &ScenePrimitive::tag), 1);
++    EXPECT_EQ(snapshot.back().tag, 7);
++    EXPECT_EQ(scene.findNodeAtPoint(kSurfaceTag, {15, 25}).tag, 7);
++    const auto accessible = scene.accessibilitySnapshot();
++    EXPECT_TRUE(accessible.nodes.contains(6));
++    EXPECT_TRUE(accessible.nodes.contains(7));
++    EXPECT_FALSE(accessible.nodes.contains(4));
++    EXPECT_FALSE(accessible.nodes.contains(5));
++    scene.setModalPresentations({{.tag = 4, .size = {300, 200}}}, 6);
++    EXPECT_EQ(scene.findNodeAtPoint(kSurfaceTag, {15, 25}).tag, 0);
++    EXPECT_TRUE(scene.accessibilitySnapshot().nodes.empty());
++}
++
++TEST(ModalSceneTest, UpdatingAModalChildDamagesItsPresentedPositionAndDismissalErasesIt) {
++    auto scene = modalScene();
++    scene.setModalPresentations({{.tag = 4, .size = {300, 200}, .translateY = 50}}, 4);
++    scene.takeDamage();
++    scene.updateNode(makePaintedView(5, makeRect(10, 20, 40, 30), red()));
++    const auto damage = scene.takeDamage();
++    ASSERT_FALSE(damage.empty());
++    for (const auto& rect : damage) {
++        EXPECT_EQ(rect, makeRect(10, 70, 40, 30));
++    }
++    EXPECT_FALSE(scene.setModalPresentations({{.tag = 4, .size = {300, 200}, .translateY = 50}}, 4));
++    EXPECT_TRUE(scene.takeDamage().empty());
++    scene.setModalPresentations({}, 0);
++    const auto dismissed = scene.takeDamage();
++    ASSERT_EQ(dismissed.size(), 1);
++    EXPECT_EQ(dismissed.front(), makeRect(10, 70, 40, 30));
++    EXPECT_EQ(scene.findNodeAtPoint(kSurfaceTag, {15, 75}).tag, 2);
++}
++
++} // namespace
+diff --git a/packages/core/tests/hermes/CMakeLists.txt b/packages/core/tests/hermes/CMakeLists.txt
+--- a/packages/core/tests/hermes/CMakeLists.txt
++++ b/packages/core/tests/hermes/CMakeLists.txt
+@@ -102,11 +102,14 @@
+     ../EditorTest.cpp
+     ../AccessibilitySnapshotTest.cpp
+     ../NativeAccessibilityActionTest.cpp
++    ../ModalControllerTest.cpp
++    ../ModalSceneTest.cpp
+     ../ClipboardBackendTest.cpp
+     ../TextInputControllerTest.cpp
+     AdditionalSurfaceTest.cpp
+     ClipboardModuleTest.cpp
+     LayoutConformanceHostTest.cpp
++    ModalHostTest.cpp
+     CrossThreadPromiseStressTest.cpp
+     FantomTesterTest.cpp
+     HotModuleReplacementSetupTest.cpp
+diff --git a/packages/core/tests/hermes/ModalHostTest.cpp b/packages/core/tests/hermes/ModalHostTest.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/tests/hermes/ModalHostTest.cpp
+@@ -0,0 +1,113 @@
++#include "FantomTester.h"
++
++#include <gtest/gtest.h>
++
++namespace react_native_linux {
++namespace {
++
++constexpr char kSetup[] = R"JAVASCRIPT(
++if (!globalThis.__nativeComponentRegistry__hasComponent('ModalHostView')) {
++  throw new Error('ModalHostView has no native registration');
++}
++globalThis.fabric = globalThis.nativeFabricUIManager;
++globalThis.events = [];
++globalThis.handles = [];
++fabric.registerEventHandler((target, type) => events.push(type));
++globalThis.node = (tag, name, props) => {
++  const handle = {stateNode: {node: null}};
++  handles.push(handle);
++  handle.stateNode.node = fabric.createNode(tag, name, 1, props, handle);
++  return handle.stateNode.node;
++};
++globalThis.content = node(2, 'View', {
++  width: '100%', height: '100%', backgroundColor: 0xffffffff, collapsable: false,
++});
++globalThis.subject = node(4, 'ModalHostView', {
++  visible: true, animationType: 'none',
++  onShow: true, onDismiss: true, onRequestClose: true, onOrientationChange: true,
++});
++fabric.appendChild(subject, content);
++globalThis.parent = node(6, 'View', {
++  width: 20, height: 20, left: 100, top: 100,
++  overflow: 'hidden', opacity: 0.1, collapsable: false,
++});
++globalThis.commit = () => {
++  parent = fabric.cloneNodeWithNewChildren(parent);
++  fabric.appendChild(parent, subject);
++  const children = fabric.createChildSet();
++  fabric.appendChildToSet(children, parent);
++  fabric.completeRoot(1, children);
++};
++commit();
++)JAVASCRIPT";
++
++void settleInitialSize(FantomTester& tester) {
++    tester.advanceModalFrame(0);
++    tester.advanceModalFrame(0);
++    ASSERT_FALSE(tester.hasReportedFatalError());
++}
++
++TEST(ModalHostTest, RegisteredModalSizesItsStockStateAndEscapesTheParentClip) {
++    FantomTester tester{{400, 300}};
++    tester.runTask(kSetup);
++    EXPECT_TRUE(tester.snapshotScene().empty());
++    settleInitialSize(tester);
++    const auto scene = tester.snapshotScene();
++    ASSERT_EQ(scene.size(), 1);
++    EXPECT_EQ(scene.front().tag, 2);
++    EXPECT_EQ(scene.front().frame, (facebook::react::Rect{{0, 0}, {400, 300}}));
++    EXPECT_EQ(scene.front().matrix.translateX, 0);
++    EXPECT_EQ(scene.front().matrix.translateY, 0);
++    EXPECT_EQ(scene.front().backgroundColorArgb >> 24, 255);
++    tester.runTask(R"JAVASCRIPT(
++if (events.filter(type => type === 'topShow').length !== 1) throw new Error('Expected one native show');
++if (events.filter(type => type === 'topOrientationChange').length !== 1) throw new Error('Expected native orientation');
++)JAVASCRIPT");
++}
++
++TEST(ModalHostTest, EscapeRequestsAControlledCloseAndNativeDismissCompletesIt) {
++    FantomTester tester{{400, 300}};
++    tester.runTask(kSetup);
++    settleInitialSize(tester);
++    tester.advanceModalFrame(0, {InputEvent{.kind = InputEventKind::KeyPress, .key = "Escape"}});
++    EXPECT_FALSE(tester.snapshotScene().empty());
++    tester.runTask(R"JAVASCRIPT(
++if (events.filter(type => type === 'topRequestClose').length !== 1) throw new Error('Escape did not request close');
++if (events.includes('topDismiss')) throw new Error('A request cannot dismiss controlled content');
++subject = fabric.cloneNodeWithNewProps(subject, {visible: false});
++commit();
++)JAVASCRIPT");
++    tester.advanceModalFrame(0);
++    EXPECT_TRUE(tester.snapshotScene().empty());
++    tester.runTask(R"JAVASCRIPT(
++if (events.filter(type => type === 'topDismiss').length !== 1) throw new Error('Missing native dismissal');
++)JAVASCRIPT");
++}
++
++TEST(ModalHostTest, FadeReachesNativeCompletionBeforeTheDismissEvent) {
++    FantomTester tester{{400, 300}};
++    tester.runTask(kSetup);
++    tester.runTask("subject = fabric.cloneNodeWithNewProps(subject, {animationType: 'fade'}); commit();");
++    settleInitialSize(tester);
++    tester.advanceModalFrame(125);
++    const auto halfway = tester.snapshotScene();
++    ASSERT_EQ(halfway.size(), 1);
++    EXPECT_EQ(halfway.front().opensLayers, std::vector<float>{0.5});
++    tester.runTask("if (events.includes('topShow')) throw new Error('Fade showed too early');");
++    tester.advanceModalFrame(125);
++    tester.runTask(R"JAVASCRIPT(
++if (events.filter(type => type === 'topShow').length !== 1) throw new Error('Fade never showed');
++subject = fabric.cloneNodeWithNewProps(subject, {visible: false});
++commit();
++)JAVASCRIPT");
++    tester.advanceModalFrame(125);
++    EXPECT_FALSE(tester.snapshotScene().empty());
++    tester.runTask("if (events.includes('topDismiss')) throw new Error('Fade dismissed too early');");
++    tester.advanceModalFrame(125);
++    EXPECT_TRUE(tester.snapshotScene().empty());
++    tester.runTask(
++        "if (events.filter(type => type === 'topDismiss').length !== 1) throw new Error('Fade never dismissed');");
++}
++
++} // namespace
++} // namespace react_native_linux

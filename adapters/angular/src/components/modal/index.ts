@@ -1,7 +1,7 @@
 // Modal: the Angular lifecycle half. RCTModalHostView is an ordinary Fabric host node committing
 // through the same childSet as the rest of the tree (no second JS surface). The style math (the
 // backdrop override, the container/host styles, the presentationStyle default), the visible gate,
-// and the iOS keep-alive reducer all live framework-agnostic in @symbiote-native/components and are shared
+// and the iOS and Linux keep-alive reducer all live framework-agnostic in @symbiote-native/components and are shared
 // verbatim with React/Vue; here Angular supplies only the lifecycle: the keep-alive state, armed on
 // show (ngOnChanges) and dropped by the native dismiss on iOS, reusing renderModal's resolved props.
 // The user children nest UNDER the container View via <ng-content>.
@@ -31,6 +31,7 @@ import {
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
+  supportsModalDismiss,
   warnAboutModalProps,
   type IAccessibilityProps,
   type IAriaProps,
@@ -42,7 +43,6 @@ import {
 import {
   dlog,
   isSymbioteEvent,
-  Platform,
   type IColorValue,
   type IStyleProp,
   type ISymbioteEvent,
@@ -154,7 +154,7 @@ export class Modal
   @Input() testID?: string;
   @Output() readonly orientationChange = new EventEmitter<ISymbioteEvent>();
 
-  // The iOS keep-alive (state/modal.ts): after visible→hidden the node stays until the native
+  // The iOS and Linux keep-alive (state/modal.ts): after visible→hidden the node stays until the native
   // onDismiss (`handleDismiss`) drops it.
   private state: IModalState = createInitialModalState(false);
 
@@ -199,7 +199,7 @@ export class Modal
     const visibleChange = changes.visible;
     // First change is reflected by the ngOnInit seed; only later toggles drive the keep-alive.
     if (visibleChange === undefined || visibleChange.firstChange) return;
-    // Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts).
+    // Arms the iOS and Linux keep-alive on show; a hide is left to the native dismiss (state/modal.ts).
     const action = modalVisibilityAction(isModalVisible(this.visible));
     if (action === undefined) return;
     queueMicrotask(() => {
@@ -208,9 +208,9 @@ export class Modal
     });
   }
 
-  // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
+  // Native dismissal releases the keep-alive before notifying the app.
   handleDismiss(): void {
-    if (Platform.OS !== 'ios') return;
+    if (!supportsModalDismiss()) return;
     this.state = modalReducer(this.state, { type: 'hide' });
     this.changeDetector.markForCheck();
     this.dismiss.emit();

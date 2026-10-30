@@ -1,7 +1,7 @@
 // Modal: the React lifecycle half. RCTModalHostView is an ordinary Fabric host node committing
 // through the same childSet as the rest of the tree (no second JS surface). The style math (the
 // backdrop override, the container/host styles, the presentationStyle default), the visible gate,
-// and the iOS keep-alive reducer all live framework-agnostic in @symbiote-native/components and are
+// and the iOS and Linux keep-alive reducer all live framework-agnostic in @symbiote-native/components and are
 // shared verbatim with Vue; here React supplies only the lifecycle: useReducer over the keep-alive
 // state machine + a post-render effect to drive the visible→hidden transition, and the Descriptor
 // bridge, nesting the user children UNDER the container View.
@@ -22,7 +22,6 @@ import {
 } from 'react';
 import {
   dlog,
-  Platform,
   type IColorValue,
   type ISymbioteEvent,
 } from '@symbiote-native/engine';
@@ -34,6 +33,7 @@ import {
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
+  supportsModalDismiss,
   warnAboutModalProps,
   type IAccessibilityProps,
   type IAriaProps,
@@ -103,7 +103,7 @@ function modalTreeOf(input: IModalTreeInput): ReactElement | null {
   );
 }
 
-// The iOS keep-alive: armed on show, dropped only by the native dismiss
+// The iOS and Linux keep-alive: armed on show, dropped only by the native dismiss
 function useKeepAlive(visible: boolean | undefined): {
   isVisible: boolean;
   state: ReturnType<typeof createInitialModalState>;
@@ -179,9 +179,9 @@ export const Modal: FC<IModalProps> = rawProps => {
     return null;
   }
 
-  // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
+  // Native dismissal releases the keep-alive before notifying the app.
   const handleDismiss = (): void => {
-    if (Platform.OS !== 'ios') return;
+    if (!supportsModalDismiss()) return;
     dispatch({ type: 'hide' });
     onDismiss?.();
   };

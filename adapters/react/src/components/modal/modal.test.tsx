@@ -21,6 +21,7 @@
 // no reachable throwing/rejecting scenario to assert here.
 
 import { useState, type ReactElement } from 'react';
+import { Platform } from '@symbiote-native/engine';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   Modal,
@@ -34,13 +35,17 @@ import {
   type ILiveNode,
 } from '@symbiote-native/test-utils';
 
+const originalOS = Platform.OS;
 const ROOT_TAG = 220;
 const USER_STYLE = { backgroundColor: 'red' };
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
 beforeEach(() => fabric.reset());
-afterEach(() => unmount(ROOT_TAG));
+afterEach(() => {
+  unmount(ROOT_TAG);
+  Object.assign(Platform, { OS: originalOS });
+});
 
 function modalNode(): ILiveNode {
   const node = live.findLive(
@@ -118,36 +123,40 @@ describe('React Modal on the engine', () => {
       expect(() => modalNode()).not.toThrow();
     });
 
-    // On iOS only the native dismiss drops the keep-alive, then the app hears it
-    it('holds the modal on iOS until the native dismiss, then unmounts and calls onDismiss', async () => {
-      let dismissed = 0;
-      function HoldCase(): ReactElement {
-        const [visible, setVisible] = useState(true);
-        return (
-          <Modal
-            visible={visible}
-            onRequestClose={() => setVisible(false)}
-            onDismiss={() => {
-              dismissed += 1;
-            }}
-          >
-            <view />
-          </Modal>
-        );
-      }
-      mount(ROOT_TAG, <HoldCase />);
-      const host = modalNode().instanceHandle;
-      fabric.fireEvent(host, 'topRequestClose', {});
-      await new Promise(resolve => setTimeout(resolve, 0));
-      expect(() => modalNode()).not.toThrow();
+    // The native dismiss drops the keep-alive, then the app hears it
+    it.each(['ios', 'linux'])(
+      'holds the %s modal until native dismissal, then unmounts and calls onDismiss',
+      async os => {
+        Object.assign(Platform, { OS: os });
+        let dismissed = 0;
+        function HoldCase(): ReactElement {
+          const [visible, setVisible] = useState(true);
+          return (
+            <Modal
+              visible={visible}
+              onRequestClose={() => setVisible(false)}
+              onDismiss={() => {
+                dismissed += 1;
+              }}
+            >
+              <view />
+            </Modal>
+          );
+        }
+        mount(ROOT_TAG, <HoldCase />);
+        const host = modalNode().instanceHandle;
+        fabric.fireEvent(host, 'topRequestClose', {});
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(() => modalNode()).not.toThrow();
 
-      fabric.fireEvent(host, 'topDismiss', {});
-      await new Promise(resolve => setTimeout(resolve, 0));
-      expect(
-        live.findLive(live.appRoot(), n => n.viewName === 'ModalHostView'),
-      ).toBeUndefined();
-      expect(dismissed).toBe(1);
-    });
+        fabric.fireEvent(host, 'topDismiss', {});
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(
+          live.findLive(live.appRoot(), n => n.viewName === 'ModalHostView'),
+        ).toBeUndefined();
+        expect(dismissed).toBe(1);
+      },
+    );
   });
 
   describe('Positive — native DirectEvents round-trip to the right JS callback', () => {

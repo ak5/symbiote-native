@@ -2,11 +2,11 @@
   // Modal: the Svelte lifecycle half. RCTModalHostView is an ordinary Fabric host node
   // committing through the SAME childSet as the rest of the tree (no second JS surface). The
   // style math (backdrop override, container/host styles, presentationStyle default), the
-  // visible gate, and the iOS keep-alive reducer all live framework-agnostic in
+  // visible gate, and the iOS and Linux keep-alive reducer all live framework-agnostic in
   // @symbiote-native/components and are shared verbatim with React/Vue (core/components/src/
   // state/modal.ts + view/render-modal.ts); Svelte supplies only the lifecycle:
   //   - $state over the keep-alive reducer (switchReducer's twin: modalReducer)
-  //   - a $effect arming the keep-alive on show, and the native dismiss dropping it (iOS)
+  //   - a $effect arming the keep-alive on show, and the native dismiss dropping it (iOS and Linux)
   //   - the descriptor bridge: renderModal() always paints the SAME fixed shape (one
   //     modal host wrapping one view container — only prop VALUES vary,
   //     never structure, per svelte-adapter-dom-shim skill §15), so rather than building a
@@ -28,9 +28,10 @@
     renderModal,
     resolveAccessibilityProps,
     shouldRenderModal,
+    supportsModalDismiss,
     warnAboutModalProps,
   } from '@symbiote-native/components';
-  import { dlog, Platform } from '@symbiote-native/engine';
+  import { dlog } from '@symbiote-native/engine';
   import { createAttachmentsSync } from '../../runes/attachments';
   import type { ShimElement } from '../../dom-shim';
   import { setVirtualizedListScope } from '../virtualized-list/nested-scope';
@@ -49,16 +50,16 @@
   const isVisible = $derived(isModalVisible(resolved.visible));
   const shouldRender = $derived(shouldRenderModal(isVisible, localState));
 
-  // Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
+  // Arms the iOS and Linux keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
   // reducer is identity-stable, so the mount run triggers no extra render.
   $effect(() => {
     const action = modalVisibilityAction(isVisible);
     if (action !== undefined) localState = modalReducer(localState, action);
   });
 
-  // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
+  // Native dismissal releases the keep-alive before notifying the app.
   function handleDismiss(): void {
-    if (Platform.OS !== 'ios') return;
+    if (!supportsModalDismiss()) return;
     localState = modalReducer(localState, { type: 'hide' });
     rawProps.onDismiss?.();
   }

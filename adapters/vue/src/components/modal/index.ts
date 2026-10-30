@@ -1,7 +1,7 @@
 // Modal: the Vue lifecycle half. RCTModalHostView is an ordinary Fabric host node committing
 // through the same childSet as the rest of the tree (no second JS surface). The style math (the
 // backdrop override, the container/host styles, the presentationStyle default), the visible gate,
-// and the iOS keep-alive reducer all live framework-agnostic in @symbiote-native/components and are shared
+// and the iOS and Linux keep-alive reducer all live framework-agnostic in @symbiote-native/components and are shared
 // verbatim with React; here Vue supplies only the lifecycle: a ref over the keep-alive state +
 // a POST-flush watch that drives the visible→hidden transition AFTER render (so one keep-alive
 // frame survives, the Vue twin of React's useEffect-after-render), and the Descriptor bridge,
@@ -28,6 +28,7 @@ import {
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
+  supportsModalDismiss,
   warnAboutModalProps,
   type IAccessibilityProps,
   type IAriaProps,
@@ -39,7 +40,6 @@ import {
 import {
   dlog,
   isProcessableColor,
-  Platform,
   type IClassNameValue,
   type IColorValue,
   type IStyleProp,
@@ -162,7 +162,7 @@ function forwardAttrs(attrs: Record<string, unknown>): IForwardBag {
   return result;
 }
 
-// Arms the iOS keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
+// Arms the iOS and Linux keep-alive on show; a hide is left to the native dismiss (state/modal.ts). The
 // reducer is identity-stable, so a no-op transition triggers no extra render.
 function useKeepAlive(rawAttrs: Record<string, unknown>): Ref<IModalState> {
   const state = ref<IModalState>(
@@ -228,9 +228,9 @@ export const Modal = defineComponent<IModalProps, IModalEmits>(
     useModalWarnings(rawAttrs);
     const state = useKeepAlive(rawAttrs);
 
-    // Modal.js: onDismiss is iOS-only — it drops the keep-alive, then tells the app.
+    // Native dismissal releases the keep-alive before notifying the app.
     const handleDismiss = (): void => {
-      if (Platform.OS !== 'ios') return;
+      if (!supportsModalDismiss()) return;
       state.value = modalReducer(state.value, { type: 'hide' });
       emit('dismiss');
     };
