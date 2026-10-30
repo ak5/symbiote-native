@@ -5,153 +5,99 @@ description: Desktop host integration boundaries and verification for the ak5 fo
 
 # Desktop hosts
 
-Work stays in `ak5/symbiote-native`. Do not submit PRs, issues or comments to the original project without the owner's explicit approval.
+Work stays in `ak5/symbiote-native`. Do not submit PRs, issues or comments to the
+original project without the owner's explicit approval. Keep separate platform
+branches: `feat/catalyst`, `feat/windows`, `feat/linux`.
 
-Keep platform work on separate branches: `feat/catalyst`, `feat/windows`, `feat/linux`.
-The goal is native desktop hosts using the shared engine and existing framework adapters.
-React Native, Fabric and Yoga sources remain unchanged. Application bundles use Metro.
+The goal is native desktop hosts using the shared engine and existing framework
+adapters. Full Linux support remains in scope: do not replace missing features
+with stubs or close the goal by documenting them as absent. Changes may modify the
+separate platform host, never stock React Native, Fabric or Yoga. Application
+bundles use Metro. esbuild is only for the existing native integration tests.
 
-## Linux integration
+## Linux host and SDK
 
-The owner confirmed that missing Linux host features remain in scope; do not
-replace them with stubs or close the goal by merely documenting them as absent.
-Host changes live under `core/engine/linux/host`, against the documented host
-pin. They may change this separate Linux platform host, never stock React
-Native, Fabric or Yoga. Keep them in this fork; no submissions elsewhere.
-The shortcut guards passed native run41002818528. The second host patch now
-implements a real data device, source/offer FD transfers and a private clipboard
-queue on the same window connection. Source acknowledgement, focus/serial checks,
-nonblocking input requests and late-result validation are required. ADR-0004
-records that thread contract. Run41012824604 passed the full native host, all36
-clipboard/controller cases and the five-framework window/persistence matrix.
-The independent-client gate exchanges exact bytes with wl-copy/wl-paste under an
-isolated Sway seat, including stalled transfers and normal/ASan/UBSan/TSan builds.
-Do not replace that protocol gate with a green bundle or only registry tests.
-Run the native clipboard/controller/module cases through CTest, one case per
-process. Standalone controller cases read RN feature defaults; ReactHost must
-override flags before their first access. Combining both suites in a single
-GTest process prevents the later runtime fixture from initializing. Keep every
-case enabled and preserve the host's existing process isolation.
-AT-SPI, modal and refresh still need implementation and proof. The layout patch
-registers stock RN's LayoutConformance descriptor; native tests must prove strict
-and compatibility geometry, nested boundaries and mode changes before claiming
-support. It must not be replaced with an ordinary View.
+The Linux host pin is `4db5e336b529c15628ffb8ba94cd6d880ff9a450` from
+`react-native-linux/react-native-linux`, consuming React Native 0.87.1. Host
+changes live under `core/engine/linux/host`; apply them in the documented order.
+Verify autolinking against `packages/cli/src/linux-autolinking.ts` and
+`autolinking-cmake.ts` in the actual host, rather than relying on its README.
 
-The experimental engine target follows `react-native-linux/react-native-linux` at
-`4db5e336b529c15628ffb8ba94cd6d880ff9a450`, which consumes React Native 0.87.1.
-The host's current code has Metro and C++ autolinking even though its README still describes them as planned.
-Verify against its source, especially `packages/cli/src/linux-autolinking.ts` and
-`packages/cli/src/autolinking-cmake.ts`.
+`core/engine/linux` compiles the same C++ engine as Android/iOS. Its generated
+factory receives a CallInvoker, not a runtime. `nativeEngine()` calls the existing
+synchronous `getVersion()` before reading bindings; Linux initializes them once
+per runtime. The factory can return a new module on each lookup, so an instance
+boolean cannot guard live bindings. Initialization failures must propagate and
+must not cache a missing engine.
 
-`core/engine/linux` supplies the C++ TurboModule; its CMake target compiles the same engine sources as Android/iOS.
-The generated factory receives a CallInvoker, not a runtime. `nativeEngine()` calls the existing synchronous
-`getVersion()` method before reading the bindings; Linux installs them there once per runtime.
-The host's module factory can produce a new module on every lookup, so an instance boolean does not protect live bindings.
-Failed initialization must propagate and must not cache a missing engine.
+The Linux Platform file reads the host's PlatformConstants before registration.
+Every packed app's source map must prove automatic Linux platform/component-map
+resolution and the installed adapter. React Native, React and Virtualized Lists
+must resolve to the consuming app's exact SDK; do not force mismatched peers or
+silently install another SDK under shared components. CSS transforms resolve
+Babel through the app's React Native Metro config to keep parser versions aligned.
 
-The native engine gate passed in fork run `40911697553` at `6713de2690a9d22eeb1b1cb1289596506217b6c7`:
-real C++ compile/link, initial Fabric commit, width update, and repeated module lookup without replacing bindings.
+React Native's `componentNameByReactViewName` already translates its iOS-shaped
+view, text, scroll-content and input names. Inspect it before duplicating a map.
+Native props and events still need runtime checks. Global CMake C++20 is required
+for the host's standalone input driver as well as the engine target.
 
-`core/engine/src/platform/index.linux.ts` reads the host's `PlatformConstants` and selects Linux
-before host registration. All adapters inherit the shared `linux` selection type. Its native smoke
-import is explicit; a real Metro example must still prove automatic platform-file resolution.
+## Native verification
 
-`.github/workflows/linux-engine.yml` is restricted to this fork. It generates registration from the
-package's actual configuration, compiles the real engine and Linux host, then runs
-`core/engine/linux/tests/native-smoke.ts` in Hermes. That test creates and updates a Fabric view through
-the production mutation buffer. esbuild is used for this native test, as in the existing engine itests;
-it is not an application bundler.
+Use `.github/workflows/linux-engine.yml` as the command source. It is restricted
+to this fork and builds actual packed React, Svelte, Vue, Solid and Angular apps.
+Vue readiness follows nextTick plus a public native measurement; retain the
+native width assertion. Solid uses its shipped universal JSX preset. Angular
+uses partial AOT, ngc and the native renderer at `build/angular/render/index.js`.
+Keep native text styles correctly typed; do not cast away fixture errors.
 
-`scripts/prepare-linux-consumer.mjs <host checkout> <new directory>` builds and packs the engine,
-shared components and React/Svelte adapters into separate disposable npm apps. It uses the pinned host template's
-React Native version and the host's packed Metro resolver, then checks the production sourcemap
-for the installed Linux Platform and adapter. Run it under `nice -n 10` with Node 24 after installing
-both workspaces. The React fixture uses intrinsic tags and is type-checked before bundling. CI runs
-each Metro bundle through the compiled host and verifies the mounted view's updated dimensions.
-The consumer has its own explicit TypeScript project: a command-line file list can pick up the
-host checkout's tsconfig and fail with TS5112 on TypeScript 6.
+Every framework needs native layout/update, keyboard, clipboard, resize,
+scrolling and persistence journeys. Preserve accessible headings in Tab order;
+the input driver must traverse them. Require app acknowledgement before asserting
+controlled data retention, and inspect the native tree if it disagrees with app
+state. A bundle or registry test alone cannot establish native behavior.
 
-The window gate builds the same host with Skia/Wayland and runs both packed Metro apps through
-the host's existing `scripts/e2e.ts` harness. `scripts/run-linux-window-consumers.mjs` installs
-disposable scenarios, types into the adapter's controlled text input and copies/pastes through
-the host's in-process clipboard. Each app must report `HiHi` and produce a window screenshot. A separate resize
-scenario drives the native window from 800x600 to 1000x600; each framework's `useWindowDimensions`
-must receive both sizes. All four native window scenarios passed in fork run `40936472812` at `a4c553fb`:
-React and Svelte each verified keyboard focus, controlled input, in-process copy/paste and
-800x600 → 1000x600 dimension-hook updates. Saved traces and screenshots confirm the assertions. Other adapters, persistence, scrolling and accessibility journeys remain to be verified.
+Clipboard exchange uses wl-copy/wl-paste on a private Sway seat. Require exact
+bytes, focus/serial acknowledgement, responsive input during stalled transfers,
+late-result rejection and shutdown with pending work. Run normal, ASan/UBSan and
+TSan protocol variants. Text-control copy/paste alone does not prove exchange
+with other applications.
 
-The pinned host uses `accessible` for Tab traversal, including the heading. The input scenario
-therefore tabs through the heading to the field and requires both focus markers. Run `40931012846`
-confirmed this in the native screenshot: one Tab left the focus ring on the heading while key events
-arrived normally. Keep the heading accessible; do not remove accessibility to make the test pass.
+AT-SPI uses a private D-Bus session and independent client, never the operator's
+desktop. Verify actual roles, text, geometry, custom action identities, edits,
+selection, notifications and in-process reload/stale handles. Modal journeys need
+both cycles across all five frameworks, all animations, native pixels, real
+resize, nesting, focus and data/caret retention. Refresh needs real Wayland pan
+input, controlled acceptance/rejection, native indicator pixels, accessible
+activation, removal, modal isolation and reload. Preserve all existing assertions.
 
-Run `40934052197` passed the React native input journey (heading/input focus and `HiHi`). Its
-resize trace showed the full injected drag finishing before the Metro app mounted. The scenario
-now holds 800x600 for five seconds using the host's 100ms configure intervals before dragging;
-both hook-reported sizes remain required. This is a bounded startup allowance: a slower app still
-fails instead of silently passing a resize it never observed. These are host-injected native
-configure events under Cage, which cannot resize its kiosk window, not a compositor-driven drag.
-The runner collects failures and attempts all framework journeys before failing the gate.
+Run controller/Hermes cases through CTest one case per process. Feature defaults
+can be read by standalone controllers before ReactHost installs its overrides;
+combining these suites in one GTest process breaks runtime initialization.
+Keep every required case enabled and require discovery of all 38 refresh cases.
 
-The host's input driver requires global C++20, supplied by its normal CMake preset. Our custom
-build directory must set `CMAKE_CXX_STANDARD=20` too; target-specific engine settings do not reach
-the standalone input driver. Compiler cache is saved after the window build to retain those objects.
+Strict native window ASan/UBSan/LSan and TSan checks include complete shutdown.
+Keep halt-on-error and leak detection enabled, with no exclusions. Build pinned
+Skia/Mesa with matching instrumentation rather than disabling a detector to link
+or hide a report. Rust dependencies are not instrumented by these C++ sanitizers.
+Use at most two native compiler workers, one Metro worker and sequential heavy
+jobs under `nice -n 10`. Do not push while a useful workflow is live: its
+cancel-in-progress policy would cancel the current evidence.
 
-The Svelte consumer composes the existing example's Metro settings with the Linux host resolver.
-The shared CSS transformer resolves Babel through the app's React Native Metro config to keep parser
-versions aligned. Loading the package's RN 0.86 transformer against an RN 0.87 app preset installs two
-parser overrides and prevents Svelte/Vue/CSS-wrapped bundles from compiling.
+## Companion and platform boundaries
 
-React Native's `componentNameByReactViewName` already translates the iOS-shaped view, text,
-scroll-content and text-input names to the Linux host's descriptors. Audit that translation before
-duplicating the component-name table. Native props and events still need their own runtime checks.
+The host's RNCClipboard and SQLite-backed RNAsyncStorage are different contracts
+from ExpoClipboard and ExpoSQLite. ExpoSharing also requires its own provider.
+The 59 companion native-link manifests do not declare Linux linkage. Keep the
+provider audit accurate and test actual public companion APIs before claiming
+support; never supply successful no-ops or empty providers.
 
-This is engine bring-up, not a completed Linux application target. Before claiming Linux support:
+Windows work stays on `feat/windows` with its separately verified RNW/RN/React
+pins. Native module registration, system clipboard, client geometry/DPI, scrolling
+and persistence require real Windows runs. Catalyst work stays on `feat/catalyst`
+and requires the Xcode host/runtime checks. Neither platform's successful bundle
+establishes unavailable companion APIs or untested architectures/hardware.
 
-- Pass the native compile/runtime gate and the shared engine regression suites.
-- Audit the engine's non-Android assumptions against Linux component names, props and events.
-- Add Metro-backed example hosts and run the same journeys across the existing adapters.
-- Verify keyboard input, clipboard, resize, persistence, scrolling and accessibility on a real Linux host.
-- Audit companion native packages and state any unavailable capabilities explicitly.
-
-The unpatched host's clipboard is process-local. The host patches provide the
-Wayland backend; the independent-client protocol gate is required to establish
-exchange with other applications. The text-input journey alone cannot prove it.
-
-The text-input clipboard journey does not establish `@symbiote-native/clipboard` support: that
-package resolves `ExpoClipboard` through `expo-modules-core`, while the pinned Linux host provides
-`RNCClipboard`. Likewise, its native `RNAsyncStorage` SQLite store does not implement the
-`ExpoSQLite` constructors used by `@symbiote-native/sqlite`. Neither companion is included in the
-current consumer matrix; do not present their APIs as available on Linux without an actual port
-and native verification.
-
-Windows remains a separate host integration. Resolve the React Native version contract before adding
-a consumer: this engine declares RN >=0.86, while the inspected published RNW stable requires RN 0.85.
-Do not force mismatched peer dependencies or label an empty branch as platform support.
-
-The Linux consumer/window matrix also includes Vue, using its ordinary `h`/`ref` lifecycle and
-existing bootstrap over the same intrinsic tags. Its packed production Metro bundle and source-map
-contract passed locally; the Vue native startup, keyboard and resize journeys still require CI.
-The runner regression now checks all six journeys are attempted when one fails. React/Svelte's
-four native journeys remain verified by run40936472812.
-
-Solid is prepared in the same Linux consumer/window matrix. Its fixture uses the adapter's
-`createWindowDimensions`, Solid signals and its shipped universal JSX Babel preset. The isolated
-packed production Metro build and Linux/adapter source-map contract pass locally. The runner test
-checks all eight framework journeys are attempted after a failure. Solid's actual Linux runtime
-checks remain pending; do not replace the existing Vue run merely to add this fixture.
-
-Angular completes the prepared five-adapter Linux matrix. The standalone app uses the adapter's
-partial-AOT config, `ngc`, shipped Babel registration/linker plugins and normal intrinsic templates.
-Its isolated packed AOT+production Metro build passed; the sourcemap must include the native AOT
-renderer at `build/angular/render/index.js`. The runner regression covers all ten journeys.
-
-That build exposed a real Angular intrinsic typing gap: `TextInputElement` inherited View-only
-style inputs. It now narrows `style` and `styleProp` to the same text styles as `TextElement`.
-All72 element tests pass, including strict-AOT acceptance of text colors/fonts and rejection of
-invalid font-size types. The native fixture keeps its text color; it does not cast around the type.
-
-Vue run40941029337 mounted the real app but failed its width-update assertion: the headless tree
-still held120 while the app logged updated. Its marker now follows a public native-view measurement
-requiring240x80 after Vue's nextTick. The original headless240 assertion remains. This strengthened
-fixture bundles successfully; actual native verification is pending the next run.
+Before declaring desktop support complete, inspect current source, native CI
+stdout and artifacts against every requested target and gate. Keep the full goal
+active while any required behavior or native verification remains incomplete.

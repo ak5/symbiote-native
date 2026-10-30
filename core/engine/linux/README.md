@@ -57,8 +57,10 @@ controlled close requests, animation, input isolation and focus restoration.
 The workflow requires its controller, scene and Hermes/Fabric regression cases.
 Each framework also runs a packed modal application through an independent
 AT-SPI client on a private Sway seat, covering opaque/transparent rendering,
-real window resizing, nested dialogs, editor state and in-process reload. These
-new modal runtime gates still require Linux verification.
+real window resizing, nested dialogs, editor state and in-process reload.
+The normal native job in run `41115170458` passed all five frameworks in both
+cycles with none/fade/slide animations, including the native editor acknowledgement
+regressions. Full lifecycle sanitizer verification remains required.
 
 The refresh patch supplies the stock `PullToRefreshView` descriptor, native
 pull/release handling, controlled refreshing, viewport indicator/title painting
@@ -75,8 +77,10 @@ The pinned host's clipboard starts as process-local storage. The host patch adds
 a Wayland data-device backend. Run `41016615907` passed native checks and
 second-client exchange verification, including ASan/UBSan and TSan builds.
 The accessibility patch connects the host to AccessKit's Unix AT-SPI transport.
-Its native client and lifecycle checks are in progress; automation-tree inspection
-and injected input alone do not establish screen-reader interoperability.
+Its independent normal client and reload checks passed in run `41115170458`.
+Full lifecycle sanitizer checks and the added selection/value journeys remain
+unverified; automation-tree inspection and injected input alone do not establish
+screen-reader interoperability.
 Expo-backed companion modules require their own Linux ports; their presence in
 the workspace does not make their native APIs available.
 

@@ -407,9 +407,8 @@ def main():
         status('accept', 0, 0)
         assert not busy(control('Refresh library')), 'Old runtime action started a new library refresh'
         print(f'PASS native refresh in-process reload and stale handles cycle={cycle}', flush=True)
-        injector.terminate()
-        injector.wait(timeout=5)
         injector.stdin.close()
+        assert injector.wait(timeout=5) == 0, 'Native Wayland input driver shutdown failed'
         alive.remove(injector)
 
 
