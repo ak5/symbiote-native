@@ -62,7 +62,7 @@ SafeAreaView maps to View; InputAccessoryView drops its whole subtree, following
 The stock app builder needs `SymbioteWindowMessages.h` around its blocking Start call to forward real resize notifications
 through DesktopWindowBridge. Keep its UI-thread lifetime, subclass cleanup and SWP_NOSIZE filter.
 
-Fork run `40975690998` at `4a5876ca` passed all five native framework journeys:
+Fork run `40986359425` at `f5e4e27f` passed all five native framework journeys:
 layout updates, UI Automation focus/typing/controlled uppercase, native Ctrl+C with a separate OS clipboard client,
 external Unicode paste, real SetWindowPos resize reaching each framework's dimension hook, and OS wheel/native scroll callbacks.
 The ScrollView must remain accessible with its list role/label for UIA lookup. Do not remove accessibility to make tests pass.
@@ -84,7 +84,9 @@ Do not replace native persistence with a JS map or direct test-side file writes.
 AsyncStorage ships an obsolete CppWinRT-only packages.config alongside its modern RNW PackageReferences.
 The App SDK checks that obsolete file even though restored project.assets.json already contains its complete dependency graph.
 The fixture validates and removes only that redundant configuration and its None entry. Keep dependency verification enabled.
-Native persistence verification is pending; inspect the exact current fork run before claiming it passes.
+Fork run `40986359425` also passed all ten separate-process storage write/read phases.
+Each uploaded SQLite database independently contained the exact Unicode snapshot and passed SQLite quick_check.
+The fixture must select UseFabric=true before the provider chooses its project globals and use the SDK app toolset v145.
 The text-control and AsyncStorage checks do not establish ExpoClipboard or ExpoSQLite companion support.
 
 ## Other desktop branches
