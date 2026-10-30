@@ -40,3 +40,6 @@ its fully instrumented native run exposed concurrent lazy initialization.
 
 Purge the standalone executable's global font strikes after local window teardown
 and before static font managers are destroyed.
+
+Use atomic updates and status loads for the pinned llvmpipe fence counter so its
+unlocked completion query can safely observe raster-worker increments.

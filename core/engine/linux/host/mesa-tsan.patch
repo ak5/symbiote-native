@@ -44,3 +44,24 @@ diff --git a/src/vulkan/runtime/vk_sync.c b/src/vulkan/runtime/vk_sync.c
  }
  
  static VkResult
+diff --git a/src/gallium/drivers/llvmpipe/lp_fence.c b/src/gallium/drivers/llvmpipe/lp_fence.c
+--- a/src/gallium/drivers/llvmpipe/lp_fence.c
++++ b/src/gallium/drivers/llvmpipe/lp_fence.c
+@@ -153,7 +153,7 @@
+    if (fence->type == LP_FENCE_TYPE_SW) {
+       mtx_lock(&fence->mutex);
+ 
+-      fence->count++;
++      p_atomic_inc(&fence->count);
+       assert(fence->count <= fence->rank);
+ 
+       if (LP_DEBUG & DEBUG_FENCE)
+@@ -177,7 +177,7 @@
+ lp_fence_signalled(struct lp_fence *f)
+ {
+    if (f->type == LP_FENCE_TYPE_SW)
+-      return f->count == f->rank;
++      return p_atomic_read(&f->count) == f->rank;
+ #ifdef HAVE_LIBDRM
+    else {
+       return sync_wait(f->sync_fd, 0) == 0;
