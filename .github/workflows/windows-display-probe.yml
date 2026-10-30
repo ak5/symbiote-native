@@ -152,12 +152,12 @@ jobs:
             if ($selected[0].Current.Name -match '^(\d+)%') { $originalPercent = [int]$Matches[1] }
             else { throw 'Cannot read the original Windows scale selection' }
             $originalDpi = [DisplayProbe]::GetDpiForWindow([IntPtr]::new($settingsRoot.Current.NativeWindowHandle))
-            if ($originalPercent -eq 150) { throw 'Runner already uses the target scale; a real scale change is required' }
+            if ($originalPercent -eq 125) { throw 'Runner already uses the target scale; a real scale change is required' }
             $scaleMayHaveChanged = $true
-            Select-Scale 150
-            Wait-WindowDpi 144
+            Select-Scale 125
+            Wait-WindowDpi 120
             Save-DisplayScreenshot 'scaled'
-            Write-Host "PASS: real OS scale changed from $originalPercent percent / $originalDpi DPI to 150 percent / 144 DPI"
+            Write-Host "PASS: real OS scale changed from $originalPercent percent / $originalDpi DPI to 125 percent / 120 DPI"
           } finally {
             try {
               if ($scaleMayHaveChanged) {
