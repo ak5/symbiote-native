@@ -213,4 +213,29 @@ for (const framework of ['react', 'svelte', 'vue', 'solid', 'angular']) {
   process.stdout.write(
     `Linux consumer bundle: ${join(app, 'index.linux.bundle.js')}\n`,
   );
+  if (framework === 'react') {
+    run(
+      join(app, 'node_modules/.bin/metro'),
+      [
+        'build',
+        'accessibility.js',
+        '--platform',
+        'linux',
+        '--dev',
+        'false',
+        '--out',
+        join(app, 'accessibility.linux.bundle.js'),
+        '--source-map',
+        '--max-workers',
+        '1',
+      ],
+      app,
+    );
+    verifyLinuxConsumerBundle(
+      JSON.parse(
+        readFileSync(join(app, 'accessibility.linux.bundle.map'), 'utf8'),
+      ),
+      framework,
+    );
+  }
 }

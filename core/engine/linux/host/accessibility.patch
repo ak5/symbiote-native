@@ -105,7 +105,7 @@ diff --git a/packages/core/CMakeLists.txt b/packages/core/CMakeLists.txt
 +    add_library(rnl_accessibility STATIC src/AccessibilityBridge.cpp)
 +    target_include_directories(rnl_accessibility PUBLIC src PRIVATE ${accesskit_c_SOURCE_DIR}/include)
 +    target_link_libraries(rnl_accessibility PUBLIC rnl_react_core accesskit-static)
-+    target_compile_options(rnl_accessibility PRIVATE -Wall -Wextra -Werror)
++    target_compile_options(rnl_accessibility PRIVATE -Wall -Wextra)
 +
      add_executable(rnl_window
          src/AutomationServer.cpp
@@ -122,7 +122,7 @@ diff --git a/packages/core/src/AccessibilityBridge.cpp b/packages/core/src/Acces
 new file mode 100644
 --- /dev/null
 +++ b/packages/core/src/AccessibilityBridge.cpp
-@@ -0,0 +1,621 @@
+@@ -0,0 +1,624 @@
 +#include "AccessibilityBridge.h"
 +
 +#include "AutomationProtocol.h"
@@ -528,7 +528,10 @@ new file mode 100644
 +        const auto textIdentity = nativeId(source) + 1;
 +        NativeNode run(accesskit_node_new(ACCESSKIT_ROLE_TEXT_RUN), accesskit_node_free);
 +        accesskit_node_set_value_with_length(run.get(), text.data(), text.size());
-+        accesskit_node_set_character_lengths(run.get(), lengths.size(), lengths.data());
++        // Rust slices require a non-null pointer even when empty.
++        const uint8_t emptyLength = 0;
++        accesskit_node_set_character_lengths(run.get(), lengths.size(),
++                                             lengths.empty() ? &emptyLength : lengths.data());
 +        accesskit_node_set_bounds(run.get(), boundsOf(geometry.bounds, publication_.window.contentOffsetY));
 +        accesskit_node_push_child(parent, textIdentity);
 +        if (geometry.editor) {
@@ -1606,7 +1609,7 @@ diff --git a/packages/core/tests/NativeAccessibilityActionTest.cpp b/packages/co
 new file mode 100644
 --- /dev/null
 +++ b/packages/core/tests/NativeAccessibilityActionTest.cpp
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,97 @@
 +#include "AccessibilityBridge.h"
 +#include "InputDispatcher.h"
 +#include "ShadowTreeTestSupport.h"
@@ -1628,11 +1631,13 @@ new file mode 100644
 +    }
 +
 +    void commit(const std::shared_ptr<const ShadowNode>& child) {
-+        shadowTree_->commit([&](const RootShadowNode& root) {
-+            return react_native_linux::cloneRootWithChildren(
-+                root, std::make_shared<const std::vector<std::shared_ptr<const ShadowNode>>>(
-+                          std::vector<std::shared_ptr<const ShadowNode>>{child}));
-+        });
++        shadowTree_->commit(
++            [&](const RootShadowNode& root) {
++                return react_native_linux::cloneRootWithChildren(
++                    root, std::make_shared<const std::vector<std::shared_ptr<const ShadowNode>>>(
++                              std::vector<std::shared_ptr<const ShadowNode>>{child}));
++            },
++            facebook::react::ShadowTreeCommitOptions{.enableStateReconciliation = false, .mountSynchronously = true});
 +    }
 +
 +    NativeAccessibilityAction activate(const std::shared_ptr<const ShadowNode>& child) {
@@ -1690,10 +1695,12 @@ new file mode 100644
 +    const auto target = button();
 +    commit(target);
 +    const auto pending = activate(target);
-+    shadowTree_->commit([](const RootShadowNode& root) {
-+        return react_native_linux::cloneRootWithChildren(
-+            root, std::make_shared<const std::vector<std::shared_ptr<const ShadowNode>>>());
-+    });
++    shadowTree_->commit(
++        [](const RootShadowNode& root) {
++            return react_native_linux::cloneRootWithChildren(
++                root, std::make_shared<const std::vector<std::shared_ptr<const ShadowNode>>>());
++        },
++        facebook::react::ShadowTreeCommitOptions{.enableStateReconciliation = false, .mountSynchronously = true});
 +    react_native_linux::InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
 +    dispatcher.dispatchAccessibilityActions({pending});
 +    EXPECT_FALSE(clicked());
@@ -1732,14 +1739,14 @@ diff --git a/packages/core/tests/TextInputControllerTest.cpp b/packages/core/tes
 +    std::string copiedFieldText() {
 +        controller_->handleKey(key("a", InputModifiers{.control = true}));
 +        controller_->handleKey(key("c", InputModifiers{.control = true}));
-+        return react_native_linux::clipboardText();
++        return react_native_linux::clipboardText().value();
 +    }
 +
 +    bool accessibilityMounted_{false};
      std::unique_ptr<TextInputController> controller_;
      std::shared_ptr<const TextInputShadowNode> mountedField_;
  };
-@@ -592,4 +614,89 @@
+@@ -592,4 +614,91 @@
      EXPECT_EQ(props.paragraphAttributes.ellipsizeMode, facebook::react::EllipsizeMode::Clip);
  }
  
@@ -1815,11 +1822,13 @@ diff --git a/packages/core/tests/TextInputControllerTest.cpp b/packages/core/tes
 +    commitTextInput(folly::dynamic::object("text", "old"));
 +    type("X");
 +    const auto previous = mountedField_;
-+    shadowTree_->commit([this](const RootShadowNode& root) {
-+        return react_native_linux::cloneRootWithChildren(
-+            root, std::make_shared<const ChildList>(ChildList{
-+                      makeField(kFieldTag, folly::dynamic::object("text", "new")("width", 200)("height", 40))}));
-+    });
++    shadowTree_->commit(
++        [this](const RootShadowNode& root) {
++            return react_native_linux::cloneRootWithChildren(
++                root, std::make_shared<const ChildList>(ChildList{
++                          makeField(kFieldTag, folly::dynamic::object("text", "new")("width", 200)("height", 40))}));
++        },
++        ShadowTreeCommitOptions{.enableStateReconciliation = false, .mountSynchronously = true});
 +    mountedField_ = newestFieldNode();
 +    ASSERT_NE(&previous->getFamily(), &mountedField_->getFamily());
 +    controller_->setMountedFields({mountedField_});

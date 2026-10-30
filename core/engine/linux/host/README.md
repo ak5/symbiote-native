@@ -71,3 +71,10 @@ when React event counts do not change. Its ADR-0005 records the dependency and
 threading contracts. Window builds require Rust 1.87 or newer and fetch the
 pinned AccessKit/Corrosion dependencies. Native compilation and an independent
 AT-SPI client are required before this can be described as verified accessibility.
+
+The independent client runs the real packed React application in headless Sway
+and a new private D-Bus session. It checks all six core components, Unicode,
+geometry, hidden/protected text, focus/caret events, native text and selection
+edits, Pressable activation and session removal/recreation. The client requires
+AT-SPI's GI bindings; it never attaches to the operator's desktop or session bus.
+Passing this client is still pending, as are lifecycle sanitizer checks.
