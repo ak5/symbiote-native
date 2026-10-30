@@ -17,6 +17,8 @@ git -C <host> apply --check "$PWD/core/engine/linux/host/layout-conformance.patc
 git -C <host> apply "$PWD/core/engine/linux/host/layout-conformance.patch"
 git -C <host> apply --check "$PWD/core/engine/linux/host/accessibility.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/accessibility.patch"
+git -C <host> apply --check "$PWD/core/engine/linux/host/custom-actions.patch"
+git -C <host> apply "$PWD/core/engine/linux/host/custom-actions.patch"
 ```
 
 `clipboard-safety.patch` prevents secure text from entering the clipboard,
@@ -77,7 +79,9 @@ and a new private D-Bus session. It checks all six core components, Unicode,
 geometry, hidden/protected text, focus/caret events, native text and selection
 edits, Pressable activation and session removal/recreation. The client requires
 AT-SPI's GI bindings; it never attaches to the operator's desktop or session bus.
-Passing this client is still pending, as are lifecycle sanitizer checks.
+Run `41054419345` passed both client cycles, 107 native regressions, all fifteen
+five-framework window journeys and ten fresh-process persistence phases.
+Lifecycle sanitizer checks remain incomplete.
 
 The lifecycle client also requests a real in-process DevSettings reload, sends
 old-handle edits across the reload boundary, and verifies a new adapter and
@@ -85,6 +89,23 @@ fresh editable state in the same process. The workflow replays the packed app
 against native ASan/UBSan and TSan builds after the normal job succeeds. These
 builds use the host's existing sanitizer presets, at most two compiler workers
 and sequential matrix jobs. They enable halt-on-error and leak detection without
-suppressions. Rust's dependency and the prebuilt Skia archive are not rebuilt
-with C++ sanitizers; the host, engine and C++ bridge are instrumented. Passing
-lifecycle/sanitizer logs are still required before claiming this gate complete.
+suppressions. The release Skia archive lacks RTTI, which prevents linking the
+host's UBSan vptr checks. `scripts/build-linux-skia.py` expands the exact locked
+Skia checkout, reuses its pinned dependency parser and builds the five existing
+archives with RTTI and matching sanitizers. Dependency checkouts and compilation
+run sequentially with at most two compiler workers. GN's effective flags are
+checked before building; no sanitizer checks are disabled. Rust's dependency is
+not instrumented by these C++ sanitizers. The first TSan run also reported a
+mutex lifetime race inside the system lavapipe driver during device creation;
+its diagnostics need investigation. Passing lifecycle/sanitizer logs are still
+required before claiming this gate complete.
+
+`custom-actions.patch` retains declared native action names, labels and handler
+flags. Its frame owner checks the current declaration and emits React Native's
+real accessibilityAction event. Opaque IDs remain stable across reordering and
+are not reassigned to different names. The exact locked AT-SPI common crate is
+fetched by checksum and patched to enumerate and dispatch these actions; the C
+ABI manifest uses a sibling path override and its lockfile remains enforced.
+Three transport regressions fail before that patch, and all ten crate tests pass
+afterward. Native C++ and real client checks, including reordered handlers, remain
+required. Clean the generated build directory after editing dependency patches.

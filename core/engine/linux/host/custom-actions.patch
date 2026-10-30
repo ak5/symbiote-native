@@ -1,0 +1,591 @@
+diff --git a/docs/adr/0006-atspi-custom-actions.md b/docs/adr/0006-atspi-custom-actions.md
+new file mode 100644
+--- /dev/null
++++ b/docs/adr/0006-atspi-custom-actions.md
+@@ -0,0 +1,42 @@
++# ADR-0006: Carry declared native accessibility actions through AT-SPI
++
++- Status: accepted in the owner fork; native integration verification in progress
++- Date: 2026-10-30
++
++## Decision
++
++Retain React Native's accessibilityActions and onAccessibilityAction contract.
++Expose each declared label through the real AT-SPI Action interface and deliver
++its declared name with ViewEventEmitter::onAccessibilityAction on the frame
++thread. Recheck current declarations, handler presence, disabled state, role,
++emitter identity and hidden ancestors before dispatch. Custom actions do not
++synthesize a pointer gesture or silently acquire focus.
++
++AccessKit's current Unix translation exposes only click. Carry a small patch of
++its exact accesskit_atspi_common 0.21.1 crate in this fork. Fetch the registry
++archive by the existing C ABI Cargo.lock checksum, preserve its licenses, apply
++the transport patch and use Cargo's path override. Both fetched sources live in
++the same FetchContent dependency directory; the C ABI manifest names its sibling.
++The lockfile patch removes source/checksum only for that exact overridden crate.
++Keep --locked for builds. Other dependency versions retain the pinned lockfile.
++Use forward-only patching and disconnected updates for the pinned C ABI checkout
++so repeated CMake configuration preserves the manifest and lockfile override.
++
++Custom IDs remain stable while an action name is declared. Removed IDs are never
++reassigned to another name in that session. Immutable publications carry the
++mapping; worker callbacks read it and queue bounded requests. Frame-only ID
++assignment never reaches Fabric, Wayland or JSI from a Rust callback thread.
++
++## Verification
++
++Three production-adapter tests fail before the Rust transport patch. All ten
++crate tests pass afterward, covering names, opaque IDs, default click coexistence,
++invalid indices, disabled state, changes and removal. A Linux-filtered --locked
++Cargo metadata check resolves one copy each of accesskit, its consumer, Unix and
++the patched common crate. The C++ owner/snapshot tests and actual packed native
++application must also pass, including real external AT-SPI calls and lifecycle
++sanitizers, before this feature is described as verified.
++
++Clean the generated native build directory after editing dependency patches so
++FetchContent populates and patches fresh source. No dependency or original-project
++PR is created by this integration.
+diff --git a/packages/core/CMakeLists.txt b/packages/core/CMakeLists.txt
+--- a/packages/core/CMakeLists.txt
++++ b/packages/core/CMakeLists.txt
+@@ -1239,11 +1239,27 @@
+     FetchContent_Declare(Corrosion
+         GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+         GIT_TAG 1499b14e4906a2890f5cee1547c8848db261753d)
++    find_program(RNL_PATCH patch REQUIRED)
++    find_program(RNL_CARGO cargo REQUIRED)
++    FetchContent_Declare(accesskit_atspi_common
++        URL https://static.crates.io/crates/accesskit_atspi_common/accesskit_atspi_common-0.21.1.crate
++        DOWNLOAD_NAME accesskit_atspi_common-0.21.1.tar.gz
++        URL_HASH SHA256=24f5baf62e34a4a6c30e3d697e4782f821a7337049c44c3b40576a27dfbb580d
++        PATCH_COMMAND ${RNL_PATCH} -N -t -p1 -i ${CMAKE_CURRENT_SOURCE_DIR}/cmake/accesskit-atspi-common.patch)
++    FetchContent_MakeAvailable(accesskit_atspi_common)
+     FetchContent_Declare(accesskit_c
+         GIT_REPOSITORY https://github.com/AccessKit/accesskit-c.git
+-        GIT_TAG e9f6614309eeb820ff03cacd174b1dccee98250c)
++        GIT_TAG e9f6614309eeb820ff03cacd174b1dccee98250c
++        UPDATE_DISCONNECTED TRUE
++        PATCH_COMMAND ${RNL_PATCH} -N -t -p1 -i ${CMAKE_CURRENT_SOURCE_DIR}/cmake/accesskit-c-lock.patch)
+     FetchContent_MakeAvailable(accesskit_c)
+     corrosion_set_cargo_flags(accesskit --locked --jobs=2)
++
++    add_custom_target(rnl_accessibility_transport_tests
++        COMMAND ${RNL_CARGO} test --locked --jobs 2 --manifest-path ${accesskit_atspi_common_SOURCE_DIR}/Cargo.toml -- --test-threads=1
++        WORKING_DIRECTORY ${accesskit_atspi_common_SOURCE_DIR}
++        USES_TERMINAL
++        VERBATIM)
+ 
+     add_library(rnl_accessibility STATIC src/AccessibilityBridge.cpp)
+     target_include_directories(rnl_accessibility PUBLIC src PRIVATE ${accesskit_c_SOURCE_DIR}/include)
+diff --git a/packages/core/cmake/accesskit-atspi-common.patch b/packages/core/cmake/accesskit-atspi-common.patch
+new file mode 100644
+--- /dev/null
++++ b/packages/core/cmake/accesskit-atspi-common.patch
+@@ -0,0 +1,219 @@
++diff --git a/src/node.rs b/src/node.rs
++--- a/src/node.rs
+++++ b/src/node.rs
++@@ -443,7 +443,7 @@
++     }
++ 
++     fn supports_action(&self) -> bool {
++-        self.0.is_clickable(&filter)
+++        self.0.is_clickable(&filter) || !self.0.data().custom_actions().is_empty()
++     }
++ 
++     fn supports_component(&self) -> bool {
++@@ -523,18 +523,31 @@
++     }
++ 
++     fn n_actions(&self) -> i32 {
++-        if self.0.is_clickable(&filter) { 1 } else { 0 }
+++        let count = self
+++            .0
+++            .data()
+++            .custom_actions()
+++            .len()
+++            .saturating_add(usize::from(self.0.is_clickable(&filter)));
+++        count.try_into().unwrap_or(i32::MAX)
+++    }
+++
+++    fn custom_action_at(&self, index: i32) -> Option<&accesskit::CustomAction> {
+++        let index = usize::try_from(index).ok()?;
+++        let offset = usize::from(self.0.is_clickable(&filter));
+++        self.0
+++            .data()
+++            .custom_actions()
+++            .get(index.checked_sub(offset)?)
++     }
++ 
++     fn get_action_name(&self, index: i32) -> String {
++-        if index != 0 {
++-            return String::new();
++-        }
++-        String::from(if self.0.is_clickable(&filter) {
++-            "click"
+++        if index == 0 && self.0.is_clickable(&filter) {
+++            "click".into()
++         } else {
++-            ""
++-        })
+++            self.custom_action_at(index)
+++                .map_or_else(String::new, |action| action.description.clone())
+++        }
++     }
++ 
++     fn raw_bounds_and_transform(&self) -> (Option<Rect>, Affine) {
++@@ -1118,14 +1131,30 @@
++     }
++ 
++     pub fn do_action(&self, index: i32) -> Result<bool> {
++-        if index != 0 {
+++        let request = self.resolve(|node| {
+++            if node.is_disabled() {
+++                return Ok(None);
+++            }
+++            let wrapper = NodeWrapper(&node);
+++            if index == 0 && node.is_clickable(&filter) {
+++                Ok(Some((Action::Click, None)))
+++            } else {
+++                Ok(wrapper.custom_action_at(index).map(|action| {
+++                    (
+++                        Action::CustomAction,
+++                        Some(ActionData::CustomAction(action.id)),
+++                    )
+++                }))
+++            }
+++        })?;
+++        let Some((action, data)) = request else {
++             return Ok(false);
++-        }
+++        };
++         self.do_action_internal(self.id, |_, _, target_node, target_tree| ActionRequest {
++-            action: Action::Click,
+++            action,
++             target_tree,
++             target_node,
++-            data: None,
+++            data,
++         })?;
++         Ok(true)
++     }
++diff --git a/src/adapter.rs b/src/adapter.rs
++--- a/src/adapter.rs
+++++ b/src/adapter.rs
++@@ -622,7 +622,8 @@
++     use super::Adapter;
++     use crate::{AdapterCallback, AppContext, CacheEvent, Event, InterfaceSet, WindowBounds};
++     use accesskit::{
++-        ActionHandler, ActionRequest, Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate,
+++        Action, ActionData, ActionHandler, ActionRequest, CustomAction, Node, NodeId, Role, TreeId,
+++        TreeInfo, TreeUpdate,
++     };
++     use accesskit_consumer::FullNodeId;
++     use std::sync::{Arc, Mutex};
++@@ -821,4 +822,118 @@
++         assert_eq!(ops.len(), 1);
++         assert!(matches!(ops[0], CacheOp::Removed(_)));
++     }
+++
+++    struct RecordingActions(Arc<Mutex<Vec<ActionRequest>>>);
+++    impl ActionHandler for RecordingActions {
+++        fn do_action(&mut self, request: ActionRequest) {
+++            self.0.lock().unwrap().push(request);
+++        }
+++    }
+++
+++    fn action_node(clickable: bool, id: i32, description: &str) -> Node {
+++        let mut node = Node::new(if clickable { Role::Button } else { Role::Group });
+++        node.set_label("Native actions".to_owned());
+++        if clickable {
+++            node.add_action(Action::Click);
+++        }
+++        node.add_action(Action::CustomAction);
+++        node.set_custom_actions(vec![CustomAction {
+++            id,
+++            description: description.to_owned(),
+++        }]);
+++        node
+++    }
+++
+++    fn build_action_adapter(node: Node) -> (Adapter, Arc<Mutex<Vec<ActionRequest>>>) {
+++        let actions = Arc::new(Mutex::new(Vec::new()));
+++        let app_context = AppContext::new(None);
+++        let mut initial = initial_tree();
+++        initial.nodes[1].1 = node;
+++        let adapter = Adapter::new(
+++            &app_context,
+++            CapturingCallback {
+++                ops: Arc::new(Mutex::new(Vec::new())),
+++            },
+++            initial,
+++            false,
+++            WindowBounds::default(),
+++            RecordingActions(actions.clone()),
+++        );
+++        (adapter, actions)
+++    }
+++
+++    #[test]
+++    fn custom_action_is_exposed_and_dispatches_its_id_without_a_click() {
+++        let (adapter, actions) = build_action_adapter(action_node(false, 41, "Archive 雪"));
+++        let root = adapter.platform_node(adapter.root_id());
+++        let node = adapter.platform_node(root.child_at_index(0).unwrap().unwrap());
+++        assert!(node.supports_action().unwrap());
+++        assert_eq!(node.n_actions().unwrap(), 1);
+++        assert_eq!(node.action_name(0).unwrap(), "Archive 雪");
+++        assert_eq!(node.actions().unwrap()[0].localized_name, "Archive 雪");
+++        assert!(!node.do_action(-1).unwrap());
+++        assert!(!node.do_action(1).unwrap());
+++        assert!(actions.lock().unwrap().is_empty());
+++        assert!(node.do_action(0).unwrap());
+++        let actions = actions.lock().unwrap();
+++        assert_eq!(actions.len(), 1);
+++        assert_eq!(actions[0].action, Action::CustomAction);
+++        assert_eq!(actions[0].target_node, NodeId(1));
+++        assert_eq!(actions[0].target_tree, TreeId::ROOT);
+++        assert!(matches!(
+++            actions[0].data,
+++            Some(ActionData::CustomAction(41))
+++        ));
+++    }
+++
+++    #[test]
+++    fn custom_action_follows_the_default_click_and_disabled_nodes_reject_both() {
+++        let (mut adapter, actions) = build_action_adapter(action_node(true, 77, "Copy identifier"));
+++        let root = adapter.platform_node(adapter.root_id());
+++        let node = adapter.platform_node(root.child_at_index(0).unwrap().unwrap());
+++        assert_eq!(node.n_actions().unwrap(), 2);
+++        assert_eq!(node.action_name(0).unwrap(), "click");
+++        assert_eq!(node.action_name(1).unwrap(), "Copy identifier");
+++        assert!(node.do_action(0).unwrap());
+++        assert!(node.do_action(1).unwrap());
+++        {
+++            let actions = actions.lock().unwrap();
+++            assert_eq!(actions.len(), 2);
+++            assert_eq!(actions[0].action, Action::Click);
+++            assert!(matches!(
+++                actions[1].data,
+++                Some(ActionData::CustomAction(77))
+++            ));
+++        }
+++        let mut disabled = action_node(true, 77, "Copy identifier");
+++        disabled.set_disabled();
+++        adapter.update(update(vec![(NodeId(1), disabled)]));
+++        assert!(!node.do_action(0).unwrap());
+++        assert!(!node.do_action(1).unwrap());
+++        assert_eq!(actions.lock().unwrap().len(), 2);
+++    }
+++
+++    #[test]
+++    fn custom_action_changes_and_removal_update_the_live_interface() {
+++        let (mut adapter, actions) = build_action_adapter(action_node(false, 41, "Archive"));
+++        let root = adapter.platform_node(adapter.root_id());
+++        let node = adapter.platform_node(root.child_at_index(0).unwrap().unwrap());
+++        adapter.update(update(vec![(
+++            NodeId(1),
+++            action_node(false, 77, "Copy identifier"),
+++        )]));
+++        assert_eq!(node.action_name(0).unwrap(), "Copy identifier");
+++        assert!(node.do_action(0).unwrap());
+++        assert!(matches!(
+++            actions.lock().unwrap()[0].data,
+++            Some(ActionData::CustomAction(77))
+++        ));
+++        let mut empty = Node::new(Role::Group);
+++        empty.set_label("Native actions".to_owned());
+++        adapter.update(update(vec![(NodeId(1), empty)]));
+++        assert!(!node.supports_action().unwrap());
+++        assert_eq!(node.n_actions().unwrap(), 0);
+++        assert!(!node.do_action(0).unwrap());
+++        assert_eq!(actions.lock().unwrap().len(), 1);
+++    }
++ }
+diff --git a/packages/core/cmake/accesskit-c-lock.patch b/packages/core/cmake/accesskit-c-lock.patch
+new file mode 100644
+--- /dev/null
++++ b/packages/core/cmake/accesskit-c-lock.patch
+@@ -0,0 +1,22 @@
++diff --git a/Cargo.toml b/Cargo.toml
++--- a/Cargo.toml
+++++ b/Cargo.toml
++@@ -40,3 +40,6 @@
++ codegen-units = 1
++ panic = "abort"
++ debug = true
+++
+++[patch.crates-io]
+++accesskit_atspi_common = { path = "../accesskit_atspi_common-src" }
++diff --git a/Cargo.lock b/Cargo.lock
++--- a/Cargo.lock
+++++ b/Cargo.lock
++@@ -38,8 +38,6 @@
++ [[package]]
++ name = "accesskit_atspi_common"
++ version = "0.21.1"
++-source = "registry+https://github.com/rust-lang/crates.io-index"
++-checksum = "24f5baf62e34a4a6c30e3d697e4782f821a7337049c44c3b40576a27dfbb580d"
++ dependencies = [
++  "accesskit",
++  "accesskit_consumer",
+diff --git a/packages/core/src/AccessibilityBridge.cpp b/packages/core/src/AccessibilityBridge.cpp
+--- a/packages/core/src/AccessibilityBridge.cpp
++++ b/packages/core/src/AccessibilityBridge.cpp
+@@ -219,9 +219,12 @@
+     return text;
+ }
+ 
++using CustomActionIds = std::unordered_map<std::string, int32_t>;
++
+ struct Publication {
+     SceneAccessibilitySnapshot snapshot;
+     AccessibilityWindow window;
++    CustomActionIds customActionIds;
+ };
+ 
+ class TreeBuilder {
+@@ -357,6 +360,15 @@
+             accesskit_node_add_action(node.get(), ACCESSKIT_ACTION_FOCUS);
+             if (clickable(role)) {
+                 accesskit_node_add_action(node.get(), ACCESSKIT_ACTION_CLICK);
++            }
++        }
++        if (!disabled(source) && source.accessibility.hasActionHandler) {
++            for (const auto& declared : source.accessibility.actions) {
++                const auto description = declared.label.value_or(declared.name);
++                auto* action = accesskit_custom_action_new(publication_.customActionIds.at(declared.name));
++                accesskit_custom_action_set_description_with_length(action, description.data(), description.size());
++                accesskit_node_push_custom_action(node.get(), action);
++                accesskit_node_add_action(node.get(), ACCESSKIT_ACTION_CUSTOM_ACTION);
+             }
+         }
+         if (source.editor) {
+@@ -462,6 +474,8 @@
+     std::mutex mutex;
+     std::vector<NativeAccessibilityAction> actions;
+     size_t queuedTextBytes{0};
++    CustomActionIds customActionIds;
++    int64_t nextCustomActionId{1};
+     WakeDescriptor wake;
+     uintptr_t token{0};
+     std::unique_ptr<accesskit_unix_adapter, decltype(&accesskit_unix_adapter_free)> adapter{
+@@ -516,6 +530,22 @@
+                             }
+                             action.kind = NativeAccessibilityAction::Kind::Activate;
+                         }
++                    } else if (request->action == ACCESSKIT_ACTION_CUSTOM_ACTION) {
++                        if (!node.accessibility.hasActionHandler || !request->data.has_value ||
++                            request->data.value.tag != ACCESSKIT_ACTION_DATA_CUSTOM_ACTION) {
++                            return;
++                        }
++                        const auto found = std::ranges::find_if(node.accessibility.actions, [&](const auto& declared) {
++                            return current->customActionIds.at(declared.name) == request->data.value.custom_action;
++                        });
++                        if (found == node.accessibility.actions.end()) {
++                            return;
++                        }
++                        if (found->name.size() > kMaximumPendingTextBytes) {
++                            return;
++                        }
++                        action.kind = NativeAccessibilityAction::Kind::Custom;
++                        action.actionName = found->name;
+                     } else if (request->action == ACCESSKIT_ACTION_SET_VALUE ||
+                                request->action == ACCESSKIT_ACTION_SET_TEXT_SELECTION) {
+                         const auto geometry = current->snapshot.geometry.find(tag);
+@@ -561,12 +591,13 @@
+                     if (!state->active) {
+                         return;
+                     }
++                    const auto pendingBytes = action.text.size() + action.actionName.size();
+                     if (state->actions.size() == kMaximumPendingActions ||
+-                        action.text.size() > kMaximumPendingTextBytes - state->queuedTextBytes) {
++                        pendingBytes > kMaximumPendingTextBytes - state->queuedTextBytes) {
+                         std::cerr << "[a11y] pending action capacity exceeded\n";
+                         return;
+                     }
+-                    state->queuedTextBytes += action.text.size();
++                    state->queuedTextBytes += pendingBytes;
+                     state->actions.push_back(std::move(action));
+                     state->wake.signal();
+                     return;
+@@ -613,7 +644,25 @@
+ 
+ void AccessibilityBridge::update(SceneAccessibilitySnapshot snapshot, AccessibilityWindow window) {
+     const bool focused = window.focused;
+-    state_->publication.store(std::make_shared<const Publication>(Publication{std::move(snapshot), std::move(window)}));
++    std::unordered_set<std::string> declaredNames;
++    for (const auto& [tag, node] : snapshot.nodes) {
++        if (node.accessibility.hasActionHandler) {
++            for (const auto& action : node.accessibility.actions) {
++                declaredNames.insert(action.name);
++            }
++        }
++    }
++    std::erase_if(state_->customActionIds, [&](const auto& entry) { return !declaredNames.contains(entry.first); });
++    for (const auto& name : declaredNames) {
++        if (!state_->customActionIds.contains(name)) {
++            if (state_->nextCustomActionId > std::numeric_limits<int32_t>::max()) {
++                throw std::overflow_error("Accessibility custom-action identifiers exhausted");
++            }
++            state_->customActionIds.emplace(name, static_cast<int32_t>(state_->nextCustomActionId++));
++        }
++    }
++    state_->publication.store(std::make_shared<const Publication>(
++        Publication{std::move(snapshot), std::move(window), state_->customActionIds}));
+     accesskit_unix_adapter_update_if_active(
+         state_->adapter.get(), [](void* data) { return static_cast<State*>(data)->build(); }, state_.get());
+     accesskit_unix_adapter_update_window_focus_state(state_->adapter.get(), focused);
+diff --git a/packages/core/src/AccessibilityBridge.h b/packages/core/src/AccessibilityBridge.h
+--- a/packages/core/src/AccessibilityBridge.h
++++ b/packages/core/src/AccessibilityBridge.h
+@@ -10,7 +10,7 @@
+ namespace react_native_linux {
+ 
+ struct NativeAccessibilityAction {
+-    enum class Kind { Focus, Activate, SetValue, SetSelection };
++    enum class Kind { Focus, Activate, SetValue, SetSelection, Custom };
+     Kind kind;
+     facebook::react::Tag tag;
+     facebook::react::SharedEventEmitter emitter;
+@@ -19,6 +19,7 @@
+     std::string text;
+     size_t selectionAnchor{0};
+     size_t selectionFocus{0};
++    std::string actionName;
+ };
+ 
+ struct AccessibilityWindow {
+diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDispatcher.cpp
+--- a/packages/core/src/InputDispatcher.cpp
++++ b/packages/core/src/InputDispatcher.cpp
+@@ -399,6 +399,20 @@
+             std::ranges::any_of(ancestors, [&](const auto& ancestor) { return isPruned(ancestor.first.get()); })) {
+             continue;
+         }
++        if (action.kind == NativeAccessibilityAction::Kind::Custom) {
++            if (!props || !props->onAccessibilityAction ||
++                (props->accessibilityState && props->accessibilityState->disabled) ||
++                std::ranges::none_of(props->accessibilityActions,
++                                     [&](const auto& declared) { return declared.name == action.actionName; })) {
++                continue;
++            }
++            const auto emitter =
++                std::dynamic_pointer_cast<const facebook::react::ViewEventEmitter>(target->getEventEmitter());
++            if (emitter) {
++                emitter->onAccessibilityAction(action.actionName);
++            }
++            continue;
++        }
+         if (action.kind == NativeAccessibilityAction::Kind::SetValue ||
+             action.kind == NativeAccessibilityAction::Kind::SetSelection) {
+             textInputController_.dispatchAccessibilityAction(action);
+diff --git a/packages/core/src/RetainedScene.cpp b/packages/core/src/RetainedScene.cpp
+--- a/packages/core/src/RetainedScene.cpp
++++ b/packages/core/src/RetainedScene.cpp
+@@ -588,7 +588,9 @@
+                                             .nativeId = viewProps->nativeId,
+                                             .labelledBy = viewProps->accessibilityLabelledBy.value,
+                                             .state = viewProps->accessibilityState,
+-                                            .value = viewProps->accessibilityValue};
++                                            .value = viewProps->accessibilityValue,
++                                            .hasActionHandler = viewProps->onAccessibilityAction,
++                                            .actions = viewProps->accessibilityActions};
+ }
+ 
+ /**
+diff --git a/packages/core/src/RetainedScene.h b/packages/core/src/RetainedScene.h
+--- a/packages/core/src/RetainedScene.h
++++ b/packages/core/src/RetainedScene.h
+@@ -482,6 +482,8 @@
+     std::vector<std::string> labelledBy;
+     std::optional<facebook::react::AccessibilityState> state;
+     facebook::react::AccessibilityValue value;
++    bool hasActionHandler{false};
++    std::vector<facebook::react::AccessibilityAction> actions;
+ };
+ 
+ /** What a `<ScrollView>`'s overlay indicators are drawn from (#49): its content size and which axes may show one. */
+diff --git a/packages/core/tests/AccessibilitySnapshotTest.cpp b/packages/core/tests/AccessibilitySnapshotTest.cpp
+--- a/packages/core/tests/AccessibilitySnapshotTest.cpp
++++ b/packages/core/tests/AccessibilitySnapshotTest.cpp
+@@ -81,4 +81,21 @@
+     EXPECT_EQ(scene.accessibilitySnapshot().geometry.at(2).editor->contentRevision, 2U);
+ }
+ 
++TEST(AccessibilitySnapshotTest, NativeCustomActionNamesLabelsAndHandlerFlagAreCaptured) {
++    RetainedScene scene;
++    scene.createSurfaceRoot(kSurfaceTag, Size{800, 600});
++    const auto props = std::make_shared<ViewProps>();
++    props->accessible = true;
++    props->onAccessibilityAction = true;
++    props->accessibilityActions = {{"archive", std::string{"Archive"}}};
++    addChild(scene, kSurfaceTag, makeStyledView(2, makeRect(10, 20, 100, 40), props));
++    const auto snapshot = scene.accessibilitySnapshot();
++    const auto& accessibility = snapshot.nodes.at(2).accessibility;
++    EXPECT_TRUE(accessibility.hasActionHandler);
++    ASSERT_EQ(accessibility.actions.size(), 1U);
++    EXPECT_EQ(accessibility.actions[0].name, "archive");
++    ASSERT_TRUE(accessibility.actions[0].label.has_value());
++    EXPECT_EQ(accessibility.actions[0].label.value(), "Archive");
++}
++
+ } // namespace
+diff --git a/packages/core/tests/NativeAccessibilityActionTest.cpp b/packages/core/tests/NativeAccessibilityActionTest.cpp
+--- a/packages/core/tests/NativeAccessibilityActionTest.cpp
++++ b/packages/core/tests/NativeAccessibilityActionTest.cpp
+@@ -30,6 +30,17 @@
+ 
+     NativeAccessibilityAction activate(const std::shared_ptr<const ShadowNode>& child) {
+         return {NativeAccessibilityAction::Kind::Activate, child->getTag(), child->getEventEmitter(), "button"};
++    }
++
++    std::shared_ptr<const ShadowNode> customTarget() {
++        const auto target = button();
++        const PropsParserContext context{kSurfaceId, *contextContainer_};
++        const auto props = viewDescriptor_.cloneProps(
++            context, target->getProps(),
++            RawProps{folly::dynamic::object("onAccessibilityAction", true)(
++                "accessibilityActions",
++                folly::dynamic::array(folly::dynamic::object("name", "archive")("label", "Archive")))});
++        return target->clone(ShadowNodeFragment{.props = props});
+     }
+ 
+     bool clicked() const { return std::ranges::find(*recordedEventTypes_, "topClick") != recordedEventTypes_->end(); }
+@@ -116,4 +127,37 @@
+     EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 0);
+ }
+ 
++TEST_F(NativeAccessibilityActionTest, DeclaredCustomActionsUseTheNativeAccessibilityEvent) {
++    const auto target = customTarget();
++    commit(target);
++    auto action = activate(target);
++    action.kind = NativeAccessibilityAction::Kind::Custom;
++    action.actionName = "archive";
++    react_native_linux::InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    dispatcher.dispatchAccessibilityActions({action});
++    EXPECT_NE(std::ranges::find(*recordedEventTypes_, "topAccessibilityAction"), recordedEventTypes_->end());
++    EXPECT_FALSE(clicked());
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 0);
++}
++
++TEST_F(NativeAccessibilityActionTest, CustomActionsAreRevokedByCurrentHandlerStateAndDeclaration) {
++    const auto target = customTarget();
++    auto action = activate(target);
++    action.kind = NativeAccessibilityAction::Kind::Custom;
++    action.actionName = "archive";
++    const PropsParserContext context{kSurfaceId, *contextContainer_};
++    react_native_linux::InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    for (const auto& delta : std::vector<folly::dynamic>{
++             folly::dynamic::object("onAccessibilityAction", false),
++             folly::dynamic::object("accessibilityActions", folly::dynamic::array()),
++             folly::dynamic::object("accessibilityState", folly::dynamic::object("disabled", true)),
++         }) {
++        const auto props = viewDescriptor_.cloneProps(context, target->getProps(), RawProps{folly::dynamic(delta)});
++        commit(target->clone(ShadowNodeFragment{.props = props}));
++        recordedEventTypes_->clear();
++        dispatcher.dispatchAccessibilityActions({action});
++        EXPECT_EQ(std::ranges::find(*recordedEventTypes_, "topAccessibilityAction"), recordedEventTypes_->end());
++    }
++}
++
+ } // namespace

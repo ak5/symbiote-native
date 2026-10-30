@@ -19,6 +19,30 @@ function App() {
   const [count, setCount] = useState(0);
   const [value, setValue] = useState('é🐧z');
   const [empty, setEmpty] = useState('');
+  const [custom, setCustom] = useState('none');
+  const [reverseActions, setReverseActions] = useState(false);
+  const declaredActions = [
+    { name: 'archive', label: 'Archive item' },
+    { name: 'copyId', label: 'Copy identifier' },
+  ];
+  /** @type {import('@symbiote-native/react').IViewProps} */
+  const customProps = {
+    accessible: true,
+    role: 'group',
+    accessibilityLabel: 'Native custom actions',
+    accessibilityActions: reverseActions
+      ? [...declaredActions].reverse()
+      : declaredActions,
+    style: { width: 300, height: 48 },
+    onAccessibilityAction: event => {
+      const name = event.nativeEvent.actionName;
+      if (name !== 'archive' && name !== 'copyId')
+        throw new Error('Unexpected native custom action');
+      setCustom(name);
+      setReverseActions(true);
+      dlog(`AT-SPI native custom action: ${name}`);
+    },
+  };
   /** @type {import('@symbiote-native/react').ITextInputProps} */
   const editorProps = {
     accessible: true,
@@ -45,7 +69,7 @@ function App() {
     'view',
     {
       accessibilityLabel: 'Native group',
-      accessibilityRole: 'group',
+      role: 'group',
       style: { width: 600, backgroundColor: '#18293b' },
     },
     createElement('text', { style: textStyle }, unicode),
@@ -121,6 +145,12 @@ function App() {
       style: fieldStyle,
     }),
     createElement('text-input', emptyProps),
+    createElement(
+      'view',
+      customProps,
+      createElement('text', { style: textStyle }, 'Custom actions'),
+    ),
+    createElement('text', { style: textStyle }, `Native custom ${custom}`),
     createElement(
       'pressable',
       {

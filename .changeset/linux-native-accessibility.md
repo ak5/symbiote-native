@@ -21,3 +21,9 @@ label property that the platform does not use for that role.
 
 Initialize the public adapter entry point in the accessibility fixture, and
 require default native behavior registration in packed Linux consumer bundles.
+
+Carry declared custom accessibility actions through the real AT-SPI transport
+and native event handler, with stable identities, revocation and actual client checks.
+
+Build the pinned Skia source with matching native sanitizers and RTTI so UBSan
+can retain its vptr checks when linking the real window.

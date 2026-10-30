@@ -38,7 +38,7 @@ jobs:
       - name: Install compiler dependencies
         run: |
           sudo nice -n 10 apt-get update
-          sudo nice -n 10 apt-get install -y ccache clang-18 cmake ninja-build pkg-config libboost-dev libdouble-conversion-dev libfmt-dev libgoogle-glog-dev libcurl4-openssl-dev libsqlite3-dev libxkbcommon-dev libicu-dev libwayland-dev libgtest-dev clang-format-18 sway wl-clipboard wtype wayland-protocols libwayland-bin
+          sudo nice -n 10 apt-get install -y ccache patch clang-18 cmake ninja-build pkg-config libboost-dev libdouble-conversion-dev libfmt-dev libgoogle-glog-dev libcurl4-openssl-dev libsqlite3-dev libxkbcommon-dev libicu-dev libwayland-dev libgtest-dev clang-format-18 sway wl-clipboard wtype wayland-protocols libwayland-bin
       - name: Apply the pinned Linux host changes
         run: |
           test "$(git -C .linux-host rev-parse HEAD)" = 4db5e336b529c15628ffb8ba94cd6d880ff9a450
@@ -50,6 +50,8 @@ jobs:
           git -C .linux-host apply "$PWD/core/engine/linux/host/layout-conformance.patch"
           git -C .linux-host apply --check "$PWD/core/engine/linux/host/accessibility.patch"
           git -C .linux-host apply "$PWD/core/engine/linux/host/accessibility.patch"
+          git -C .linux-host apply --check "$PWD/core/engine/linux/host/custom-actions.patch"
+          git -C .linux-host apply "$PWD/core/engine/linux/host/custom-actions.patch"
       - name: Check native accessibility source formatting
         run: |
           nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/AccessibilityBridge.cpp .linux-host/packages/core/src/AccessibilityBridge.h .linux-host/packages/core/src/EditorModel.cpp .linux-host/packages/core/src/EditorModel.h .linux-host/packages/core/src/RetainedScene.cpp .linux-host/packages/core/src/RetainedScene.h .linux-host/packages/core/src/LinuxMountingManager.cpp .linux-host/packages/core/src/LinuxMountingManager.h .linux-host/packages/core/src/InputDispatcher.cpp .linux-host/packages/core/src/InputDispatcher.h .linux-host/packages/core/src/FabricHost.h .linux-host/packages/core/src/WindowSession.cpp .linux-host/packages/core/src/WindowSession.h .linux-host/packages/core/src/WindowMain.cpp .linux-host/packages/core/tests/{AccessibilitySnapshotTest,NativeAccessibilityActionTest,EditorTest}.cpp
@@ -144,6 +146,7 @@ jobs:
           rustc --version
           cargo --version
           nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON
+          nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_accessibility_transport_tests --parallel 2
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_window rnl_inject --parallel 2
           # The host's existing e2e harness locates its executables under build/dev.
           ln -s symbiote .linux-host/build/dev
@@ -218,7 +221,7 @@ jobs:
       - name: Install native compiler and accessibility dependencies
         run: |
           sudo nice -n 10 apt-get update
-          sudo nice -n 10 apt-get install -y ccache clang-18 cmake ninja-build pkg-config libboost-dev libdouble-conversion-dev libfmt-dev libgoogle-glog-dev libcurl4-openssl-dev libsqlite3-dev libxkbcommon-dev libicu-dev libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev mesa-vulkan-drivers wayland-protocols sway wtype at-spi2-core python3-gi gir1.2-atspi-2.0 libglib2.0-bin dbus-daemon
+          sudo nice -n 10 apt-get install -y ccache patch clang-18 cmake ninja-build pkg-config libboost-dev libdouble-conversion-dev libfmt-dev libgoogle-glog-dev libcurl4-openssl-dev libsqlite3-dev libxkbcommon-dev libicu-dev libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev mesa-vulkan-drivers wayland-protocols sway wtype at-spi2-core python3-gi gir1.2-atspi-2.0 libglib2.0-bin dbus-daemon
           if [ "${{ matrix.sanitizer }}" = tsan ]; then
             # Match the shadow mapping used by the independent clipboard TSan gate.
             sudo sysctl -w vm.mmap_rnd_bits=28
@@ -226,7 +229,7 @@ jobs:
       - name: Apply the pinned Linux host changes
         run: |
           test "$(git -C .linux-host rev-parse HEAD)" = 4db5e336b529c15628ffb8ba94cd6d880ff9a450
-          for patch in clipboard-safety system-clipboard layout-conformance accessibility; do
+          for patch in clipboard-safety system-clipboard layout-conformance accessibility custom-actions; do
             git -C .linux-host apply --check "$PWD/core/engine/linux/host/$patch.patch"
             git -C .linux-host apply "$PWD/core/engine/linux/host/$patch.patch"
           done
@@ -253,6 +256,8 @@ jobs:
           path: ~/.cache/ccache
           key: linux-accessibility-${{ matrix.sanitizer }}-4db5e33-${{ github.sha }}
           restore-keys: linux-accessibility-${{ matrix.sanitizer }}-4db5e33-
+      - name: Build the pinned Skia with matching sanitizers and RTTI
+        run: nice -n 10 python3 scripts/build-linux-skia.py .linux-host "${{ matrix.sanitizer }}"
       - name: Build the real native window with sanitizers
         working-directory: .linux-host
         run: |

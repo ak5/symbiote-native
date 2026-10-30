@@ -221,6 +221,24 @@ def main():
                   'real framework event handlers', alive)
             print(f'PASS native AT-SPI activation and notifications cycle={cycle}', flush=True)
 
+            custom = until(lambda: named(root, 'Native custom actions'), 'custom action control', alive)
+            custom_actions = custom.get_action_iface()
+            assert custom_actions is not None
+            assert Atspi.Action.get_n_actions(custom_actions) == 2
+            assert [Atspi.Action.get_action_name(custom_actions, index) for index in range(2)] == ['Archive item', 'Copy identifier']
+            assert not Atspi.Action.do_action(custom_actions, -1)
+            assert not Atspi.Action.do_action(custom_actions, 2)
+            assert Atspi.Action.do_action(custom_actions, 0)
+            until(lambda: named(root, 'Native custom archive'), 'real declared archive handler', alive)
+            until(lambda: Atspi.Action.get_action_name(custom_actions, 0) == 'Copy identifier',
+                  'updated custom action order', alive)
+            assert Atspi.Action.do_action(custom_actions, 0)
+            until(lambda: named(root, 'Native custom copyId'), 'reordered action preserves its identity', alive)
+            until(lambda: 'AT-SPI native custom action: archive' in log.read_text(errors='replace') and
+                              'AT-SPI native custom action: copyId' in log.read_text(errors='replace'),
+                  'real native custom event payloads', alive)
+            print(f'PASS native AT-SPI custom action labels, identities and reordered handlers cycle={cycle}', flush=True)
+
             old_root = root
             reloads_before = log.read_text(errors='replace').count('[rnl-reload] reloaded')
             reload_action = named(root, 'Reload native session').get_action_iface()
