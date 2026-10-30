@@ -1,0 +1,21 @@
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -1907,16 +1907,9 @@
+   asan_c_args = ['-DBUILT_WITH_ASAN=0']
+ endif
+ 
+-# ThreadSanitizer can't deal with futexes, and reports races for cases we don't care about
+-# so add a define to work silence these issues.
++# Use synchronization visible to ThreadSanitizer and retain all diagnostics.
+ if get_option('b_sanitize').contains('thread')
+   pre_args += '-DTHREAD_SANITIZER=1'
+-  tsan_blacklist = '-fsanitize-blacklist=@0@'.format(join_paths(meson.project_source_root(), 'build-support', 'tsan-blacklist.txt'))
+-  if cc.has_argument(tsan_blacklist)
+-    pre_args += tsan_blacklist
+-  else
+-    warning('Compiler does not support "-fsanitize-blacklist", expected race conditions will not be surpressed')
+-  endif
+ else
+   pre_args += '-DTHREAD_SANITIZER=0'
+ endif

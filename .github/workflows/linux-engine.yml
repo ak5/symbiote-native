@@ -124,7 +124,7 @@ jobs:
           grep -F 'Symbiote Linux engine smoke passed' .linux-host/symbiote-smoke.log
       - name: Build a Metro application from packed packages
         run: |
-          nice -n 10 node --test scripts/linux-consumer-bundle.test.mjs
+          nice -n 10 node --test --test-concurrency=1 scripts/linux-consumer-bundle.test.mjs scripts/linux-sanitizer-builds.test.mjs
           nice -n 10 node scripts/prepare-linux-consumer.mjs .linux-host .linux-host/symbiote-app
       - name: Run the packaged application in the native host
         run: |
@@ -225,6 +225,7 @@ jobs:
           if [ "${{ matrix.sanitizer }}" = tsan ]; then
             # Match the shadow mapping used by the independent clipboard TSan gate.
             sudo sysctl -w vm.mmap_rnd_bits=28
+            sudo nice -n 10 apt-get install -y python3-venv python3-mako python3-yaml python3-packaging llvm-19-dev libdrm-dev libelf-dev libexpat1-dev libzstd-dev bison flex
           fi
       - name: Apply the pinned Linux host changes
         run: |
@@ -258,6 +259,13 @@ jobs:
           restore-keys: linux-accessibility-${{ matrix.sanitizer }}-4db5e33-
       - name: Build the pinned Skia with matching sanitizers and RTTI
         run: nice -n 10 python3 scripts/build-linux-skia.py .linux-host "${{ matrix.sanitizer }}"
+      - name: Build instrumented lavapipe without sanitizer exclusions
+        if: matrix.sanitizer == 'tsan'
+        run: |
+          nice -n 10 python3 -m venv --system-site-packages .linux-host/build/mesa-tools
+          nice -n 10 .linux-host/build/mesa-tools/bin/pip install meson==1.9.2
+          nice -n 10 env PATH="$PWD/.linux-host/build/mesa-tools/bin:$PATH" CC="ccache $CC" CXX="ccache $CXX" python3 scripts/build-linux-lavapipe.py .linux-host
+          echo "VK_DRIVER_FILES=$PWD/.linux-host/build/lavapipe-tsan/driver.json" >> "$GITHUB_ENV"
       - name: Build the real native window with sanitizers
         working-directory: .linux-host
         run: |
@@ -280,4 +288,9 @@ jobs:
           path: |
             .linux-host/symbiote-accessibility-*.log
             .linux-host/accessibility-${{ matrix.sanitizer }}-results
+            .linux-host/third_party/skia/out/symbiote-*/args.gn
+            .linux-host/third_party/skia/.source-sanitizer.json
+            .linux-host/build/lavapipe-tsan/driver.json
+            .linux-host/build/lavapipe-tsan/native/meson-logs/meson-log.txt
+            .linux-host/build/lavapipe-tsan/native/meson-info/intro-buildoptions.json
           if-no-files-found: ignore

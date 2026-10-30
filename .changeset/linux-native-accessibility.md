@@ -27,3 +27,7 @@ and native event handler, with stable identities, revocation and actual client c
 
 Build the pinned Skia source with matching native sanitizers and RTTI so UBSan
 can retain its vptr checks when linking the real window.
+
+Investigate native lifecycle races with an instrumented, checksum-pinned lavapipe
+build that retains observable synchronization and removes sanitizer exclusions.
+Verify the real window loaded that exact driver during the external client gate.

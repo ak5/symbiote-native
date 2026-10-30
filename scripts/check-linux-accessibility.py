@@ -151,6 +151,12 @@ def main():
             alive = [compositor, window, keys]
             desktop = Atspi.get_desktop(0)
             root = until(lambda: named(desktop, title), 'real AT-SPI window', alive, 20)
+            if environment.get('VK_DRIVER_FILES'):
+                driver = json.loads(Path(environment['VK_DRIVER_FILES']).read_text())
+                library = Path(driver['ICD']['library_path'])
+                assert library.is_absolute() and library.is_file(), 'Expected a real native Vulkan driver'
+                assert str(library) in Path(f'/proc/{window.pid}/maps').read_text(), 'Expected driver was not loaded'
+                print(f'PASS native Vulkan driver loaded: {library}', flush=True)
             editor = until(lambda: named(root, 'Native editor'), 'native editor publication', alive)
             until(lambda: text(editor) == 'é🐧z', 'Unicode editor value', alive)
             expected = {'Native group': Atspi.Role.PANEL, 'Native image': Atspi.Role.IMAGE,

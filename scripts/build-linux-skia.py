@@ -39,7 +39,6 @@ def build(host, variant):
         'cxx': os.environ.get('CXX', 'clang++-18'),
         'cc_wrapper': 'ccache',
         'is_official_build': True,
-        'is_skia_standalone': False,
         'is_debug': False,
         'skia_use_partition_alloc': False,
         'skia_enable_graphite': False,

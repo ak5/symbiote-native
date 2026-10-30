@@ -100,6 +100,16 @@ mutex lifetime race inside the system lavapipe driver during device creation;
 its diagnostics need investigation. Passing lifecycle/sanitizer logs are still
 required before claiming this gate complete.
 
+The TSan follow-up builds Mesa 25.2.8 from its official checksum-pinned archive,
+using its sanitizer-visible synchronization mode. [mesa-tsan.patch](mesa-tsan.patch) removes
+the build's default sanitizer exclusions; the driver sources retain their
+licenses. Only the hash-pinned Wayland protocol wrap can supply a fallback
+dependency. The resulting ICD manifest selects the generated driver for the
+private test session, and the client checks the real window's process mappings.
+`scripts/build-linux-lavapipe.py` applies this patch only to the downloaded Mesa source.
+This build never installs into the system library directories. Its compilation
+and actual TSan client run remain to be verified.
+
 `custom-actions.patch` retains declared native action names, labels and handler
 flags. Its frame owner checks the current declaration and emits React Native's
 real accessibilityAction event. Opaque IDs remain stable across reordering and
