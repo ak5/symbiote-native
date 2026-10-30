@@ -110,20 +110,26 @@ def main():
         event_log.write(json.dumps(entry, ensure_ascii=False) + '\n')
         event_log.flush()
 
-    def capture_screenshot(cycle, label):
+    def automation_request(cycle, request):
         log = (args.output / f'native-{cycle}.log').read_text(errors='replace')
         match = re.search(r'\[rnl-automation\] listening on ([^\n]+)', log)
         assert match, 'Native automation socket was not published'
         endpoint = Path(match.group(1)).resolve()
         assert endpoint.parent == Path(environment['XDG_RUNTIME_DIR']).resolve()
-        path = (args.output / label).resolve()
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as channel:
             channel.settimeout(5)
             channel.connect(str(endpoint))
-            channel.sendall((json.dumps({'command': 'TakeScreenshot', 'path': str(path)}) + '\n').encode())
+            channel.sendall((json.dumps(request) + '\n').encode())
             with channel.makefile('r', encoding='utf-8') as response:
-                result = json.loads(response.readline(65536))
-            assert result.get('ok') is True, result
+                maximum = 4 * 1024 * 1024
+                line = response.readline(maximum + 1)
+                assert len(line) <= maximum and line.endswith('\n'), 'Incomplete native automation response'
+                return json.loads(line)
+
+    def capture_screenshot(cycle, label):
+        path = (args.output / label).resolve()
+        result = automation_request(cycle, {'command': 'TakeScreenshot', 'path': str(path)})
+        assert result.get('ok') is True, result
         return path
 
     def exercise_modal(root, desktop, window, alive, cycle):
@@ -507,8 +513,7 @@ def main():
             title = f'Native Accessibility {cycle}'
             window_command = [str(args.executable.resolve()), '--fabric', str(args.bundle.resolve()),
                               '--title', title, '--no-decorations']
-            if args.scenario in ('modal', 'refresh'):
-                window_command.append('--automation')
+            window_command.append('--automation')
             window = start(window_command, f'native-{cycle}')
             keys = start(['wtype', '-s', '300', '-P', 'Shift_L', '-p', 'Shift_L', '-s', '60000'],
                          f'keyboard-{cycle}')
@@ -676,7 +681,7 @@ def main():
         listener.deregister('object:state-changed')
         Atspi.exit()
     finally:
-        if args.scenario in ('modal', 'refresh') and 'root' in locals() and 'window' in locals() and window.poll() is None:
+        if 'root' in locals() and 'window' in locals() and window.poll() is None:
             try:
                 diagnostic = []
                 for node in walk(root):
@@ -692,6 +697,14 @@ def main():
                     json.dumps(diagnostic, ensure_ascii=False, indent=2) + '\n')
             except Exception as error:
                 print(f'Could not collect private native diagnostics: {error}', file=sys.stderr)
+            try:
+                for command_name, label in (('DumpVisualTree', 'visual'), ('DumpAccessibilityTree', 'accessibility')):
+                    native = automation_request(cycle, {'command': command_name})
+                    (args.output / f'failure-native-{label}-{cycle}.json').write_text(
+                        json.dumps(native, ensure_ascii=False, indent=2) + '\n')
+                capture_screenshot(cycle, f'failure-{cycle}.png')
+            except Exception as error:
+                print(f'Could not collect native tree/screenshot: {error}', file=sys.stderr)
         for process in reversed(processes):
             if process.poll() is None:
                 process.terminate()

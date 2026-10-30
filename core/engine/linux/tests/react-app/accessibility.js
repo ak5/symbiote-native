@@ -176,6 +176,7 @@ function App() {
       'view',
       {
         role: 'tablist',
+        collapsable: false,
         accessibilityLabel: 'Native tabs',
         style: { width: 600, height: 48, flexDirection: 'row' },
       },
@@ -211,6 +212,7 @@ function App() {
       'view',
       {
         role: 'radiogroup',
+        collapsable: false,
         accessibilityLabel: 'Native radio group',
         style: { width: 400, height: 48, flexDirection: 'row' },
       },
