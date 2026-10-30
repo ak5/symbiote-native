@@ -1,0 +1,4 @@
+# The existing Catalyst job uses this custom GitHub Actions runner label.
+self-hosted-runner:
+  labels:
+    - xcode-27

@@ -383,8 +383,10 @@ example apps are the working spec and they stay green.
 The Svelte example includes a native UIKit/Fabric Mac Catalyst host. The
 [Mac Catalyst guide](./examples/svelte/README.md#mac-catalyst) covers building the
 Mac application, the dedicated canary entry, native UI tests and installed
-package verification. Companion packages and platform-specific integrations
-need their own Catalyst checks.
+package verification. The fork's `Catalyst host integration` workflow rebuilds
+packages from the current `feat/catalyst` commit before running that packed native
+consumer and saving its Xcode results. Companion packages and platform-specific
+integrations need their own Catalyst checks.
 
 ---
 
