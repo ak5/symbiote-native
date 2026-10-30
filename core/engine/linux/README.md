@@ -20,7 +20,7 @@ component map as well as the Linux Platform module.
 
 The fork's Linux workflow builds the host and engine, then installs and bundles
 React, Svelte, Vue, Solid and Angular applications. Native checks cover module
-initialization, Fabric updates, keyboard focus, controlled input, process-local
+initialization, Fabric updates, keyboard focus, controlled input, native
 copy/paste and dimension updates. Resize uses the host's injected configure
 events under Cage.
 
@@ -57,13 +57,14 @@ not supply Linux native implementations. Preserve the host's unknown-component
 diagnostics; replacing these controls with an ordinary View would lose their
 behavior.
 
-The host patch registers React Native's existing `LayoutConformance` descriptor,
-including its Yoga strict/compatibility behavior. Native validation of mode
-changes and nested boundaries remains pending.
+The host patch uses React Native's existing `LayoutConformance` shadow node and
+Yoga strict/compatibility behavior. A Linux descriptor invalidates layout on
+mode-only changes. Native validation of this invalidation fix remains pending.
 
 The pinned host's clipboard starts as process-local storage. The host patch adds
-a Wayland data-device backend; its native checks and second-client exchange
-verification must pass before claiming system clipboard support. The host still
+a Wayland data-device backend. Run `41016615907` passed native checks and
+second-client exchange verification, including ASan/UBSan and TSan builds.
+The host still
 has no AT-SPI bridge. Its automation tree and injected input checks do not
 establish screen-reader interoperability.
 Expo-backed companion modules require their own Linux ports; their presence in

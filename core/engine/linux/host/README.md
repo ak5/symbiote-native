@@ -36,8 +36,9 @@ The patch includes its threading decision in the host's ADR-0004.
 
 Fork run `41012824604` compiled this implementation and passed all 36 isolated
 native clipboard/controller cases, the five-framework window matrix and native
-persistence checks. Independent-client protocol verification remains required
-before reporting system clipboard exchange as complete.
+persistence checks. Run `41016615907` also passed independent-client clipboard
+exchange in normal, ASan/UBSan and TSan builds, followed by the full native
+application matrix. Its saved protocol logs verify all six cases in each build.
 
 The protocol gate builds the actual backend with a small native Wayland window
 and exchanges exact bytes with `wl-copy` and `wl-paste` on an isolated headless
@@ -49,8 +50,11 @@ with the workflow artifacts. It does not access the user's desktop or clipboard.
 AT-SPI and the other missing native controls remain in scope. The host's MIT
 license is retained in `LICENSE`.
 
-`layout-conformance.patch` registers React Native's existing descriptor. Yoga's
-own strict/compatibility behavior applies to the subtree; the wrapper creates no
-native view. Its Hermes/Fabric tests check percentage sizing against a padded
-parent, nested boundaries and changing the mode without replacing descendants.
-Native validation of this patch remains pending.
+`layout-conformance.patch` uses React Native's existing shadow node and Yoga
+strict/compatibility behavior. A small Linux descriptor invalidates layout on a
+mode-only clone: RN's style comparison otherwise leaves the previous geometry
+cached. It creates no native view and changes no React Native or Yoga source.
+Its Hermes/Fabric tests check percentage sizing against a padded parent, nested
+boundaries and changing the mode without replacing descendants. Initial and
+nested modes passed in `41026127748`; the mode-change regression exposed the
+invalidation issue. Native validation of the descriptor fix remains pending.

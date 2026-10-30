@@ -50,7 +50,7 @@ jobs:
           git -C .linux-host apply "$PWD/core/engine/linux/host/layout-conformance.patch"
       - name: Check the standalone clipboard backend
         run: |
-          nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/{Clipboard.cpp,Clipboard.h,ClipboardText.h,WaylandClipboard.cpp,WaylandClipboard.h,WaylandSeat.cpp,WaylandSeat.h,WaylandWindow.cpp,WaylandWindow.h,TextInputController.cpp,TextInputController.h,TurboModuleRegistry.cpp,FabricHost.cpp} .linux-host/packages/core/tests/ClipboardBackendTest.cpp .linux-host/packages/core/tests/TextInputControllerTest.cpp .linux-host/packages/core/tests/hermes/{ClipboardModuleTest.cpp,LayoutConformanceHostTest.cpp}
+          nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/{Clipboard.cpp,Clipboard.h,ClipboardText.h,WaylandClipboard.cpp,WaylandClipboard.h,WaylandSeat.cpp,WaylandSeat.h,WaylandWindow.cpp,WaylandWindow.h,TextInputController.cpp,TextInputController.h,TurboModuleRegistry.cpp,FabricHost.cpp,LayoutConformanceComponent.h} .linux-host/packages/core/tests/ClipboardBackendTest.cpp .linux-host/packages/core/tests/TextInputControllerTest.cpp .linux-host/packages/core/tests/hermes/{ClipboardModuleTest.cpp,LayoutConformanceHostTest.cpp}
           nice -n 10 clang++-18 -std=c++20 -Wall -Wextra -Werror -pthread -I .linux-host/packages/core/src .linux-host/packages/core/src/Clipboard.cpp .linux-host/packages/core/src/WaylandClipboard.cpp .linux-host/packages/core/tests/ClipboardBackendTest.cpp -lwayland-client -lgtest -lgtest_main -o .linux-host/clipboard-checks
           nice -n 10 timeout 60s .linux-host/clipboard-checks
       - name: Verify clipboard exchange with independent native clients

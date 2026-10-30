@@ -1,21 +1,53 @@
 --- a/packages/core/src/FabricHost.cpp
 +++ b/packages/core/src/FabricHost.cpp
-@@ -32,6 +32,7 @@
- #include <react/renderer/components/text/ParagraphComponentDescriptor.h>
- #include <react/renderer/components/text/RawTextComponentDescriptor.h>
- #include <react/renderer/components/text/TextComponentDescriptor.h>
-+#include <react/renderer/components/view/LayoutConformanceComponentDescriptor.h>
- #include <react/renderer/components/view/ViewComponentDescriptor.h>
- #include <react/renderer/core/EventBeat.h>
- #include <react/renderer/core/LayoutConstraints.h>
+@@ -1,6 +1,7 @@
+ #include "FabricHost.h"
+ 
+ #include "AutolinkedComponents.h"
++#include "LayoutConformanceComponent.h"
+ #include "SwitchComponent.h"
+ #include "TextInputComponent.h"
+ 
 @@ -100,6 +101,7 @@
  
      add(facebook::react::concreteComponentDescriptorProvider<facebook::react::RootComponentDescriptor>());
      add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ViewComponentDescriptor>());
-+    add(facebook::react::concreteComponentDescriptorProvider<facebook::react::LayoutConformanceComponentDescriptor>());
++    add(facebook::react::concreteComponentDescriptorProvider<LayoutConformanceComponentDescriptor>());
      add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ImageComponentDescriptor>());
      add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ScrollViewComponentDescriptor>());
      add(facebook::react::concreteComponentDescriptorProvider<facebook::react::ParagraphComponentDescriptor>());
+--- /dev/null
++++ b/packages/core/src/LayoutConformanceComponent.h
+@@ -0,0 +1,29 @@
++#pragma once
++
++#include <memory>
++
++#include <react/renderer/components/view/LayoutConformanceComponentDescriptor.h>
++
++namespace react_native_linux {
++
++class LayoutConformanceComponentDescriptor final : public facebook::react::LayoutConformanceComponentDescriptor {
++    using Base = facebook::react::LayoutConformanceComponentDescriptor;
++
++public:
++    using Base::Base;
++
++    std::shared_ptr<facebook::react::ShadowNode>
++    cloneShadowNode(const facebook::react::ShadowNode& source,
++                    const facebook::react::ShadowNodeFragment& fragment) const override {
++        auto clone = Base::cloneShadowNode(source, fragment);
++        const auto& previous = static_cast<const facebook::react::LayoutConformanceShadowNode&>(source);
++        auto& next = static_cast<facebook::react::LayoutConformanceShadowNode&>(*clone);
++        if (previous.getConcreteProps().mode != next.getConcreteProps().mode) {
++            // RN dirties Yoga for style changes, but mode is outside yogaStyle.
++            next.dirtyLayout();
++        }
++        return clone;
++    }
++};
++
++} // namespace react_native_linux
 --- a/packages/core/tests/hermes/CMakeLists.txt
 +++ b/packages/core/tests/hermes/CMakeLists.txt
 @@ -103,6 +103,7 @@
