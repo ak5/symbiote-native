@@ -9,6 +9,7 @@ export interface IProbe extends TurboModule {
 export function viewportLabel(metrics: {
   width: number;
   height: number;
+  scale: number;
 }): string;
 
 export function createLayoutProbe(

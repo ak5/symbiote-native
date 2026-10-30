@@ -59,8 +59,14 @@ The standard CLI still generates mobile hosts; use the SDK application procedure
 
 TextInput uses the stock `WindowsTextInput` descriptor and SDK direct-event declarations.
 SafeAreaView maps to View; InputAccessoryView drops its whole subtree, following RNW's non-iOS contract.
-The stock app builder needs `SymbioteWindowMessages.h` around its blocking Start call to forward real resize notifications
-through DesktopWindowBridge. Keep its UI-thread lifetime, subclass cleanup and SWP_NOSIZE filter.
+Use `SymbioteWindowMessages.h` on the UI thread before the host starts, with its HWND and ReactInstanceSettings.
+It forwards resize messages and explicitly registers the application-owned DeviceInfo provider in SymbioteDisplayMetrics.h.
+The SDK supports user module replacement before first lookup; REACT_MODULE_NOREG prevents accidental global registration.
+Report native client pixels, current monitor bounds, DPI/96 and UISettings text scale, retaining stock RN JS Dimensions/PixelRatio.
+Only own typed state passes through the property bag, within this application's EXE; never unwrap SDK-private values.
+Capture changes on the UI thread, protect snapshots for the JS thread and hold module callbacks weakly.
+Remove the subclass and revoke text-scale notifications on destruction. Install the subclass last to avoid dangling callbacks
+if startup configuration throws. Native metrics/provider verification is pending the next Windows run.
 
 Fork run `40986359425` at `f5e4e27f` passed all five native framework journeys:
 layout updates, UI Automation focus/typing/controlled uppercase, native Ctrl+C with a separate OS clipboard client,

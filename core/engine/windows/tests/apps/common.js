@@ -1,12 +1,14 @@
-export function viewportLabel({ width, height }) {
+export function viewportLabel({ width, height, scale }) {
   if (
     !Number.isFinite(width) ||
     !Number.isFinite(height) ||
     width < 0 ||
-    height < 0
+    height < 0 ||
+    !Number.isFinite(scale) ||
+    scale <= 0
   )
     throw new Error('Invalid native window dimensions');
-  return `Viewport: ${width.toFixed(2)}x${height.toFixed(2)}`;
+  return `Viewport: ${width.toFixed(2)}x${height.toFixed(2)} @${scale.toFixed(2)}`;
 }
 
 export function createLayoutProbe(framework, platform, update, probe) {

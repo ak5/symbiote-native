@@ -192,7 +192,8 @@ jobs:
         shell: pwsh
         run: |
           $projectDir = '.windows-fabric-probe/windows/SymbioteFabricProbe'
-          Copy-Item core/engine/windows/SymbioteWindowMessages.h $projectDir
+          Copy-Item .windows-fabric-probe/node_modules/@symbiote-native/engine/windows/SymbioteWindowMessages.h $projectDir
+          Copy-Item .windows-fabric-probe/node_modules/@symbiote-native/engine/windows/SymbioteDisplayMetrics.h $projectDir
           Copy-Item core/engine/windows/tests/PersistenceConfig.h $projectDir
           Copy-Item core/engine/windows/tests/FabricProbe.h $projectDir
           Copy-Item core/engine/cpp/SymbioteBuffer.h $projectDir
@@ -207,7 +208,7 @@ jobs:
           $source = $source.Replace('#include "pch.h"', "#include `"pch.h`"`n#include <winrt/Microsoft.UI.Interop.h>`n#include `"SymbioteWindowMessages.h`"`n#include `"PersistenceConfig.h`"")
           $start = 'reactNativeWin32App.Start();'
           if (-not $source.Contains($start)) { throw 'The SDK app startup changed' }
-          $source = $source.Replace($start, 'symbiote::windows::WindowMessages windowMessages{winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id()), settings.Notifications()};' + "`n" + 'try { symbiote::windows::probe::configurePersistence(); } catch (winrt::hresult_error const &error) { symbiote::windows::probe::report("FAIL: persistence configuration: " + winrt::to_string(error.message())); return 1; }' + "`n" + $start)
+          $source = $source.Replace($start, 'symbiote::windows::WindowMessages windowMessages{winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id()), settings};' + "`n" + 'try { symbiote::windows::probe::configurePersistence(); } catch (winrt::hresult_error const &error) { symbiote::windows::probe::report("FAIL: persistence configuration: " + winrt::to_string(error.message())); return 1; }' + "`n" + $start)
           Set-Content $sourcePath $source
       - name: Autolink the production native package into the application
         shell: pwsh
@@ -297,6 +298,11 @@ jobs:
                 throw "$title did not report a native scroll event after OS wheel input"
               }
               if ($log -match 'FAIL:') { throw "$title failed during native interaction: $log" }
+              if (-not $app.CloseMainWindow() -or -not $app.WaitForExit(5000)) {
+                throw "$title did not shut down after closing its native window"
+              }
+              if ($app.ExitCode -ne 0) { throw "$title native shutdown failed: $($app.ExitCode)" }
+              Write-Host "PASS: $title graceful native shutdown"
             } catch {
               $frameworkFailures += "$framework verification failed: $_"
               Write-Warning $frameworkFailures[-1]

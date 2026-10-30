@@ -55,13 +55,22 @@ compatible Windows native providers and native verification; a successful Metro
 bundle does not establish their availability. The standard CLI still scaffolds
 the mobile hosts; the Windows SDK application setup above supplies this host.
 
-## Forward native resize notifications
+## Native window metrics
 
-The RNW 0.85 Win32 app builder resizes the Fabric surface, but its DeviceInfo
-module subscribes to the separate `DesktopWindowBridge` notification channel.
-Forward the host window's resize messages so the stock Dimensions singleton and
-all five framework hooks receive updates. This uses the SDK's public bridge;
-React Native sources stay unchanged.
+The RNW 0.85 Win32 app builder needs window-message forwarding for dimension
+updates. Its DeviceInfo also reports outer window bounds with a fixed scale of
+one. `SymbioteWindowMessages.h` supplies an opt-in DeviceInfo provider through
+the SDK's public module-registration API. It reports client pixels, the current
+monitor's bounds, `GetDpiForWindow` density and the user's text scale. React
+Native's own Dimensions and PixelRatio implementations remain unchanged.
+
+Construct this helper on the window's UI thread before starting the React host
+or requesting DeviceInfo. Use one helper per React host and keep it alive with
+that host's native window. It updates metrics after resize, movement, DPI,
+display and text-scale changes. State belongs to this application/host; the
+engine does not replace DeviceInfo in applications that omit the helper.
+Create a new React host when replacing its native window; DeviceInfo instances
+are cached for the lifetime of a host.
 
 In the generated application's C++ entry, after `pch.h`, include:
 
@@ -77,13 +86,20 @@ obtaining `appWindow` and `settings` from the standard SDK template:
 ```cpp
 symbiote::windows::WindowMessages windowMessages{
     winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id()),
-    settings.Notifications()};
+    settings};
 reactNativeWin32App.Start();
 ```
 
-The forwarder removes its window subclass when the native window is destroyed
-or its owner leaves scope. The native application gate installs this same
-header and requires a real OS resize to reach every framework's metrics hook.
+The helper removes its window subclass and text-scale subscription when the
+window is destroyed or its owner leaves scope. Its native module and UI-thread
+snapshots share only application-owned state through the SDK's typed property
+bag. Module callbacks hold weak references to avoid retaining an old runtime.
+
+The native gate compares each framework's width, height and scale with actual
+Win32 client bounds and DPI before and after OS resizing. The input driver uses
+per-monitor DPI awareness for its coordinate queries and restores its previous
+thread context afterward. Tests at the runner's default display scale do not
+establish physical HiDPI or multi-monitor calibration.
 
 ## Persistent storage interoperability
 

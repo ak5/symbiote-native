@@ -8,13 +8,21 @@ import {
 
 test('viewport labels retain fractional metrics and allow initialization before layout', () => {
   assert.equal(
-    viewportLabel({ width: 640.5, height: 480.25 }),
-    'Viewport: 640.50x480.25',
+    viewportLabel({ width: 640.5, height: 480.25, scale: 1.5 }),
+    'Viewport: 640.50x480.25 @1.50',
   );
-  assert.equal(viewportLabel({ width: 0, height: 0 }), 'Viewport: 0.00x0.00');
+  assert.equal(
+    viewportLabel({ width: 0, height: 0, scale: 2 }),
+    'Viewport: 0.00x0.00 @2.00',
+  );
   for (const width of [NaN, Infinity, -1, undefined])
     assert.throws(
-      () => viewportLabel({ width, height: 480 }),
+      () => viewportLabel({ width, height: 480, scale: 1 }),
+      /Invalid native window dimensions/,
+    );
+  for (const scale of [0, -1, NaN, Infinity, undefined])
+    assert.throws(
+      () => viewportLabel({ width: 640, height: 480, scale }),
       /Invalid native window dimensions/,
     );
 });
