@@ -9,3 +9,6 @@ checks pass; no original-project submissions are included.
 
 Add an independent AT-SPI client and packed six-component app gate on a private
 D-Bus/Wayland seat, and align the native regression fixtures with the pinned SDK.
+
+Reject queued accessibility actions after a control or ancestor becomes hidden.
+Document exact companion-provider gaps and verify the native image fixture loads.

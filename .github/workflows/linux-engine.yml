@@ -150,7 +150,7 @@ jobs:
       - name: Verify accessibility through an independent AT-SPI client
         run: |
           set -o pipefail
-          nice -n 10 python3 scripts/check-linux-accessibility.py .linux-host/build/symbiote/bin/rnl_window .linux-host/symbiote-app/react/accessibility.linux.bundle.js .linux-host/accessibility-results 2>&1 | tee .linux-host/symbiote-accessibility.log
+          nice -n 10 /usr/bin/python3 scripts/check-linux-accessibility.py .linux-host/build/symbiote/bin/rnl_window .linux-host/symbiote-app/react/accessibility.linux.bundle.js .linux-host/accessibility-results 2>&1 | tee .linux-host/symbiote-accessibility.log
       - name: Exercise native keyboard, clipboard, resize and scrolling in each application
         run: nice -n 10 node scripts/run-linux-window-consumers.mjs .linux-host .linux-host/symbiote-app
       - name: Verify native library persistence across application relaunches

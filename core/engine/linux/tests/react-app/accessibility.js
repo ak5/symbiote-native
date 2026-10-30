@@ -44,8 +44,9 @@ function App() {
     createElement('text', { style: textStyle }, unicode),
     createElement('image', {
       accessibilityLabel: 'Native image',
+      onLoad: () => dlog('AT-SPI native image loaded'),
       source: {
-        uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jK1kAAAAASUVORK5CYII=',
+        uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
       },
       style: { width: 32, height: 32 },
     }),

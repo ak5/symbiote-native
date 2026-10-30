@@ -174,6 +174,8 @@ def main():
             readonly = named(root, 'Readonly editor')
             assert not readonly.get_editable_text_iface().set_text_contents('overwrite')
             assert text(readonly) == 'readonly café'
+            until(lambda: 'AT-SPI native image loaded' in (args.output / f'native-{cycle}.log').read_text(errors='replace'),
+                  'actual native image decode and load event', alive)
             print(f'PASS native AT-SPI six components, Unicode, geometry, hidden and protected text cycle={cycle}', flush=True)
 
             events.clear()

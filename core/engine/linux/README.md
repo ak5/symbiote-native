@@ -1,6 +1,6 @@
 # Linux engine
 
-This experimental target uses `react-native-linux/react-native-linux` at
+This native target uses `react-native-linux/react-native-linux` at
 `4db5e336b529c15628ffb8ba94cd6d880ff9a450` with its React Native 0.87.1 dependency.
 `react-native.config.cjs` supplies the host's C++ autolinker configuration. The
 generated module factory registers `SymbioteEngineModule`, whose synchronous
@@ -59,13 +59,17 @@ behavior.
 
 The host patch uses React Native's existing `LayoutConformance` shadow node and
 Yoga strict/compatibility behavior. A Linux descriptor invalidates layout on
-mode-only changes. Native validation of this invalidation fix remains pending.
+mode-only changes. Run `41026955352` passed all three native layout cases, including mode-only
+invalidation, in the full application matrix.
 
 The pinned host's clipboard starts as process-local storage. The host patch adds
 a Wayland data-device backend. Run `41016615907` passed native checks and
 second-client exchange verification, including ASan/UBSan and TSan builds.
-The host still
-has no AT-SPI bridge. Its automation tree and injected input checks do not
-establish screen-reader interoperability.
+The accessibility patch connects the host to AccessKit's Unix AT-SPI transport.
+Its native client and lifecycle checks are in progress; automation-tree inspection
+and injected input alone do not establish screen-reader interoperability.
 Expo-backed companion modules require their own Linux ports; their presence in
 the workspace does not make their native APIs available.
+
+See the [native provider audit](./host/provider-audit.md) for the exact companion
+contracts that the existing clipboard and persistence gates do not establish.

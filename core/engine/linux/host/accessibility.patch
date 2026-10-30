@@ -2,7 +2,7 @@ diff --git a/docs/adr/0005-accesskit-c-abi-accessibility.md b/docs/adr/0005-acce
 new file mode 100644
 --- /dev/null
 +++ b/docs/adr/0005-accesskit-c-abi-accessibility.md
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,85 @@
 +# ADR-0005: Use AccessKit's C ABI for native Linux accessibility
 +
 +- Status: accepted in the ak5/symbiote-native fork; implementation in progress
@@ -49,7 +49,9 @@ new file mode 100644
 +
 +Actions enter a bounded queue. The frame thread checks the current emitter,
 +role and enabled/focusable state before using its native focus and activation
-+paths. A recycled or removed control cannot receive an old action. Worker
++paths. A recycled or removed control cannot receive an old action. The frame thread
++also rejects a newly hidden target or ancestor, even while the transport still
++holds the previous publication. Worker
 +callbacks never call Fabric, Wayland or JSI.
 +
 +AccessKit's Unix Adapter::drop queues RemoveAdapter asynchronously. Opaque callback
@@ -919,7 +921,7 @@ diff --git a/packages/core/src/FabricHost.h b/packages/core/src/FabricHost.h
 diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDispatcher.cpp
 --- a/packages/core/src/InputDispatcher.cpp
 +++ b/packages/core/src/InputDispatcher.cpp
-@@ -370,6 +370,37 @@
+@@ -370,6 +370,51 @@
      }
  }
  
@@ -936,6 +938,20 @@ diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDisp
 +        const auto target = shadowNodeWithTag(root, action.tag);
 +        if (!target || !action.emitter || target->getEventEmitter() != action.emitter ||
 +            accessibilityRoleOf(*target) != action.role) {
++            continue;
++        }
++        const auto isPruned = [](const facebook::react::ShadowNode& node) {
++            const auto props = std::dynamic_pointer_cast<const facebook::react::ViewProps>(node.getProps());
++            return isDisplayNone(node) ||
++                   (props && (props->accessibilityElementsHidden ||
++                              props->importantForAccessibility ==
++                                  facebook::react::ImportantForAccessibility::NoHideDescendants));
++        };
++        const auto props = std::dynamic_pointer_cast<const facebook::react::ViewProps>(target->getProps());
++        const auto ancestors = target->getFamily().getAncestors(*root);
++        if (isPruned(*target) ||
++            (props && props->importantForAccessibility == facebook::react::ImportantForAccessibility::No) ||
++            std::ranges::any_of(ancestors, [&](const auto& ancestor) { return isPruned(ancestor.first.get()); })) {
 +            continue;
 +        }
 +        if (action.kind == NativeAccessibilityAction::Kind::SetValue ||
@@ -1609,7 +1625,7 @@ diff --git a/packages/core/tests/NativeAccessibilityActionTest.cpp b/packages/co
 new file mode 100644
 --- /dev/null
 +++ b/packages/core/tests/NativeAccessibilityActionTest.cpp
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,119 @@
 +#include "AccessibilityBridge.h"
 +#include "InputDispatcher.h"
 +#include "ShadowTreeTestSupport.h"
@@ -1672,7 +1688,7 @@ new file mode 100644
 +    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 0);
 +}
 +
-+TEST_F(NativeAccessibilityActionTest, DisabledOrChangedRoleCannotReceiveAPendingActivation) {
++TEST_F(NativeAccessibilityActionTest, UnavailableControlsCannotReceiveAPendingActivation) {
 +    const auto target = button();
 +    const auto pending = activate(target);
 +    const PropsParserContext context{kSurfaceId, *contextContainer_};
@@ -1680,6 +1696,10 @@ new file mode 100644
 +    for (const auto& delta : std::vector<folly::dynamic>{
 +             folly::dynamic::object("accessibilityState", folly::dynamic::object("disabled", true)),
 +             folly::dynamic::object("accessibilityRole", "link"),
++             folly::dynamic::object("accessibilityElementsHidden", true),
++             folly::dynamic::object("importantForAccessibility", "no"),
++             folly::dynamic::object("importantForAccessibility", "no-hide-descendants"),
++             folly::dynamic::object("display", "none"),
 +         }) {
 +        const auto props = viewDescriptor_.cloneProps(context, target->getProps(), RawProps{folly::dynamic(delta)});
 +        const auto changed = target->clone(ShadowNodeFragment{.props = props});
@@ -1706,6 +1726,24 @@ new file mode 100644
 +    EXPECT_FALSE(clicked());
 +}
 +
++TEST_F(NativeAccessibilityActionTest, AHiddenAncestorRevokesItsDescendantsPendingActions) {
++    const auto target = button();
++    const auto parent = react_native_linux::makeConfiguredShadowNode(
++        viewDescriptor_, 3, kSurfaceId, contextContainer_, folly::dynamic::object("width", 200)("height", 100),
++        std::make_shared<const std::vector<std::shared_ptr<const ShadowNode>>>(
++            std::vector<std::shared_ptr<const ShadowNode>>{target}));
++    commit(parent);
++    const auto pending = activate(target);
++    const PropsParserContext context{kSurfaceId, *contextContainer_};
++    const auto props = viewDescriptor_.cloneProps(
++        context, parent->getProps(), RawProps{folly::dynamic::object("accessibilityElementsHidden", true)});
++    commit(parent->clone(ShadowNodeFragment{.props = props}));
++    react_native_linux::InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    dispatcher.dispatchAccessibilityActions({pending});
++    EXPECT_FALSE(clicked());
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 0);
++}
++
 +} // namespace
 diff --git a/packages/core/tests/TextInputControllerTest.cpp b/packages/core/tests/TextInputControllerTest.cpp
 --- a/packages/core/tests/TextInputControllerTest.cpp
@@ -1719,7 +1757,7 @@ diff --git a/packages/core/tests/TextInputControllerTest.cpp b/packages/core/tes
  #include "ShadowTreeTestSupport.h"
  
  #include <algorithm>
-@@ -114,6 +116,26 @@
+@@ -114,6 +116,29 @@
          return static_cast<size_t>(std::count(recordedEventTypes_->begin(), recordedEventTypes_->end(), type));
      }
  
@@ -1731,9 +1769,12 @@ diff --git a/packages/core/tests/TextInputControllerTest.cpp b/packages/core/tes
 +        }
 +        controller_->synchronize();
 +        const auto snapshot = mountingManager_->accessibilitySnapshot();
-+        const auto& state = snapshot.geometry.at(kFieldTag).editor;
-+        EXPECT_TRUE(state.has_value());
-+        return {kind, kFieldTag, mountedField_->getEventEmitter(), "", state->contentRevision};
++        const auto& state = snapshot.geometry.at(kFieldTag).editor.value();
++        return {.kind = kind,
++                .tag = kFieldTag,
++                .emitter = mountedField_->getEventEmitter(),
++                .role = "",
++                .contentRevision = state.contentRevision};
 +    }
 +
 +    std::string copiedFieldText() {
@@ -1746,7 +1787,7 @@ diff --git a/packages/core/tests/TextInputControllerTest.cpp b/packages/core/tes
      std::unique_ptr<TextInputController> controller_;
      std::shared_ptr<const TextInputShadowNode> mountedField_;
  };
-@@ -592,4 +614,91 @@
+@@ -592,4 +617,91 @@
      EXPECT_EQ(props.paragraphAttributes.ellipsizeMode, facebook::react::EllipsizeMode::Clip);
  }
  
