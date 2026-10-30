@@ -2,7 +2,7 @@ diff --git a/docs/adr/0005-accesskit-c-abi-accessibility.md b/docs/adr/0005-acce
 new file mode 100644
 --- /dev/null
 +++ b/docs/adr/0005-accesskit-c-abi-accessibility.md
-@@ -0,0 +1,89 @@
+@@ -0,0 +1,90 @@
 +# ADR-0005: Use AccessKit's C ABI for native Linux accessibility
 +
 +- Status: accepted in the ak5/symbiote-native fork; implementation in progress
@@ -16,7 +16,8 @@ new file mode 100644
 +
 +Pin accesskit-c 0.23.1 to `e9f6614309eeb820ff03cacd174b1dccee98250c` and
 +Corrosion 0.6.1 to `1499b14e4906a2890f5cee1547c8848db261753d`. The C binding's
-+committed Cargo.lock selects accesskit 0.25.1 and accesskit_unix 0.24.0. Build
++committed Cargo.lock selects accesskit 0.25.2, accesskit_consumer 0.39.2,
++accesskit_atspi_common 0.21.1 and accesskit_unix 0.24.1. Build
 +with `--locked`, at most two Cargo jobs, and Rust 1.87 or newer. Consume the
 +published C header and static-library CMake targets.
 +
@@ -85,9 +86,9 @@ new file mode 100644
 +## Sources
 +
 +- [C bindings and build contract](https://github.com/AccessKit/accesskit-c/tree/e9f6614309eeb820ff03cacd174b1dccee98250c)
-+- [Activation and text contracts](https://github.com/AccessKit/accesskit/blob/accesskit-v0.25.1/accesskit/src/lib.rs)
-+- [Consumer label/value contract](https://github.com/AccessKit/accesskit/blob/accesskit_unix-v0.24.0/accesskit_consumer/src/node.rs)
-+- [Unix adapter lifecycle](https://github.com/AccessKit/accesskit/blob/accesskit_unix-v0.24.0/adapters/unix/src/adapter.rs)
++- [Activation and text contracts](https://github.com/AccessKit/accesskit/blob/accesskit-v0.25.2/accesskit/src/lib.rs)
++- [Consumer label/value contract](https://github.com/AccessKit/accesskit/blob/accesskit_unix-v0.24.1/accesskit_consumer/src/node.rs)
++- [Unix adapter lifecycle](https://github.com/AccessKit/accesskit/blob/accesskit_unix-v0.24.1/adapters/unix/src/adapter.rs)
 +- [Existing host decision question](https://github.com/react-native-linux/react-native-linux/issues/347)
 +
 +All implementation and publication remain in the owner's fork. This decision

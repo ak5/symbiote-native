@@ -3,8 +3,12 @@ import {
   AppRegistry as NativeAppRegistry,
   TurboModuleRegistry,
 } from 'react-native';
+import { Platform } from '@symbiote-native/react';
 import { registerApp } from '@symbiote-native/react/bootstrap';
 import { dlog } from '@symbiote-native/engine';
+
+if (Platform.OS !== 'linux')
+  throw new Error('Expected the native Linux adapter');
 
 const textStyle = { color: '#ffffff', height: 28 };
 const fieldStyle = { ...textStyle, width: 260, height: 40 };

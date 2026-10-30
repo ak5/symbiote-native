@@ -13,6 +13,7 @@ export function verifyLinuxConsumerBundle(map, framework = 'react') {
     '@symbiote-native/engine/build/platform/index.linux.js',
     `@symbiote-native/${framework}/build/${framework === 'angular' ? 'angular/render/index.js' : 'render.js'}`,
     '@symbiote-native/components/build/component-names/index.linux.js',
+    `@symbiote-native/${framework}/build/${framework === 'angular' ? 'angular/' : ''}register.js`,
   ]) {
     assert(
       sources.some(path => path.endsWith(source)),

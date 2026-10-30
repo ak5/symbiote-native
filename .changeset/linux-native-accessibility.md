@@ -18,3 +18,6 @@ the real packed app under native ASan/UBSan and TSan after the normal gate.
 
 Preserve oversized grapheme text through AccessKit Label values rather than a
 label property that the platform does not use for that role.
+
+Initialize the public adapter entry point in the accessibility fixture, and
+require default native behavior registration in packed Linux consumer bundles.

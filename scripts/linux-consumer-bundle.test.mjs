@@ -7,6 +7,7 @@ const sources = [
   '/app/node_modules/@symbiote-native/engine/build/platform/index.linux.js',
   '/app/node_modules/@symbiote-native/react/build/render.js',
   '/app/node_modules/@symbiote-native/components/build/component-names/index.linux.js',
+  '/app/node_modules/@symbiote-native/react/build/register.js',
 ];
 
 test('accepts both flat and indexed Metro sourcemaps', () => {
@@ -21,11 +22,22 @@ test('checks the selected adapter in a Svelte bundle', () => {
     sources[0],
     sources[1].replace('/react/', '/svelte/'),
     sources[2],
+    sources[3].replace('/react/', '/svelte/'),
   ];
   verifyLinuxConsumerBundle({ sources: svelte }, 'svelte');
   assert.throws(
     () => verifyLinuxConsumerBundle({ sources }, 'svelte'),
     /svelte/,
+  );
+});
+
+test('rejects a bundle that omits default native behavior registration', () => {
+  assert.throws(
+    () =>
+      verifyLinuxConsumerBundle({
+        sources: sources.filter(source => !source.endsWith('/register.js')),
+      }),
+    /register.js/,
   );
 });
 
@@ -65,6 +77,7 @@ test('requires Angular native AOT renderer output', () => {
     sources[0],
     '/app/node_modules/@symbiote-native/angular/build/angular/render/index.js',
     sources[2],
+    '/app/node_modules/@symbiote-native/angular/build/angular/register.js',
   ];
   verifyLinuxConsumerBundle({ sources: angular }, 'angular');
   assert.throws(
@@ -87,6 +100,7 @@ test('requires one Vue component and reactivity runtime', () => {
     sources[0],
     '/app/node_modules/@symbiote-native/vue/build/render.js',
     sources[2],
+    '/app/node_modules/@symbiote-native/vue/build/register.js',
     '/app/node_modules/vue/node_modules/@vue/runtime-core/dist/runtime-core.esm-bundler.js',
     '/app/node_modules/vue/node_modules/@vue/reactivity/dist/reactivity.esm-bundler.js',
   ];
