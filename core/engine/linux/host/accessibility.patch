@@ -1,0 +1,1844 @@
+diff --git a/docs/adr/0005-accesskit-c-abi-accessibility.md b/docs/adr/0005-accesskit-c-abi-accessibility.md
+new file mode 100644
+--- /dev/null
++++ b/docs/adr/0005-accesskit-c-abi-accessibility.md
+@@ -0,0 +1,83 @@
++# ADR-0005: Use AccessKit's C ABI for native Linux accessibility
++
++- Status: accepted in the ak5/symbiote-native fork; implementation in progress
++- Date: 2026-10-30
++
++## Decision
++
++Map the retained native scene to AccessKit through its maintained C bindings.
++Use the Unix adapter's real AT-SPI/D-Bus transport. The host remains C++; Rust is
++a build dependency of the library. React Native, Fabric and Yoga stay unchanged.
++
++Pin accesskit-c 0.23.1 to `e9f6614309eeb820ff03cacd174b1dccee98250c` and
++Corrosion 0.6.1 to `1499b14e4906a2890f5cee1547c8848db261753d`. The C binding's
++committed Cargo.lock selects accesskit 0.25.1 and accesskit_unix 0.24.0. Build
++with `--locked`, at most two Cargo jobs, and Rust 1.87 or newer. Consume the
++published C header and static-library CMake targets.
++
++## Native tree and identity
++
++The frame thread copies semantic nodes, focus, editor selection and transformed
++geometry under one mounting-manager lock. Unpainted accessible views remain in
++this snapshot. Geometry reuses the renderer's transform, scroll and clipping
++calculations. The bridge publishes a complete immutable tree while accessibility
++is active; AccessKit computes platform changes and notifications.
++
++Assign each native Create a monotonically increasing identity. Updates keep it;
++deleting and recreating a Fabric tag gives it a new identity. AccessKit identifiers
++reserve one value for the window and derive native/text-run identifiers from
++that creation identity. A new WindowSession owns a new adapter on reload.
++
++Roles, labels, hints, state, values and labelled-by relations use native props.
++Text-run boundaries follow the editor's ICU graphemes. Password text is masked
++before crossing the C ABI, and field contents do not become an implicit field
++label. Window-relative geometry uses the native content offset. No global
++Wayland window position or glyph metrics are invented.
++
++## Threading and lifetime
++
++The Unix adapter calls activation, action and deactivation handlers on another
++thread. Activation wakes the frame loop through an owned eventfd and returns no
++tree; the frame thread supplies the real full update through AccessKit's documented
++asynchronous activation path. The window polls the borrowed descriptor alongside
++its Wayland connection, including while a compositor withholds frame callbacks.
++
++Actions enter a bounded queue. The frame thread checks the current emitter,
++role and enabled/focusable state before using its native focus and activation
++paths. A recycled or removed control cannot receive an old action. Worker
++callbacks never call Fabric, Wayland or JSI.
++
++AccessKit's Unix Adapter::drop queues RemoveAdapter asynchronously. Opaque callback
++tokens therefore resolve through weak registrations instead of pointing at a
++WindowSession. Closing removes the registration before freeing the adapter;
++in-flight handlers retain their own state, and later handlers find no session.
++The process-lifetime registration index retains no closed session data.
++
++## Verification and remaining work
++
++Native unit tests must cover geometry, clipping, unpainted nodes, caret/focus
++snapshots, recycling and stale actions. A real AT-SPI client must walk all six
++core components in a running Symbiote app, inspect Unicode and protected text,
++observe focus/caret/state events and activate a native control. Lifecycle races
++need sanitizer checks. Startup or an automation JSON tree alone proves none of
++these transport requirements.
++
++The transport connects focus, activation, editable text and selection to the
++native controller. Edits carry an independent content revision, so controlled
++updates that leave React event counts unchanged still revoke stale requests.
++The controller applies its existing normalization and length limits, emits
++native change events, and rejects writes during composition or to read-only
++fields. Full role-conformance enumeration and precise optional text geometry
++still require their own implementation and checks. AccessKit's uint8 character-length ABI uses a readable label fallback for a
++selectable cluster over 255 UTF-8 bytes; range navigation is unavailable there.
++Do not report the accessibility target complete while these checks are pending.
++
++## Sources
++
++- [C bindings and build contract](https://github.com/AccessKit/accesskit-c/tree/e9f6614309eeb820ff03cacd174b1dccee98250c)
++- [Activation and text contracts](https://github.com/AccessKit/accesskit/blob/accesskit-v0.25.1/accesskit/src/lib.rs)
++- [Unix adapter lifecycle](https://github.com/AccessKit/accesskit/blob/accesskit_unix-v0.24.0/adapters/unix/src/adapter.rs)
++- [Existing host decision question](https://github.com/react-native-linux/react-native-linux/issues/347)
++
++All implementation and publication remain in the owner's fork. This decision
++does not authorize submissions to another repository.
+diff --git a/packages/core/CMakeLists.txt b/packages/core/CMakeLists.txt
+--- a/packages/core/CMakeLists.txt
++++ b/packages/core/CMakeLists.txt
+@@ -1236,6 +1236,20 @@
+     target_include_directories(rnl_viewporter PUBLIC ${RNL_PROTOCOL_DIR})
+     target_link_libraries(rnl_viewporter PUBLIC PkgConfig::RNL_WAYLAND_CLIENT)
+ 
++    FetchContent_Declare(Corrosion
++        GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
++        GIT_TAG 1499b14e4906a2890f5cee1547c8848db261753d)
++    FetchContent_Declare(accesskit_c
++        GIT_REPOSITORY https://github.com/AccessKit/accesskit-c.git
++        GIT_TAG e9f6614309eeb820ff03cacd174b1dccee98250c)
++    FetchContent_MakeAvailable(accesskit_c)
++    corrosion_set_cargo_flags(accesskit --locked --jobs=2)
++
++    add_library(rnl_accessibility STATIC src/AccessibilityBridge.cpp)
++    target_include_directories(rnl_accessibility PUBLIC src PRIVATE ${accesskit_c_SOURCE_DIR}/include)
++    target_link_libraries(rnl_accessibility PUBLIC rnl_react_core accesskit-static)
++    target_compile_options(rnl_accessibility PRIVATE -Wall -Wextra -Werror)
++
+     add_executable(rnl_window
+         src/AutomationServer.cpp
+         src/GpuResourceInvalidation.cpp
+@@ -1287,6 +1301,7 @@
+     else()
+         message(WARNING "libsystemd is unavailable; the appearance portal and single-instance activation are disabled")
+     endif()
++    target_link_libraries(rnl_window PRIVATE rnl_accessibility)
+     target_compile_options(rnl_window PRIVATE -Wall -Wextra)
+     target_include_directories(rnl_window PRIVATE src)
+ 
+diff --git a/packages/core/src/AccessibilityBridge.cpp b/packages/core/src/AccessibilityBridge.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/src/AccessibilityBridge.cpp
+@@ -0,0 +1,621 @@
++#include "AccessibilityBridge.h"
++
++#include "AutomationProtocol.h"
++#include "EditorModel.h"
++#include "FocusModel.h"
++#include "TextGeometry.h"
++
++#include <accesskit.h>
++#include <algorithm>
++#include <atomic>
++#include <cerrno>
++#include <cstring>
++#include <folly/Indestructible.h>
++#include <iostream>
++#include <iterator>
++#include <limits>
++#include <memory>
++#include <mutex>
++#include <stdexcept>
++#include <string_view>
++#include <sys/eventfd.h>
++#include <system_error>
++#include <unistd.h>
++#include <unordered_map>
++#include <unordered_set>
++#include <utility>
++
++namespace react_native_linux {
++namespace {
++
++constexpr accesskit_node_id kWindowId = 1;
++constexpr size_t kMaximumPendingActions = 128;
++constexpr size_t kMaximumPendingTextBytes = 64 * 1024 * 1024;
++
++struct RoleMapping {
++    std::string_view name;
++    accesskit_role role;
++};
++
++constexpr RoleMapping kRoles[]{
++    {"alert", ACCESSKIT_ROLE_ALERT},
++    {"alertdialog", ACCESSKIT_ROLE_ALERT_DIALOG},
++    {"application", ACCESSKIT_ROLE_APPLICATION},
++    {"article", ACCESSKIT_ROLE_ARTICLE},
++    {"banner", ACCESSKIT_ROLE_BANNER},
++    {"button", ACCESSKIT_ROLE_BUTTON},
++    {"cell", ACCESSKIT_ROLE_CELL},
++    {"checkbox", ACCESSKIT_ROLE_CHECK_BOX},
++    {"columnheader", ACCESSKIT_ROLE_COLUMN_HEADER},
++    {"combobox", ACCESSKIT_ROLE_COMBO_BOX},
++    {"complementary", ACCESSKIT_ROLE_COMPLEMENTARY},
++    {"contentinfo", ACCESSKIT_ROLE_CONTENT_INFO},
++    {"definition", ACCESSKIT_ROLE_DEFINITION},
++    {"dialog", ACCESSKIT_ROLE_DIALOG},
++    {"directory", ACCESSKIT_ROLE_LIST},
++    {"document", ACCESSKIT_ROLE_DOCUMENT},
++    {"feed", ACCESSKIT_ROLE_FEED},
++    {"figure", ACCESSKIT_ROLE_FIGURE},
++    {"form", ACCESSKIT_ROLE_FORM},
++    {"grid", ACCESSKIT_ROLE_GRID},
++    {"group", ACCESSKIT_ROLE_GROUP},
++    {"heading", ACCESSKIT_ROLE_HEADING},
++    {"img", ACCESSKIT_ROLE_IMAGE},
++    {"link", ACCESSKIT_ROLE_LINK},
++    {"list", ACCESSKIT_ROLE_LIST},
++    {"listitem", ACCESSKIT_ROLE_LIST_ITEM},
++    {"log", ACCESSKIT_ROLE_LOG},
++    {"main", ACCESSKIT_ROLE_MAIN},
++    {"marquee", ACCESSKIT_ROLE_MARQUEE},
++    {"math", ACCESSKIT_ROLE_MATH},
++    {"menu", ACCESSKIT_ROLE_MENU},
++    {"menubar", ACCESSKIT_ROLE_MENU_BAR},
++    {"menuitem", ACCESSKIT_ROLE_MENU_ITEM},
++    {"meter", ACCESSKIT_ROLE_METER},
++    {"navigation", ACCESSKIT_ROLE_NAVIGATION},
++    {"none", ACCESSKIT_ROLE_GROUP},
++    {"note", ACCESSKIT_ROLE_NOTE},
++    {"option", ACCESSKIT_ROLE_LIST_BOX_OPTION},
++    {"presentation", ACCESSKIT_ROLE_GENERIC_CONTAINER},
++    {"progressbar", ACCESSKIT_ROLE_PROGRESS_INDICATOR},
++    {"radio", ACCESSKIT_ROLE_RADIO_BUTTON},
++    {"radiogroup", ACCESSKIT_ROLE_RADIO_GROUP},
++    {"region", ACCESSKIT_ROLE_REGION},
++    {"row", ACCESSKIT_ROLE_ROW},
++    {"rowgroup", ACCESSKIT_ROLE_ROW_GROUP},
++    {"rowheader", ACCESSKIT_ROLE_ROW_HEADER},
++    {"scrollbar", ACCESSKIT_ROLE_SCROLL_BAR},
++    {"searchbox", ACCESSKIT_ROLE_SEARCH_INPUT},
++    {"separator", ACCESSKIT_ROLE_SPLITTER},
++    {"slider", ACCESSKIT_ROLE_SLIDER},
++    {"spinbutton", ACCESSKIT_ROLE_SPIN_BUTTON},
++    {"status", ACCESSKIT_ROLE_STATUS},
++    {"summary", ACCESSKIT_ROLE_GROUP},
++    {"switch", ACCESSKIT_ROLE_SWITCH},
++    {"tab", ACCESSKIT_ROLE_TAB},
++    {"table", ACCESSKIT_ROLE_TABLE},
++    {"tablist", ACCESSKIT_ROLE_TAB_LIST},
++    {"tabpanel", ACCESSKIT_ROLE_TAB_PANEL},
++    {"term", ACCESSKIT_ROLE_TERM},
++    {"timer", ACCESSKIT_ROLE_TIMER},
++    {"toolbar", ACCESSKIT_ROLE_TOOLBAR},
++    {"tooltip", ACCESSKIT_ROLE_TOOLTIP},
++    {"tree", ACCESSKIT_ROLE_TREE},
++    {"treegrid", ACCESSKIT_ROLE_TREE_GRID},
++    {"treeitem", ACCESSKIT_ROLE_TREE_ITEM},
++    {"text", ACCESSKIT_ROLE_LABEL},
++    {"image", ACCESSKIT_ROLE_IMAGE},
++    {"imagebutton", ACCESSKIT_ROLE_BUTTON},
++    {"keyboardkey", ACCESSKIT_ROLE_BUTTON},
++    {"adjustable", ACCESSKIT_ROLE_SLIDER},
++    {"header", ACCESSKIT_ROLE_HEADING},
++    {"search", ACCESSKIT_ROLE_SEARCH_INPUT},
++    {"tabbar", ACCESSKIT_ROLE_TAB_LIST},
++    {"dropdownlist", ACCESSKIT_ROLE_COMBO_BOX},
++    {"togglebutton", ACCESSKIT_ROLE_BUTTON},
++    {"scrollview", ACCESSKIT_ROLE_SCROLL_VIEW},
++    {"horizontalscrollview", ACCESSKIT_ROLE_SCROLL_VIEW},
++    {"viewgroup", ACCESSKIT_ROLE_GROUP},
++    {"webview", ACCESSKIT_ROLE_WEB_VIEW},
++    {"drawerlayout", ACCESSKIT_ROLE_GROUP},
++    {"slidingdrawer", ACCESSKIT_ROLE_GROUP},
++    {"iconmenu", ACCESSKIT_ROLE_MENU},
++    {"pager", ACCESSKIT_ROLE_GROUP},
++};
++
++using NativeNode = std::unique_ptr<accesskit_node, decltype(&accesskit_node_free)>;
++
++accesskit_node_id nativeId(const SceneNode& node) { return node.accessibilityId * 2; }
++
++accesskit_role roleOf(const SceneNode& node, std::string_view name) {
++    if (node.editor) {
++        if (node.editor->isSecure) {
++            return ACCESSKIT_ROLE_PASSWORD_INPUT;
++        }
++        if (name == "searchbox" || name == "search") {
++            return ACCESSKIT_ROLE_SEARCH_INPUT;
++        }
++        return node.editor->isMultiline ? ACCESSKIT_ROLE_MULTILINE_TEXT_INPUT : ACCESSKIT_ROLE_TEXT_INPUT;
++    }
++    const auto found = std::ranges::find(kRoles, name, &RoleMapping::name);
++    if (found != std::end(kRoles) && name != "none") {
++        return found->role;
++    }
++    if (node.componentName == "ScrollView") {
++        return ACCESSKIT_ROLE_SCROLL_VIEW;
++    }
++    if (node.image) {
++        return ACCESSKIT_ROLE_IMAGE;
++    }
++    if (node.switchControl) {
++        return ACCESSKIT_ROLE_SWITCH;
++    }
++    return ACCESSKIT_ROLE_GROUP;
++}
++
++accesskit_rect boundsOf(facebook::react::Rect bounds, float contentOffsetY) {
++    return {bounds.origin.x, bounds.origin.y + contentOffsetY, bounds.origin.x + bounds.size.width,
++            bounds.origin.y + bounds.size.height + contentOffsetY};
++}
++
++bool disabled(const SceneNode& node) {
++    return (node.accessibility.state && node.accessibility.state->disabled) ||
++           (node.switchControl && node.switchControl->isDisabled);
++}
++
++bool focusable(const SceneNode& node) {
++    return !disabled(node) && (node.accessibility.accessible || node.switchControl.has_value());
++}
++
++bool clickable(accesskit_role role) {
++    return role == ACCESSKIT_ROLE_BUTTON || role == ACCESSKIT_ROLE_LINK || role == ACCESSKIT_ROLE_SWITCH ||
++           role == ACCESSKIT_ROLE_CHECK_BOX || role == ACCESSKIT_ROLE_RADIO_BUTTON ||
++           role == ACCESSKIT_ROLE_MENU_ITEM || role == ACCESSKIT_ROLE_TAB;
++}
++
++class WakeDescriptor {
++public:
++    WakeDescriptor() : descriptor_(eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK)) {
++        if (descriptor_ < 0) {
++            throw std::system_error(errno, std::generic_category(), "Accessibility wake event");
++        }
++    }
++
++    ~WakeDescriptor() { close(descriptor_); }
++
++    WakeDescriptor(const WakeDescriptor&) = delete;
++    WakeDescriptor& operator=(const WakeDescriptor&) = delete;
++
++    int get() const noexcept { return descriptor_; }
++
++    void signal() const noexcept {
++        const uint64_t one = 1;
++        while (write(descriptor_, &one, sizeof(one)) < 0 && errno == EINTR) {
++        }
++    }
++
++    void drain() const noexcept {
++        uint64_t pending;
++        while (read(descriptor_, &pending, sizeof(pending)) < 0 && errno == EINTR) {
++        }
++    }
++
++private:
++    int descriptor_;
++};
++
++std::string accessibilityText(const SceneNode& source) {
++    if (!source.text || (source.editor && source.editor->isPlaceholder)) {
++        return {};
++    }
++    auto text = source.text->attributedString->getString();
++    if (source.editor && source.editor->isSecure) {
++        EditorModel protectedText;
++        protectedText.setSegmenter(segmentText);
++        protectedText.setSecure(true);
++        protectedText.setText(std::move(text));
++        return protectedText.displayText();
++    }
++    return text;
++}
++
++struct Publication {
++    SceneAccessibilitySnapshot snapshot;
++    AccessibilityWindow window;
++};
++
++class TreeBuilder {
++public:
++    explicit TreeBuilder(const Publication& publication)
++        : publication_(publication), update_(accesskit_tree_update_with_focus(kWindowId), accesskit_tree_update_free) {}
++
++    accesskit_tree_update* build() {
++        NativeNode root(accesskit_node_new(ACCESSKIT_ROLE_WINDOW), accesskit_node_free);
++        accesskit_node_set_label_with_length(root.get(), publication_.window.title.data(),
++                                             publication_.window.title.size());
++        accesskit_node_set_bounds(root.get(), boundsOf({.origin = {}, .size = publication_.window.size}, 0));
++        accesskit_node_set_clips_children(root.get());
++        const auto projected = describeAccessibilityTree(publication_.snapshot.nodes);
++        for (const auto& node : projected["nodes"]) {
++            collectExposedTags(node);
++        }
++        for (const auto& node : projected["nodes"]) {
++            append(root.get(), node);
++        }
++        accesskit_tree_update_push_node(update_.get(), kWindowId, root.release());
++        accesskit_tree_update_set_tree_info(update_.get(), accesskit_tree_info_new(kWindowId));
++        return update_.release();
++    }
++
++private:
++    void collectExposedTags(const folly::dynamic& description) {
++        const auto tag = static_cast<facebook::react::Tag>(description["tag"].asInt());
++        const auto found = publication_.snapshot.nodes.find(tag);
++        if (found == publication_.snapshot.nodes.end() || !publication_.snapshot.geometry.contains(tag) ||
++            found->second.accessibilityId == 0) {
++            return;
++        }
++        if (found->second.editor && !publication_.snapshot.geometry.at(tag).editor) {
++            return;
++        }
++        exposedTags_.insert(tag);
++        if (const auto* children = description.get_ptr("children")) {
++            for (const auto& child : *children) {
++                collectExposedTags(child);
++            }
++        }
++    }
++
++    void append(accesskit_node* parent, const folly::dynamic& description) {
++        const auto tag = static_cast<facebook::react::Tag>(description["tag"].asInt());
++        const auto found = publication_.snapshot.nodes.find(tag);
++        const auto geometry = publication_.snapshot.geometry.find(tag);
++        if (found == publication_.snapshot.nodes.end() || geometry == publication_.snapshot.geometry.end() ||
++            found->second.accessibilityId == 0) {
++            return;
++        }
++        const auto& source = found->second;
++        if (source.editor && !geometry->second.editor) {
++            return;
++        }
++        const auto identity = nativeId(source);
++        const auto role = roleOf(source, description["role"].asString());
++        NativeNode node(accesskit_node_new(role), accesskit_node_free);
++        accesskit_node_set_bounds(node.get(), boundsOf(geometry->second.bounds, publication_.window.contentOffsetY));
++        if (source.clipsChildren) {
++            accesskit_node_set_clips_children(node.get());
++        }
++        if (!source.accessibilityLabel.empty()) {
++            const auto& text = source.accessibilityLabel;
++            accesskit_node_set_label_with_length(node.get(), text.data(), text.size());
++        } else if (!source.editor || source.editor->isPlaceholder) {
++            if (const auto* name = description.get_ptr("name")) {
++                const auto& text = name->asString();
++                accesskit_node_set_label_with_length(node.get(), text.data(), text.size());
++            }
++        }
++        if (!source.accessibility.hint.empty()) {
++            const auto& text = source.accessibility.hint;
++            accesskit_node_set_description_with_length(node.get(), text.data(), text.size());
++        }
++        if (const auto* relations = description.get_ptr("labelledBy")) {
++            for (const auto& relation : *relations) {
++                const auto labelledBy = static_cast<facebook::react::Tag>(relation.asInt());
++                if (labelledBy != tag && exposedTags_.contains(labelledBy)) {
++                    accesskit_node_push_labelled_by(node.get(), nativeId(publication_.snapshot.nodes.at(labelledBy)));
++                }
++            }
++        }
++        if (disabled(source)) {
++            accesskit_node_set_disabled(node.get());
++        }
++        if (source.accessibility.state) {
++            const auto& state = *source.accessibility.state;
++            if (state.busy) {
++                accesskit_node_set_busy(node.get());
++            }
++            if (state.selected) {
++                accesskit_node_set_selected(node.get(), true);
++            }
++            if (state.expanded) {
++                accesskit_node_set_expanded(node.get(), *state.expanded);
++            }
++            if (state.checked != facebook::react::AccessibilityState::None) {
++                const auto value = state.checked == facebook::react::AccessibilityState::Mixed ? ACCESSKIT_TOGGLED_MIXED
++                                   : state.checked == facebook::react::AccessibilityState::Checked
++                                       ? ACCESSKIT_TOGGLED_TRUE
++                                       : ACCESSKIT_TOGGLED_FALSE;
++                accesskit_node_set_toggled(node.get(), value);
++            }
++        }
++        if (source.switchControl) {
++            accesskit_node_set_toggled(node.get(),
++                                       source.switchControl->isOn ? ACCESSKIT_TOGGLED_TRUE : ACCESSKIT_TOGGLED_FALSE);
++        }
++        if (source.editor && !source.editor->isEditable) {
++            accesskit_node_set_read_only(node.get());
++        }
++        if (source.accessibility.liveRegion == facebook::react::AccessibilityLiveRegion::Polite) {
++            accesskit_node_set_live(node.get(), ACCESSKIT_LIVE_POLITE);
++        } else if (source.accessibility.liveRegion == facebook::react::AccessibilityLiveRegion::Assertive) {
++            accesskit_node_set_live(node.get(), ACCESSKIT_LIVE_ASSERTIVE);
++        }
++        const auto& value = source.accessibility.value;
++        if (value.min) {
++            accesskit_node_set_min_numeric_value(node.get(), *value.min);
++        }
++        if (value.max) {
++            accesskit_node_set_max_numeric_value(node.get(), *value.max);
++        }
++        if (value.now) {
++            accesskit_node_set_numeric_value(node.get(), *value.now);
++        }
++        if (value.text) {
++            accesskit_node_set_value_with_length(node.get(), value.text->data(), value.text->size());
++        }
++        if (focusable(source)) {
++            accesskit_node_add_action(node.get(), ACCESSKIT_ACTION_FOCUS);
++            if (clickable(role)) {
++                accesskit_node_add_action(node.get(), ACCESSKIT_ACTION_CLICK);
++            }
++        }
++        if (source.editor) {
++            accesskit_node_add_action(node.get(), ACCESSKIT_ACTION_SET_TEXT_SELECTION);
++            if (source.editor->isEditable && !disabled(source)) {
++                accesskit_node_add_action(node.get(), ACCESSKIT_ACTION_SET_VALUE);
++            }
++        }
++        if (publication_.snapshot.focusedTag == tag) {
++            accesskit_tree_update_set_focus(update_.get(), identity);
++        }
++        if (const auto* children = description.get_ptr("children")) {
++            for (const auto& child : *children) {
++                append(node.get(), child);
++            }
++        }
++        appendText(node.get(), source, geometry->second);
++        accesskit_node_push_child(parent, identity);
++        accesskit_tree_update_push_node(update_.get(), identity, node.release());
++    }
++
++    void appendText(accesskit_node* parent, const SceneNode& source, const SceneAccessibilityGeometry& geometry) {
++        const auto text = accessibilityText(source);
++        if (text.empty() && !source.editor) {
++            return;
++        }
++        const auto segments = segmentText(text);
++        std::vector<uint8_t> lengths;
++        for (size_t index = 1; index < segments.graphemeStarts.size(); ++index) {
++            const auto bytes = segments.graphemeStarts[index] - segments.graphemeStarts[index - 1];
++            if (bytes > std::numeric_limits<uint8_t>::max()) {
++                // shortcut: AccessKit's uint8 ABI limits range navigation; use a label until wider lengths exist.
++                NativeNode label(accesskit_node_new(ACCESSKIT_ROLE_LABEL), accesskit_node_free);
++                accesskit_node_set_label_with_length(label.get(), text.data(), text.size());
++                accesskit_node_set_bounds(label.get(), boundsOf(geometry.bounds, publication_.window.contentOffsetY));
++                const auto identity = nativeId(source) + 1;
++                accesskit_node_push_child(parent, identity);
++                accesskit_tree_update_push_node(update_.get(), identity, label.release());
++                std::cerr << "[a11y] text is readable; range navigation exceeds AccessKit's character-length limit\n";
++                return;
++            }
++            lengths.push_back(static_cast<uint8_t>(bytes));
++        }
++        const auto textIdentity = nativeId(source) + 1;
++        NativeNode run(accesskit_node_new(ACCESSKIT_ROLE_TEXT_RUN), accesskit_node_free);
++        accesskit_node_set_value_with_length(run.get(), text.data(), text.size());
++        accesskit_node_set_character_lengths(run.get(), lengths.size(), lengths.data());
++        accesskit_node_set_bounds(run.get(), boundsOf(geometry.bounds, publication_.window.contentOffsetY));
++        accesskit_node_push_child(parent, textIdentity);
++        if (geometry.editor) {
++            const auto& editor = *geometry.editor;
++            const auto begin =
++                editor.caretUtf16 == editor.selectionBeginUtf16 ? editor.selectionEndUtf16 : editor.selectionBeginUtf16;
++            const auto characterIndex = [&](size_t utf16) {
++                const auto byte = utf8OffsetForUtf16Index(text, utf16);
++                return static_cast<size_t>(
++                    std::lower_bound(segments.graphemeStarts.begin(), segments.graphemeStarts.end(), byte) -
++                    segments.graphemeStarts.begin());
++            };
++            accesskit_node_set_text_selection(
++                parent, {{textIdentity, characterIndex(begin)}, {textIdentity, characterIndex(editor.caretUtf16)}});
++        }
++        accesskit_tree_update_push_node(update_.get(), textIdentity, run.release());
++    }
++
++    std::unordered_set<facebook::react::Tag> exposedTags_;
++    const Publication& publication_;
++    std::unique_ptr<accesskit_tree_update, decltype(&accesskit_tree_update_free)> update_;
++};
++
++} // namespace
++
++struct AccessibilityBridge::State {
++    struct Registry {
++        std::mutex mutex;
++        uintptr_t nextToken{1};
++        std::unordered_map<uintptr_t, std::weak_ptr<State>> entries;
++    };
++
++    static Registry& registry() {
++        // AccessKit queues removal asynchronously; late callbacks must outlive the C++ session safely.
++        static folly::Indestructible<Registry> registrations;
++        return *registrations;
++    }
++
++    static std::shared_ptr<State> lookup(void* data) {
++        auto& registrations = registry();
++        const std::scoped_lock lock(registrations.mutex);
++        const auto found = registrations.entries.find(reinterpret_cast<uintptr_t>(data));
++        return found == registrations.entries.end() ? nullptr : found->second.lock();
++    }
++
++    std::atomic<bool> active{false};
++    std::atomic<std::shared_ptr<const Publication>> publication{std::make_shared<const Publication>()};
++    std::mutex mutex;
++    std::vector<NativeAccessibilityAction> actions;
++    size_t queuedTextBytes{0};
++    WakeDescriptor wake;
++    uintptr_t token{0};
++    std::unique_ptr<accesskit_unix_adapter, decltype(&accesskit_unix_adapter_free)> adapter{
++        nullptr, accesskit_unix_adapter_free};
++
++    void connect(const std::shared_ptr<State>& self) {
++        auto& registrations = registry();
++        {
++            const std::scoped_lock lock(registrations.mutex);
++            if (registrations.nextToken == std::numeric_limits<uintptr_t>::max()) {
++                throw std::overflow_error("Accessibility callback tokens exhausted");
++            }
++            token = registrations.nextToken++;
++            registrations.entries.emplace(token, self);
++        }
++        void* data = reinterpret_cast<void*>(token);
++        adapter.reset(accesskit_unix_adapter_new(
++            [](void* data) -> accesskit_tree_update* {
++                if (const auto state = lookup(data)) {
++                    state->active = true;
++                    state->wake.signal();
++                }
++                // The frame thread sends the real full tree through AccessKit's asynchronous activation path.
++                return nullptr;
++            },
++            data,
++            [](accesskit_action_request* raw, void* data) {
++                std::unique_ptr<accesskit_action_request, decltype(&accesskit_action_request_free)> request(
++                    raw, accesskit_action_request_free);
++                const auto state = lookup(data);
++                if (!state || !std::ranges::equal(request->target_tree.bytes, ACCESSKIT_TREE_ID_ROOT.bytes)) {
++                    return;
++                }
++                const auto current = state->publication.load();
++                for (const auto& [tag, node] : current->snapshot.nodes) {
++                    if (nativeId(node) != request->target_node || disabled(node)) {
++                        continue;
++                    }
++                    const auto role =
++                        effectiveAccessibilityRole(node.accessibility.accessibilityRole, node.accessibility.role);
++                    NativeAccessibilityAction action{.kind = NativeAccessibilityAction::Kind::Focus,
++                                                     .tag = tag,
++                                                     .emitter = node.accessibilityEmitter,
++                                                     .role = role};
++                    if (request->action == ACCESSKIT_ACTION_FOCUS || request->action == ACCESSKIT_ACTION_CLICK) {
++                        if (!focusable(node)) {
++                            return;
++                        }
++                        if (request->action == ACCESSKIT_ACTION_CLICK) {
++                            if (!clickable(roleOf(node, role))) {
++                                return;
++                            }
++                            action.kind = NativeAccessibilityAction::Kind::Activate;
++                        }
++                    } else if (request->action == ACCESSKIT_ACTION_SET_VALUE ||
++                               request->action == ACCESSKIT_ACTION_SET_TEXT_SELECTION) {
++                        const auto geometry = current->snapshot.geometry.find(tag);
++                        if (!node.editor || geometry == current->snapshot.geometry.end() || !geometry->second.editor ||
++                            !request->data.has_value) {
++                            return;
++                        }
++                        action.contentRevision = geometry->second.editor->contentRevision;
++                        const auto& data = request->data.value;
++                        if (request->action == ACCESSKIT_ACTION_SET_VALUE) {
++                            if (!node.editor->isEditable || data.tag != ACCESSKIT_ACTION_DATA_VALUE || !data.value) {
++                                return;
++                            }
++                            const auto bytes = strnlen(data.value, kMaximumPendingTextBytes + 1);
++                            if (bytes > kMaximumPendingTextBytes) {
++                                std::cerr << "[a11y] editable text exceeds the pending-transfer limit\n";
++                                return;
++                            }
++                            action.kind = NativeAccessibilityAction::Kind::SetValue;
++                            action.text.assign(data.value, bytes);
++                        } else {
++                            if (data.tag != ACCESSKIT_ACTION_DATA_SET_TEXT_SELECTION) {
++                                return;
++                            }
++                            const auto& selection = data.set_text_selection;
++                            const auto textIdentity = nativeId(node) + 1;
++                            if (selection.anchor.node != textIdentity || selection.focus.node != textIdentity) {
++                                return;
++                            }
++                            const auto segments = segmentText(accessibilityText(node));
++                            if (selection.anchor.character_index >= segments.graphemeStarts.size() ||
++                                selection.focus.character_index >= segments.graphemeStarts.size()) {
++                                return;
++                            }
++                            action.kind = NativeAccessibilityAction::Kind::SetSelection;
++                            action.selectionAnchor = selection.anchor.character_index;
++                            action.selectionFocus = selection.focus.character_index;
++                        }
++                    } else {
++                        return;
++                    }
++                    const std::scoped_lock lock(state->mutex);
++                    if (!state->active) {
++                        return;
++                    }
++                    if (state->actions.size() == kMaximumPendingActions ||
++                        action.text.size() > kMaximumPendingTextBytes - state->queuedTextBytes) {
++                        std::cerr << "[a11y] pending action capacity exceeded\n";
++                        return;
++                    }
++                    state->queuedTextBytes += action.text.size();
++                    state->actions.push_back(std::move(action));
++                    state->wake.signal();
++                    return;
++                }
++            },
++            data,
++            [](void* data) {
++                if (const auto state = lookup(data)) {
++                    state->active = false;
++                    const std::scoped_lock lock(state->mutex);
++                    state->actions.clear();
++                    state->queuedTextBytes = 0;
++                }
++            },
++            data));
++    }
++
++    void close() {
++        auto& registrations = registry();
++        {
++            const std::scoped_lock lock(registrations.mutex);
++            registrations.entries.erase(token);
++        }
++        adapter.reset();
++    }
++
++    accesskit_tree_update* build() {
++        const auto current = publication.load();
++        return TreeBuilder(*current).build();
++    }
++};
++
++AccessibilityBridge::AccessibilityBridge() : state_(std::make_shared<State>()) { state_->connect(state_); }
++
++AccessibilityBridge::~AccessibilityBridge() { state_->close(); }
++
++bool AccessibilityBridge::needsSnapshot() const noexcept { return state_->active; }
++
++int AccessibilityBridge::wakeDescriptor() const noexcept { return state_->wake.get(); }
++
++void AccessibilityBridge::setWindowFocused(bool focused) {
++    accesskit_unix_adapter_update_window_focus_state(state_->adapter.get(), focused);
++}
++
++void AccessibilityBridge::update(SceneAccessibilitySnapshot snapshot, AccessibilityWindow window) {
++    const bool focused = window.focused;
++    state_->publication.store(std::make_shared<const Publication>(Publication{std::move(snapshot), std::move(window)}));
++    accesskit_unix_adapter_update_if_active(
++        state_->adapter.get(), [](void* data) { return static_cast<State*>(data)->build(); }, state_.get());
++    accesskit_unix_adapter_update_window_focus_state(state_->adapter.get(), focused);
++}
++
++std::vector<NativeAccessibilityAction> AccessibilityBridge::takeActions() {
++    state_->wake.drain();
++    const std::scoped_lock lock(state_->mutex);
++    state_->queuedTextBytes = 0;
++    return std::exchange(state_->actions, {});
++}
++
++} // namespace react_native_linux
+diff --git a/packages/core/src/AccessibilityBridge.h b/packages/core/src/AccessibilityBridge.h
+new file mode 100644
+--- /dev/null
++++ b/packages/core/src/AccessibilityBridge.h
+@@ -0,0 +1,56 @@
++#pragma once
++
++#include "RetainedScene.h"
++
++#include <cstdint>
++#include <memory>
++#include <string>
++#include <vector>
++
++namespace react_native_linux {
++
++struct NativeAccessibilityAction {
++    enum class Kind { Focus, Activate, SetValue, SetSelection };
++    Kind kind;
++    facebook::react::Tag tag;
++    facebook::react::SharedEventEmitter emitter;
++    std::string role;
++    uint64_t contentRevision{0};
++    std::string text;
++    size_t selectionAnchor{0};
++    size_t selectionFocus{0};
++};
++
++struct AccessibilityWindow {
++    std::string title;
++    facebook::react::Size size;
++    float contentOffsetY{0};
++    bool focused{false};
++};
++
++/**
++ * The frame thread publishes immutable snapshots and drains actions. AccessKit's
++ * worker callbacks only read the published snapshot or enqueue a bounded action;
++ * they never call Fabric, a Wayland proxy or JSI. Opaque callback tokens resolve
++ * through weak registrations; removing a session rejects late callbacks while
++ * in-flight callbacks retain only their own state. Reload owns a new adapter.
++ */
++class AccessibilityBridge final {
++public:
++    AccessibilityBridge();
++    ~AccessibilityBridge();
++    AccessibilityBridge(const AccessibilityBridge&) = delete;
++    AccessibilityBridge& operator=(const AccessibilityBridge&) = delete;
++
++    bool needsSnapshot() const noexcept;
++    int wakeDescriptor() const noexcept;
++    void setWindowFocused(bool focused);
++    void update(SceneAccessibilitySnapshot snapshot, AccessibilityWindow window);
++    std::vector<NativeAccessibilityAction> takeActions();
++
++private:
++    struct State;
++    std::shared_ptr<State> state_;
++};
++
++} // namespace react_native_linux
+diff --git a/packages/core/src/EditorModel.cpp b/packages/core/src/EditorModel.cpp
+--- a/packages/core/src/EditorModel.cpp
++++ b/packages/core/src/EditorModel.cpp
+@@ -248,12 +248,15 @@
+ 
+ int EditorModel::mostRecentEventCount() const noexcept { return mostRecentEventCount_; }
+ 
++uint64_t EditorModel::contentRevision() const noexcept { return contentRevision_; }
++
+ bool EditorModel::setText(std::string text) {
+     if (text == text_ && !isComposing_) {
+         return false;
+     }
+ 
+     text_ = std::move(text);
++    ++contentRevision_;
+     compositionBeginByte_ = 0;
+     compositionLength_ = 0;
+     isComposing_ = false;
+@@ -355,6 +358,7 @@
+     const size_t end = isComposing_ ? compositionEndByte() : selectionEndByte();
+ 
+     text_.replace(begin, end - begin, preedit);
++    ++contentRevision_;
+     resegment();
+ 
+     compositionBeginByte_ = begin;
+@@ -380,6 +384,7 @@
+ 
+     if (hadComposition) {
+         text_.erase(compositionBeginByte_, compositionLength_);
++        ++contentRevision_;
+         resegment();
+         collapseCaretTo(compositionBeginByte_);
+         compositionLength_ = 0;
+@@ -569,6 +574,7 @@
+ 
+ bool EditorModel::replaceRange(size_t beginByte, size_t endByte, const std::string& replacement) {
+     text_.replace(beginByte, endByte - beginByte, replacement);
++    ++contentRevision_;
+     compositionBeginByte_ = 0;
+     compositionLength_ = 0;
+     isComposing_ = false;
+diff --git a/packages/core/src/EditorModel.h b/packages/core/src/EditorModel.h
+--- a/packages/core/src/EditorModel.h
++++ b/packages/core/src/EditorModel.h
+@@ -176,6 +176,7 @@
+     SurroundingText surroundingText() const;
+ 
+     int mostRecentEventCount() const noexcept;
++    uint64_t contentRevision() const noexcept;
+ 
+     /**
+      * Replaces the whole buffer without touching the event count, which is what a `defaultValue` or a first
+@@ -248,6 +249,7 @@
+     size_t compositionLength_{0};
+     int maximumLength_{0};
+     int mostRecentEventCount_{0};
++    uint64_t contentRevision_{0};
+     bool isMultiline_{false};
+     bool isSecure_{false};
+     bool isComposing_{false};
+diff --git a/packages/core/src/FabricHost.cpp b/packages/core/src/FabricHost.cpp
+--- a/packages/core/src/FabricHost.cpp
++++ b/packages/core/src/FabricHost.cpp
+@@ -328,6 +328,11 @@
+     inputDispatcher_->dispatch(events);
+ }
+ 
++void FabricHost::dispatchAccessibilityActions(const std::vector<NativeAccessibilityAction>& actions) {
++    react_native_assert(std::this_thread::get_id() == owningThread_);
++    inputDispatcher_->dispatchAccessibilityActions(actions);
++}
++
+ void FabricHost::injectFocusCommand(facebook::react::Tag tag) {
+     react_native_assert(std::this_thread::get_id() == owningThread_);
+ 
+@@ -455,6 +460,11 @@
+     return mountingManager_->visualTreeNodes();
+ }
+ 
++SceneAccessibilitySnapshot FabricHost::accessibilitySnapshot() const {
++    react_native_assert(std::this_thread::get_id() == owningThread_);
++    return mountingManager_->accessibilitySnapshot();
++}
++
+ std::vector<AccessibilityChange> FabricHost::takeAccessibilityChanges() {
+     react_native_assert(std::this_thread::get_id() == owningThread_);
+ 
+diff --git a/packages/core/src/FabricHost.h b/packages/core/src/FabricHost.h
+--- a/packages/core/src/FabricHost.h
++++ b/packages/core/src/FabricHost.h
+@@ -108,6 +108,7 @@
+      */
+     void setTextInputFocusSink(TextInputFocusSink* textInputFocusSink);
+     void dispatchInput(const std::vector<InputEvent>& events);
++    void dispatchAccessibilityActions(const std::vector<NativeAccessibilityAction>& actions);
+ 
+     /**
+      * Queues a `focus` `dispatchCommand` for `tag`, the same way a `<View>` ref's `focus()` reaches
+@@ -183,6 +184,7 @@
+ 
+     /** The committed tree as the automation channel's `DumpVisualTree` reports it (#214). */
+     SceneNodes visualTreeNodes() const;
++    SceneAccessibilitySnapshot accessibilitySnapshot() const;
+ 
+     /** `LinuxMountingManager::takeAccessibilityChanges`, for `ListAccessibilityChanges` (#264). */
+     std::vector<AccessibilityChange> takeAccessibilityChanges();
+diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDispatcher.cpp
+--- a/packages/core/src/InputDispatcher.cpp
++++ b/packages/core/src/InputDispatcher.cpp
+@@ -370,6 +370,37 @@
+     }
+ }
+ 
++void InputDispatcher::dispatchAccessibilityActions(const std::vector<NativeAccessibilityAction>& actions) {
++    if (actions.empty()) {
++        return;
++    }
++    syncFocusables();
++    const auto root = rootShadowNode();
++    if (!root) {
++        return;
++    }
++    for (const auto& action : actions) {
++        const auto target = shadowNodeWithTag(root, action.tag);
++        if (!target || !action.emitter || target->getEventEmitter() != action.emitter ||
++            accessibilityRoleOf(*target) != action.role) {
++            continue;
++        }
++        if (action.kind == NativeAccessibilityAction::Kind::SetValue ||
++            action.kind == NativeAccessibilityAction::Kind::SetSelection) {
++            textInputController_.dispatchAccessibilityAction(action);
++            continue;
++        }
++        if (!isFocusableNode(*target)) {
++            continue;
++        }
++        applyFocusTransition(focusModel_.focusTag(action.tag, FocusOrigin::Keyboard));
++        if (action.kind == NativeAccessibilityAction::Kind::Activate && focusModel_.focusedTag() == action.tag &&
++            !std::dynamic_pointer_cast<const TextInputShadowNode>(target)) {
++            emitActivation(InputEvent{.kind = InputEventKind::KeyPress, .key = "Enter", .code = "Enter"});
++        }
++    }
++}
++
+ void InputDispatcher::dispatchCommands(const std::vector<SceneCommand>& commands) {
+     syncFocusables();
+ 
+diff --git a/packages/core/src/InputDispatcher.h b/packages/core/src/InputDispatcher.h
+--- a/packages/core/src/InputDispatcher.h
++++ b/packages/core/src/InputDispatcher.h
+@@ -1,5 +1,6 @@
+ #pragma once
+ 
++#include "AccessibilityBridge.h"
+ #include "FocusModel.h"
+ #include "InputPipeline.h"
+ #include "LinuxMountingManager.h"
+@@ -110,6 +111,7 @@
+                     std::shared_ptr<LinuxMountingManager> mountingManager, facebook::react::SurfaceId surfaceId);
+ 
+     void dispatch(const std::vector<InputEvent>& events);
++    void dispatchAccessibilityActions(const std::vector<NativeAccessibilityAction>& actions);
+ 
+     /**
+      * Applies the frame's `dispatchCommand` queue. `focus` is a `<View>` ref's
+diff --git a/packages/core/src/LinuxMountingManager.cpp b/packages/core/src/LinuxMountingManager.cpp
+--- a/packages/core/src/LinuxMountingManager.cpp
++++ b/packages/core/src/LinuxMountingManager.cpp
+@@ -173,6 +173,11 @@
+     return scene_.nodes();
+ }
+ 
++SceneAccessibilitySnapshot LinuxMountingManager::accessibilitySnapshot() const {
++    const std::lock_guard<std::mutex> guard(sceneMutex_);
++    return scene_.accessibilitySnapshot();
++}
++
+ void LinuxMountingManager::recordAccessibilityChangeIfAny(
+     const facebook::react::ShadowView& next,
+     std::unordered_map<facebook::react::Tag, std::size_t>& changedThisTransaction) {
+diff --git a/packages/core/src/LinuxMountingManager.h b/packages/core/src/LinuxMountingManager.h
+--- a/packages/core/src/LinuxMountingManager.h
++++ b/packages/core/src/LinuxMountingManager.h
+@@ -203,6 +203,7 @@
+      * docs/cpp-toolchain.md.
+      */
+     SceneNodes visualTreeNodes() const;
++    SceneAccessibilitySnapshot accessibilitySnapshot() const;
+ 
+     /**
+      * Every `AccessibilityChange` committed since the last call, in commit order, and empties the queue — the
+diff --git a/packages/core/src/RetainedScene.cpp b/packages/core/src/RetainedScene.cpp
+--- a/packages/core/src/RetainedScene.cpp
++++ b/packages/core/src/RetainedScene.cpp
+@@ -584,6 +584,7 @@
+                                             .role = viewProps->role,
+                                             .accessibilityRole = viewProps->accessibilityRole,
+                                             .hint = viewProps->accessibilityHint,
++                                            .liveRegion = viewProps->accessibilityLiveRegion,
+                                             .nativeId = viewProps->nativeId,
+                                             .labelledBy = viewProps->accessibilityLabelledBy.value,
+                                             .state = viewProps->accessibilityState,
+@@ -674,7 +675,9 @@
+     node.editor = SceneEditorContent{.caretColorArgb = textInputProps->caretHidden ? 0 : caretColorArgb,
+                                      .selectionColorArgb = selectionColorArgb,
+                                      .isPlaceholder = isPlaceholder,
+-                                     .isMultiline = textInputProps->multiline};
++                                     .isMultiline = textInputProps->multiline,
++                                     .isSecure = textInputProps->secureTextEntry,
++                                     .isEditable = textInputProps->editable};
+ }
+ 
+ /**
+@@ -1427,6 +1430,9 @@
+     SceneNode& node = nodes_[surfaceId];
+ 
+     node.tag = surfaceId;
++    if (node.accessibilityId == 0) {
++        node.accessibilityId = nextAccessibilityId_++;
++    }
+     node.componentName = facebook::react::RootComponentName;
+     node.layoutMetrics.frame.size = size;
+ 
+@@ -1436,7 +1442,7 @@
+ }
+ 
+ void RetainedScene::createNode(const facebook::react::ShadowView& shadowView) {
+-    writeNode(shadowView);
++    writeNode(shadowView).accessibilityId = nextAccessibilityId_++;
+     damageSubtree(shadowView.tag);
+ }
+ 
+@@ -1693,10 +1699,10 @@
+ 
+     if (std::tie(current.caretUtf16, current.selectionBeginUtf16, current.selectionEndUtf16,
+                  current.compositionBeginUtf16, current.compositionEndUtf16, current.scrollOffsetX,
+-                 current.scrollOffsetY, current.isCaretVisible) ==
++                 current.scrollOffsetY, current.isCaretVisible, current.contentRevision) ==
+         std::tie(editorState.caretUtf16, editorState.selectionBeginUtf16, editorState.selectionEndUtf16,
+                  editorState.compositionBeginUtf16, editorState.compositionEndUtf16, editorState.scrollOffsetX,
+-                 editorState.scrollOffsetY, editorState.isCaretVisible)) {
++                 editorState.scrollOffsetY, editorState.isCaretVisible, editorState.contentRevision)) {
+         return;
+     }
+ 
+@@ -1814,6 +1820,39 @@
+     return primitives;
+ }
+ 
++SceneAccessibilitySnapshot RetainedScene::accessibilitySnapshot() const {
++    SceneAccessibilitySnapshot snapshot{.nodes = nodes_, .geometry = {}, .focusedTag = focusedTag_};
++    for (const auto tag : sortedRootTags()) {
++        appendAccessibilityGeometry(snapshot, tag, ScenePaintState{});
++    }
++    return snapshot;
++}
++
++void RetainedScene::appendAccessibilityGeometry(SceneAccessibilitySnapshot& snapshot, facebook::react::Tag tag,
++                                                const ScenePaintState& state) const {
++    const auto found = nodes_.find(tag);
++    if (found == nodes_.end() || found->second.layoutMetrics.displayType == facebook::react::DisplayType::None) {
++        return;
++    }
++    const auto& node = found->second;
++    const auto geometry = nodeGeometry(node, state);
++    const auto bounds = mappedBounds(geometry.frame, geometry.matrix);
++    auto visibleBounds = bounds;
++    for (const auto& clip : state.clips) {
++        visibleBounds = facebook::react::Rect::intersect(visibleBounds, mappedBounds(clip.frame, clip.matrix));
++    }
++    const auto editor = editorStates_.find(tag);
++    snapshot.geometry.emplace(tag, SceneAccessibilityGeometry{.bounds = bounds,
++                                                              .visibleBounds = visibleBounds,
++                                                              .editor = editor == editorStates_.end()
++                                                                            ? std::nullopt
++                                                                            : std::optional{editor->second}});
++    const auto childState = childPaintState(node, state, geometry, state.opacity * node.opacity);
++    for (const auto child : node.childTags) {
++        appendAccessibilityGeometry(snapshot, child, childState);
++    }
++}
++
+ SceneDamage RetainedScene::takeDamage() { return std::exchange(damage_, SceneDamage{}); }
+ 
+ std::string RetainedScene::dump() const {
+@@ -1830,6 +1869,7 @@
+     SceneNode& node = nodes_[shadowView.tag];
+ 
+     node.tag = shadowView.tag;
++    node.accessibilityEmitter = shadowView.eventEmitter;
+     node.componentName = readComponentName(shadowView);
+     node.layoutMetrics = shadowView.layoutMetrics;
+     readPaintProps(node, shadowView);
+diff --git a/packages/core/src/RetainedScene.h b/packages/core/src/RetainedScene.h
+--- a/packages/core/src/RetainedScene.h
++++ b/packages/core/src/RetainedScene.h
+@@ -157,6 +157,7 @@
+     float scrollOffsetX{0.0F};
+     float scrollOffsetY{0.0F};
+     bool isCaretVisible{false};
++    uint64_t contentRevision{0};
+ };
+ 
+ /**
+@@ -174,6 +175,8 @@
+     uint32_t selectionColorArgb{};
+     bool isPlaceholder{false};
+     bool isMultiline{false};
++    bool isSecure{false};
++    bool isEditable{true};
+ };
+ 
+ /**
+@@ -474,6 +477,7 @@
+     facebook::react::Role role{facebook::react::Role::None};
+     std::string accessibilityRole;
+     std::string hint;
++    facebook::react::AccessibilityLiveRegion liveRegion{facebook::react::AccessibilityLiveRegion::None};
+     std::string nativeId;
+     std::vector<std::string> labelledBy;
+     std::optional<facebook::react::AccessibilityState> state;
+@@ -515,6 +519,8 @@
+ };
+ 
+ struct SceneNode {
++    uint64_t accessibilityId{};
++    facebook::react::SharedEventEmitter accessibilityEmitter;
+     facebook::react::Tag tag{};
+     facebook::react::Tag parentTag{};
+     std::string componentName;
+@@ -604,6 +610,19 @@
+ 
+ using SceneNodes = std::unordered_map<facebook::react::Tag, SceneNode>;
+ 
++struct SceneAccessibilityGeometry {
++    facebook::react::Rect bounds;
++    facebook::react::Rect visibleBounds;
++    std::optional<SceneEditorState> editor;
++};
++
++/** One transaction's semantic nodes, painted geometry and native focus. */
++struct SceneAccessibilitySnapshot {
++    SceneNodes nodes;
++    std::unordered_map<facebook::react::Tag, SceneAccessibilityGeometry> geometry;
++    facebook::react::Tag focusedTag{};
++};
++
+ /**
+  * Where a mounting transaction moved a maintaining `<ScrollView>`'s content to, for whoever owns the scroll
+  * position.
+@@ -815,6 +834,7 @@
+      */
+     SceneHit findNodeAtPoint(facebook::react::Tag rootTag, facebook::react::Point surfacePoint) const;
+     SceneSnapshot snapshot() const;
++    SceneAccessibilitySnapshot accessibilitySnapshot() const;
+ 
+     /**
+      * Holds every maintaining `<ScrollView>`'s visible child still across the mutations just applied, and answers
+@@ -852,6 +872,10 @@
+     std::optional<facebook::react::Rect> subtreeExtent(facebook::react::Tag tag) const;
+     void damageSubtree(facebook::react::Tag tag);
+ 
++    void appendAccessibilityGeometry(SceneAccessibilitySnapshot& snapshot, facebook::react::Tag tag,
++                                     const ScenePaintState& state) const;
++
++    uint64_t nextAccessibilityId_{2};
+     SceneNodes nodes_;
+     std::vector<RejectedNonFiniteProp> rejectedNonFiniteProps_;
+     SceneDamage damage_;
+diff --git a/packages/core/src/TextInputController.cpp b/packages/core/src/TextInputController.cpp
+--- a/packages/core/src/TextInputController.cpp
++++ b/packages/core/src/TextInputController.cpp
+@@ -1,5 +1,6 @@
+ #include "TextInputController.h"
+ 
++#include "AccessibilityBridge.h"
+ #include "Clipboard.h"
+ #include "ScrollPhysics.h"
+ 
+@@ -116,7 +117,7 @@
+     for (const std::shared_ptr<const TextInputShadowNode>& shadowNode : shadowNodes) {
+         const auto existing = fields_.find(shadowNode->getTag());
+ 
+-        if (existing != fields_.end()) {
++        if (existing != fields_.end() && &existing->second.shadowNode->getFamily() == &shadowNode->getFamily()) {
+             existing->second.shadowNode = shadowNode;
+             mounted.emplace(shadowNode->getTag(), std::move(existing->second));
+ 
+@@ -417,6 +418,44 @@
+                                             facebook::react::Point /*surfacePoint*/, bool /*isExtending*/) {}
+ 
+ #endif
++
++void TextInputController::dispatchAccessibilityAction(const NativeAccessibilityAction& action) {
++    const auto found = fields_.find(action.tag);
++    if (found == fields_.end()) {
++        return;
++    }
++    auto& field = found->second;
++    const auto& props = field.shadowNode->getConcreteProps();
++    if (field.shadowNode->getEventEmitter() != action.emitter || field.editor.isComposing() ||
++        field.editor.contentRevision() != action.contentRevision ||
++        (props.accessibilityState && props.accessibilityState->disabled)) {
++        return;
++    }
++    if (action.kind == NativeAccessibilityAction::Kind::SetValue) {
++        if (!props.editable) {
++            return;
++        }
++        auto replacement = field.editor;
++        replacement.selectAll();
++        replacement.insertText(action.text);
++        if (replacement.text() == field.editor.text()) {
++            return;
++        }
++        field.editor = std::move(replacement);
++    } else if (action.kind == NativeAccessibilityAction::Kind::SetSelection) {
++        const auto segmenter = fieldSegmenter();
++        const auto segments = segmenter ? segmenter(field.editor.text()) : segmentUtf8CodePoints(field.editor.text());
++        if (action.selectionAnchor >= segments.graphemeStarts.size() ||
++            action.selectionFocus >= segments.graphemeStarts.size()) {
++            return;
++        }
++        field.editor.setSelectionRange(segments.graphemeStarts[action.selectionAnchor],
++                                       segments.graphemeStarts[action.selectionFocus]);
++    } else {
++        return;
++    }
++    publish(field);
++}
+ 
+ void TextInputController::dispatchCommand(const SceneCommand& command) {
+     if (command.name != "setTextAndSelection" || !command.args.isArray() || command.args.size() != 4 ||
+@@ -631,7 +670,8 @@
+             utf16LengthOfUtf8(displayed, field.editor.displayOffsetForByte(field.editor.compositionEndByte())),
+         .scrollOffsetX = field.scrollOffsetX,
+         .scrollOffsetY = field.scrollOffsetY,
+-        .isCaretVisible = isFocused && isCaretVisible_};
++        .isCaretVisible = isFocused && isCaretVisible_,
++        .contentRevision = field.editor.contentRevision()};
+ 
+ #ifdef RNL_ENABLE_TEXT_GEOMETRY
+     const facebook::react::Rect box = contentBox(*field.shadowNode);
+diff --git a/packages/core/src/TextInputController.h b/packages/core/src/TextInputController.h
+--- a/packages/core/src/TextInputController.h
++++ b/packages/core/src/TextInputController.h
+@@ -25,6 +25,8 @@
+ 
+ namespace react_native_linux {
+ 
++struct NativeAccessibilityAction;
++
+ /**
+  * What a key press did to the focused field, and therefore what the input dispatcher must not also do with it.
+  *
+@@ -122,6 +124,7 @@
+     void synchronize();
+ 
+     void dispatchCommand(const SceneCommand& command);
++    void dispatchAccessibilityAction(const NativeAccessibilityAction& action);
+ 
+     /**
+      * Advances the caret blink by one frame, and reports whether the caret changed phase.
+diff --git a/packages/core/src/WaylandWindow.cpp b/packages/core/src/WaylandWindow.cpp
+--- a/packages/core/src/WaylandWindow.cpp
++++ b/packages/core/src/WaylandWindow.cpp
+@@ -368,7 +368,7 @@
+ 
+ bool WaylandWindow::hasPresentedFirstFrame() const noexcept { return presentedFirstFrame_; }
+ 
+-bool WaylandWindow::waitForRedraw(std::chrono::milliseconds fallbackTimeout) {
++bool WaylandWindow::waitForRedraw(std::chrono::milliseconds fallbackTimeout, int wakeDescriptor) {
+     const std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + fallbackTimeout;
+ 
+     while (!closed_ && !frameCallbackFired_) {
+@@ -379,7 +379,9 @@
+             break;
+         }
+ 
+-        dispatchWithTimeout(remaining);
++        if (dispatchWithTimeout(remaining, wakeDescriptor)) {
++            break;
++        }
+     }
+ 
+     return !closed_;
+@@ -486,10 +488,10 @@
+     return outcome;
+ }
+ 
+-void WaylandWindow::dispatchWithTimeout(std::chrono::milliseconds timeout) {
++bool WaylandWindow::dispatchWithTimeout(std::chrono::milliseconds timeout, int wakeDescriptor) {
+     while (wl_display_prepare_read(display_) != 0) {
+         if (closesWaylandWindow(reportDispatchFailure(wl_display_dispatch_pending(display_)))) {
+-            return;
++            return false;
+         }
+     }
+ 
+@@ -500,7 +502,7 @@
+             if (closesWaylandWindow(flushOutcome)) {
+                 wl_display_cancel_read(display_);
+ 
+-                return;
++                return false;
+             }
+ 
+             break;
+@@ -508,28 +510,43 @@
+ 
+         // Back-pressure on the display socket (#331): block for the same bounded timeout the read side polls
+         // with, then retry the flush, rather than falling through to a read poll that never sends the request.
+-        pollfd flushPollDescriptor{.fd = wl_display_get_fd(display_), .events = POLLOUT, .revents = 0};
+-        const int flushReadyDescriptors = poll(&flushPollDescriptor, 1, static_cast<int>(timeout.count()));
+-
+-        if (flushReadyDescriptors <= 0 || (flushPollDescriptor.revents & POLLOUT) == 0) {
++        pollfd flushDescriptors[]{{.fd = wl_display_get_fd(display_), .events = POLLOUT, .revents = 0},
++                                  {.fd = wakeDescriptor, .events = POLLIN, .revents = 0}};
++        const int flushReadyDescriptors = poll(flushDescriptors, 2, static_cast<int>(timeout.count()));
++        if (flushReadyDescriptors > 0 && (flushDescriptors[1].revents & (POLLERR | POLLHUP | POLLNVAL))) {
+             wl_display_cancel_read(display_);
+-
+-            return;
+-        }
+-    }
+-
+-    pollfd pollDescriptor{.fd = wl_display_get_fd(display_), .events = POLLIN, .revents = 0};
+-    const int readyDescriptors = poll(&pollDescriptor, 1, static_cast<int>(timeout.count()));
+-
+-    if (readyDescriptors > 0 && (pollDescriptor.revents & POLLIN) != 0) {
++            throw std::runtime_error("Native wake descriptor failed");
++        }
++        if (flushReadyDescriptors > 0 && (flushDescriptors[1].revents & POLLIN)) {
++            wl_display_cancel_read(display_);
++            return true;
++        }
++
++        if (flushReadyDescriptors <= 0 || (flushDescriptors[0].revents & POLLOUT) == 0) {
++            wl_display_cancel_read(display_);
++
++            return false;
++        }
++    }
++
++    pollfd descriptors[]{{.fd = wl_display_get_fd(display_), .events = POLLIN, .revents = 0},
++                         {.fd = wakeDescriptor, .events = POLLIN, .revents = 0}};
++    const int readyDescriptors = poll(descriptors, 2, static_cast<int>(timeout.count()));
++
++    if (readyDescriptors > 0 && (descriptors[1].revents & (POLLERR | POLLHUP | POLLNVAL))) {
++        wl_display_cancel_read(display_);
++        throw std::runtime_error("Native wake descriptor failed");
++    }
++    if (readyDescriptors > 0 && (descriptors[0].revents & POLLIN) != 0) {
+         if (closesWaylandWindow(reportDispatchFailure(wl_display_read_events(display_)))) {
+-            return;
++            return false;
+         }
+     } else {
+         wl_display_cancel_read(display_);
+     }
+ 
+     reportDispatchFailure(wl_display_dispatch_pending(display_));
++    return readyDescriptors > 0 && (descriptors[1].revents & POLLIN);
+ }
+ 
+ void WaylandWindow::handleActivationTokenDone(void* data, xdg_activation_token_v1* token, const char* tokenString) {
+diff --git a/packages/core/src/WaylandWindow.h b/packages/core/src/WaylandWindow.h
+--- a/packages/core/src/WaylandWindow.h
++++ b/packages/core/src/WaylandWindow.h
+@@ -285,7 +285,7 @@
+     /** The token the last `requestActivationToken` produced, exactly once; `std::nullopt` until the `done` event. */
+     std::optional<std::string> takeActivationToken();
+ 
+-    bool waitForRedraw(std::chrono::milliseconds fallbackTimeout);
++    bool waitForRedraw(std::chrono::milliseconds fallbackTimeout, int wakeDescriptor = -1);
+ 
+     /**
+      * Drains whatever the compositor has already sent on the display socket, without blocking, and reports it as
+@@ -326,7 +326,7 @@
+ 
+ private:
+     void bindGlobal(wl_registry* registry, uint32_t name, const char* interfaceName, uint32_t version);
+-    void dispatchWithTimeout(std::chrono::milliseconds timeout);
++    bool dispatchWithTimeout(std::chrono::milliseconds timeout, int wakeDescriptor = -1);
+     /**
+      * Classifies one dispatch/flush/read-events return value through `classifyWaylandDispatchResult`
+      * (`WaylandDispatchDiagnostics.h`), passing both `wl_display_get_error` and the plain `errno` the call itself
+diff --git a/packages/core/src/WindowMain.cpp b/packages/core/src/WindowMain.cpp
+--- a/packages/core/src/WindowMain.cpp
++++ b/packages/core/src/WindowMain.cpp
+@@ -1659,6 +1659,14 @@
+                     presented = renderer.drawFrame(window, {}, drawPlaceholder);
+                 }
+ 
++                if (session) {
++                    session->updateAccessibility({.title = parsedArguments.title,
++                                                  .size = {.width = static_cast<float>(window.size().width),
++                                                           .height = static_cast<float>(window.size().height)},
++                                                  .contentOffsetY = static_cast<float>(chrome.content.topOffset),
++                                                  .focused = window.hasKeyboardFocus()});
++                }
++
+                 FrameMark;
+ 
+                 if (parsedArguments.windowDebug && broughtUp.vulkanRenderer != nullptr) {
+@@ -1684,8 +1692,8 @@
+                                                          : react_native_linux::FrameClock::WindowActivity::Inactive,
+                         readThermalState(fallbackNow), kNominalRefreshInterval);
+ 
+-                    if (!window.waitForRedraw(
+-                            std::chrono::duration_cast<std::chrono::milliseconds>(fallbackInterval))) {
++                    if (!window.waitForRedraw(std::chrono::duration_cast<std::chrono::milliseconds>(fallbackInterval),
++                                              session ? session->accessibilityWakeDescriptor() : -1)) {
+                         break;
+                     }
+                 }
+diff --git a/packages/core/src/WindowSession.cpp b/packages/core/src/WindowSession.cpp
+--- a/packages/core/src/WindowSession.cpp
++++ b/packages/core/src/WindowSession.cpp
+@@ -106,9 +106,19 @@
+     fabricHost_->advanceCaretBlink(frameMilliseconds);
+     fabricHost_->advanceImageAnimations(frameMilliseconds);
+     fabricHost_->advanceControlAnimations(frameMilliseconds);
++    fabricHost_->dispatchAccessibilityActions(accessibility_.takeActions());
+     fabricHost_->dispatchInput(events);
+     fabricHost_->advanceScroll(frameMilliseconds);
+     fabricHost_->induceEventBeat();
++}
++
++int WindowSession::accessibilityWakeDescriptor() const noexcept { return accessibility_.wakeDescriptor(); }
++
++void WindowSession::updateAccessibility(AccessibilityWindow window) {
++    accessibility_.setWindowFocused(window.focused);
++    if (accessibility_.needsSnapshot()) {
++        accessibility_.update(fabricHost_->accessibilitySnapshot(), std::move(window));
++    }
+ }
+ 
+ void WindowSession::tickAnimations(std::chrono::steady_clock::time_point now) {
+diff --git a/packages/core/src/WindowSession.h b/packages/core/src/WindowSession.h
+--- a/packages/core/src/WindowSession.h
++++ b/packages/core/src/WindowSession.h
+@@ -4,6 +4,7 @@
+ #include "AppearancePortal.h"
+ #endif
+ 
++#include "AccessibilityBridge.h"
+ #include "FabricHost.h"
+ #include "FrameClock.h"
+ #include "FrameJournal.h"
+@@ -98,6 +99,8 @@
+      */
+     void setTextInputFocusSink(TextInputFocusSink* textInputFocusSink);
+     void deliverInput(std::vector<InputEvent> events);
++    void updateAccessibility(AccessibilityWindow window);
++    int accessibilityWakeDescriptor() const noexcept;
+ 
+     /**
+      * Feeds an activation URL to `Linking` (#363): this process's own launch `argv`, seeded once before the
+@@ -174,6 +177,7 @@
+     AppearancePortal appearancePortal_;
+ #endif
+     std::unique_ptr<FabricHost> fabricHost_;
++    AccessibilityBridge accessibility_;
+     std::chrono::steady_clock::time_point lastFrameTime_{std::chrono::steady_clock::now()};
+     FrameClock frameClock_;
+     FrameJournal frameJournal_;
+diff --git a/packages/core/tests/AccessibilitySnapshotTest.cpp b/packages/core/tests/AccessibilitySnapshotTest.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/tests/AccessibilitySnapshotTest.cpp
+@@ -0,0 +1,84 @@
++#include "RetainedScene.h"
++#include "SceneTestSupport.h"
++
++#include <gtest/gtest.h>
++#include <yoga/enums/Overflow.h>
++
++namespace {
++
++TEST(AccessibilitySnapshotTest, UnpaintedNodesUseTheNativeTransformAndClipGeometry) {
++    RetainedScene scene;
++    scene.createSurfaceRoot(kSurfaceTag, Size{800, 600});
++    const auto props = std::make_shared<ViewProps>();
++    props->accessible = true;
++    props->transform = Transform::Translate(30, 40, 0);
++    props->yogaStyle.setOverflow(facebook::yoga::Overflow::Hidden);
++    addChild(scene, kSurfaceTag, makeStyledView(2, makeRect(10, 20, 100, 100), props));
++    addChild(scene, 2, makeView(3, makeRect(90, 10, 40, 20)));
++
++    EXPECT_TRUE(scene.snapshot().empty());
++    const auto snapshot = scene.accessibilitySnapshot();
++    EXPECT_EQ(snapshot.geometry.at(2).bounds, makeRect(40, 60, 100, 100));
++    EXPECT_EQ(snapshot.geometry.at(3).bounds, makeRect(130, 70, 40, 20));
++    EXPECT_EQ(snapshot.geometry.at(3).visibleBounds, makeRect(130, 70, 10, 20));
++    EXPECT_TRUE(snapshot.nodes.at(2).accessibility.accessible);
++}
++
++TEST(AccessibilitySnapshotTest, RecycledTagsGetNewIdentitiesButUpdatesKeepTheirIdentity) {
++    RetainedScene scene;
++    scene.createSurfaceRoot(kSurfaceTag, Size{800, 600});
++    auto view = makeView(2, makeRect(10, 20, 100, 100));
++    addChild(scene, kSurfaceTag, view);
++    const auto identity = scene.accessibilitySnapshot().nodes.at(2).accessibilityId;
++    ASSERT_NE(identity, 0U);
++    view.layoutMetrics.frame.size.width = 200;
++    scene.updateNode(view);
++    EXPECT_EQ(scene.accessibilitySnapshot().nodes.at(2).accessibilityId, identity);
++    scene.removeChild(kSurfaceTag, view);
++    scene.deleteNode(2);
++    addChild(scene, kSurfaceTag, view);
++    EXPECT_NE(scene.accessibilitySnapshot().nodes.at(2).accessibilityId, identity);
++}
++
++TEST(AccessibilitySnapshotTest, FocusAndCaretAreCapturedWithTheSameNodeState) {
++    RetainedScene scene;
++    scene.createSurfaceRoot(kSurfaceTag, Size{800, 600});
++    auto props = textInputProps();
++    props->secureTextEntry = true;
++    props->editable = false;
++    addChild(scene, kSurfaceTag, makeTextInput(2, makeRect(10, 20, 200, 40), "secret", props));
++    scene.setFocus(2, true);
++    scene.setEditorState(
++        2, react_native_linux::SceneEditorState{.caretUtf16 = 3, .selectionBeginUtf16 = 1, .selectionEndUtf16 = 3});
++
++    const auto snapshot = scene.accessibilitySnapshot();
++    EXPECT_EQ(snapshot.focusedTag, 2);
++    ASSERT_TRUE(snapshot.geometry.at(2).editor.has_value());
++    EXPECT_EQ(snapshot.geometry.at(2).editor->caretUtf16, 3U);
++    EXPECT_EQ(snapshot.geometry.at(2).editor->selectionBeginUtf16, 1U);
++    EXPECT_TRUE(snapshot.nodes.at(2).editor->isSecure);
++    EXPECT_FALSE(snapshot.nodes.at(2).editor->isEditable);
++}
++
++TEST(AccessibilitySnapshotTest, DisplayNoneRemovesTheWholeSubtreeFromTheGeometry) {
++    RetainedScene scene;
++    scene.createSurfaceRoot(kSurfaceTag, Size{800, 600});
++    auto hidden = makeView(2, makeRect(10, 20, 100, 100));
++    hidden.layoutMetrics.displayType = facebook::react::DisplayType::None;
++    addChild(scene, kSurfaceTag, hidden);
++    addChild(scene, 2, makeView(3, makeRect(0, 0, 10, 10)));
++    const auto snapshot = scene.accessibilitySnapshot();
++    EXPECT_FALSE(snapshot.geometry.contains(2));
++    EXPECT_FALSE(snapshot.geometry.contains(3));
++}
++
++TEST(AccessibilitySnapshotTest, SameLengthTextChangesPublishTheirNewContentRevision) {
++    RetainedScene scene;
++    scene.createSurfaceRoot(kSurfaceTag, Size{800, 600});
++    addChild(scene, kSurfaceTag, makeTextInput(2, makeRect(10, 20, 200, 40), "old", textInputProps()));
++    scene.setEditorState(2, react_native_linux::SceneEditorState{.contentRevision = 1});
++    scene.setEditorState(2, react_native_linux::SceneEditorState{.contentRevision = 2});
++    EXPECT_EQ(scene.accessibilitySnapshot().geometry.at(2).editor->contentRevision, 2U);
++}
++
++} // namespace
+diff --git a/packages/core/tests/EditorTest.cpp b/packages/core/tests/EditorTest.cpp
+--- a/packages/core/tests/EditorTest.cpp
++++ b/packages/core/tests/EditorTest.cpp
+@@ -760,4 +760,35 @@
+     EXPECT_EQ(model.displayText(), "\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2\xE2\x80\xA2");
+ }
+ 
++TEST(EditorModelTest, ContentRevisionTracksTextIndependentlyOfReactEventCount) {
++    auto model = modelWith("old");
++    const auto initial = model.contentRevision();
++    EXPECT_EQ(model.mostRecentEventCount(), 0);
++    EXPECT_TRUE(model.setText("new"));
++    EXPECT_GT(model.contentRevision(), initial);
++    EXPECT_EQ(model.mostRecentEventCount(), 0);
++    const auto changed = model.contentRevision();
++    model.selectAll();
++    EXPECT_FALSE(model.setText("new"));
++    EXPECT_EQ(model.contentRevision(), changed);
++    model.insertText("typed");
++    EXPECT_GT(model.contentRevision(), changed);
++    EXPECT_EQ(model.mostRecentEventCount(), 1);
++}
++
++TEST(EditorModelTest, CompositionAndSurroundingDeletionAdvanceContentRevision) {
++    auto model = modelWith("old");
++    auto revision = model.contentRevision();
++    model.applyPreedit("ni", 0, 2);
++    EXPECT_GT(model.contentRevision(), revision);
++    revision = model.contentRevision();
++    model.deleteSurrounding(0, 0);
++    EXPECT_EQ(model.text(), "old");
++    EXPECT_GT(model.contentRevision(), revision);
++    revision = model.contentRevision();
++    model.deleteSurrounding(1, 0);
++    EXPECT_EQ(model.text(), "ol");
++    EXPECT_GT(model.contentRevision(), revision);
++}
++
+ } // namespace
+diff --git a/packages/core/tests/NativeAccessibilityActionTest.cpp b/packages/core/tests/NativeAccessibilityActionTest.cpp
+new file mode 100644
+--- /dev/null
++++ b/packages/core/tests/NativeAccessibilityActionTest.cpp
+@@ -0,0 +1,93 @@
++#include "AccessibilityBridge.h"
++#include "InputDispatcher.h"
++#include "ShadowTreeTestSupport.h"
++
++#include <algorithm>
++#include <gtest/gtest.h>
++
++namespace {
++
++using react_native_linux::NativeAccessibilityAction;
++
++class NativeAccessibilityActionTest : public react_native_linux::TextInputFieldFixture {
++protected:
++    std::shared_ptr<const ShadowNode> button() {
++        return react_native_linux::makeConfiguredShadowNode(
++            viewDescriptor_, 2, kSurfaceId, contextContainer_,
++            folly::dynamic::object("accessible", true)("accessibilityRole", "button")("width", 100)("height", 40),
++            std::make_shared<const std::vector<std::shared_ptr<const ShadowNode>>>());
++    }
++
++    void commit(const std::shared_ptr<const ShadowNode>& child) {
++        shadowTree_->commit([&](const RootShadowNode& root) {
++            return react_native_linux::cloneRootWithChildren(
++                root, std::make_shared<const std::vector<std::shared_ptr<const ShadowNode>>>(
++                          std::vector<std::shared_ptr<const ShadowNode>>{child}));
++        });
++    }
++
++    NativeAccessibilityAction activate(const std::shared_ptr<const ShadowNode>& child) {
++        return {NativeAccessibilityAction::Kind::Activate, child->getTag(), child->getEventEmitter(), "button"};
++    }
++
++    bool clicked() const { return std::ranges::find(*recordedEventTypes_, "topClick") != recordedEventTypes_->end(); }
++
++    facebook::react::ViewComponentDescriptor viewDescriptor_{ComponentDescriptorParameters{
++        .eventDispatcher = eventDispatcher_, .contextContainer = contextContainer_, .flavor = nullptr}};
++};
++
++TEST_F(NativeAccessibilityActionTest, ActivationUsesTheNativeFocusAndClickPath) {
++    const auto target = button();
++    commit(target);
++    react_native_linux::InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    dispatcher.dispatchAccessibilityActions({activate(target)});
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 2);
++    EXPECT_TRUE(clicked());
++}
++
++TEST_F(NativeAccessibilityActionTest, RecycledTagCannotReceiveAnOldAction) {
++    const auto oldTarget = button();
++    commit(oldTarget);
++    const auto pending = activate(oldTarget);
++    const auto replacement = button();
++    ASSERT_NE(replacement->getEventEmitter(), oldTarget->getEventEmitter());
++    commit(replacement);
++    react_native_linux::InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    dispatcher.dispatchAccessibilityActions({pending});
++    EXPECT_FALSE(clicked());
++    EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 0);
++}
++
++TEST_F(NativeAccessibilityActionTest, DisabledOrChangedRoleCannotReceiveAPendingActivation) {
++    const auto target = button();
++    const auto pending = activate(target);
++    const PropsParserContext context{kSurfaceId, *contextContainer_};
++    react_native_linux::InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    for (const auto& delta : std::vector<folly::dynamic>{
++             folly::dynamic::object("accessibilityState", folly::dynamic::object("disabled", true)),
++             folly::dynamic::object("accessibilityRole", "link"),
++         }) {
++        const auto props = viewDescriptor_.cloneProps(context, target->getProps(), RawProps{folly::dynamic(delta)});
++        const auto changed = target->clone(ShadowNodeFragment{.props = props});
++        ASSERT_EQ(changed->getEventEmitter(), target->getEventEmitter());
++        commit(changed);
++        dispatcher.dispatchAccessibilityActions({pending});
++        EXPECT_FALSE(clicked());
++        EXPECT_EQ(mountingManager_->accessibilitySnapshot().focusedTag, 0);
++    }
++}
++
++TEST_F(NativeAccessibilityActionTest, RemovedTargetCannotReceiveAnAction) {
++    const auto target = button();
++    commit(target);
++    const auto pending = activate(target);
++    shadowTree_->commit([](const RootShadowNode& root) {
++        return react_native_linux::cloneRootWithChildren(
++            root, std::make_shared<const std::vector<std::shared_ptr<const ShadowNode>>>());
++    });
++    react_native_linux::InputDispatcher dispatcher(uiManager_, mountingManager_, kSurfaceId);
++    dispatcher.dispatchAccessibilityActions({pending});
++    EXPECT_FALSE(clicked());
++}
++
++} // namespace
+diff --git a/packages/core/tests/TextInputControllerTest.cpp b/packages/core/tests/TextInputControllerTest.cpp
+--- a/packages/core/tests/TextInputControllerTest.cpp
++++ b/packages/core/tests/TextInputControllerTest.cpp
+@@ -1,6 +1,8 @@
+ #include "TextInputController.h"
+ 
++#include "AccessibilityBridge.h"
+ #include "Clipboard.h"
++#include "SceneTestSupport.h"
+ #include "ShadowTreeTestSupport.h"
+ 
+ #include <algorithm>
+@@ -114,6 +116,26 @@
+         return static_cast<size_t>(std::count(recordedEventTypes_->begin(), recordedEventTypes_->end(), type));
+     }
+ 
++    react_native_linux::NativeAccessibilityAction
++    accessibilityAction(react_native_linux::NativeAccessibilityAction::Kind kind) {
++        if (!accessibilityMounted_) {
++            mountChildAndTakeFrame(*mountingManager_, facebook::react::ShadowView{*mountedField_});
++            accessibilityMounted_ = true;
++        }
++        controller_->synchronize();
++        const auto snapshot = mountingManager_->accessibilitySnapshot();
++        const auto& state = snapshot.geometry.at(kFieldTag).editor;
++        EXPECT_TRUE(state.has_value());
++        return {kind, kFieldTag, mountedField_->getEventEmitter(), "", state->contentRevision};
++    }
++
++    std::string copiedFieldText() {
++        controller_->handleKey(key("a", InputModifiers{.control = true}));
++        controller_->handleKey(key("c", InputModifiers{.control = true}));
++        return react_native_linux::clipboardText();
++    }
++
++    bool accessibilityMounted_{false};
+     std::unique_ptr<TextInputController> controller_;
+     std::shared_ptr<const TextInputShadowNode> mountedField_;
+ };
+@@ -592,4 +614,89 @@
+     EXPECT_EQ(props.paragraphAttributes.ellipsizeMode, facebook::react::EllipsizeMode::Clip);
+ }
+ 
++TEST_F(TextInputControllerTest, AccessibilityEditsUseNativeNormalizationAndChangeEvents) {
++    commitTextInput(folly::dynamic::object("text", "old")("maxLength", 4));
++    auto action = accessibilityAction(react_native_linux::NativeAccessibilityAction::Kind::SetValue);
++    action.text = "ab\r\ncd";
++    recordedEventTypes_->clear();
++    controller_->dispatchAccessibilityAction(action);
++    EXPECT_EQ(countRecorded(kChangeEvent), 1U);
++    EXPECT_EQ(copiedFieldText(), "ab c");
++}
++
++TEST_F(TextInputControllerTest, AccessibilitySelectionUsesUnicodeCharacterBoundaries) {
++    commitTextInput(folly::dynamic::object("text", "é🐧z"));
++    auto action = accessibilityAction(react_native_linux::NativeAccessibilityAction::Kind::SetSelection);
++    action.selectionAnchor = 1;
++    action.selectionFocus = 2;
++    recordedEventTypes_->clear();
++    controller_->dispatchAccessibilityAction(action);
++    EXPECT_EQ(countRecorded(kSelectionChangeEvent), 1U);
++    type("X");
++    EXPECT_EQ(copiedFieldText(), "éXz");
++}
++
++TEST_F(TextInputControllerTest, ProgrammaticEditsRevokePendingAccessibilityChanges) {
++    commitTextInput(folly::dynamic::object("text", "old"));
++    auto action = accessibilityAction(react_native_linux::NativeAccessibilityAction::Kind::SetValue);
++    action.text = "stale";
++    controller_->dispatchCommand(
++        {.tag = kFieldTag, .name = "setTextAndSelection", .args = folly::dynamic::array(0, "new", 0, 3)});
++    recordedEventTypes_->clear();
++    controller_->dispatchAccessibilityAction(action);
++    EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++    EXPECT_EQ(copiedFieldText(), "new");
++}
++
++TEST_F(TextInputControllerTest, IdenticalNormalizedAccessibilityTextPreservesPendingRevision) {
++    commitTextInput(folly::dynamic::object("text", "a b"));
++    auto action = accessibilityAction(react_native_linux::NativeAccessibilityAction::Kind::SetValue);
++    action.text = "a\nb";
++    recordedEventTypes_->clear();
++    controller_->dispatchAccessibilityAction(action);
++    EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++    action.text = "changed";
++    controller_->dispatchAccessibilityAction(action);
++    EXPECT_EQ(countRecorded(kChangeEvent), 1U);
++    EXPECT_EQ(copiedFieldText(), "changed");
++}
++
++TEST_F(TextInputControllerTest, ReadOnlyFieldsRejectAccessibilityReplacement) {
++    commitTextInput(folly::dynamic::object("text", "readonly")("editable", false));
++    auto action = accessibilityAction(react_native_linux::NativeAccessibilityAction::Kind::SetValue);
++    action.text = "overwrite";
++    controller_->dispatchAccessibilityAction(action);
++    EXPECT_EQ(copiedFieldText(), "readonly");
++}
++
++TEST_F(TextInputControllerTest, AccessibilityEditsCannotReplaceAnActiveComposition) {
++    commitTextInput(folly::dynamic::object("text", "old"));
++    controller_->onImePreedit("ni", 0, 2);
++    auto action = accessibilityAction(react_native_linux::NativeAccessibilityAction::Kind::SetValue);
++    action.text = "overwrite";
++    recordedEventTypes_->clear();
++    controller_->dispatchAccessibilityAction(action);
++    EXPECT_TRUE(controller_->isComposing());
++    EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++    controller_->onImeCommit("你");
++    EXPECT_EQ(copiedFieldText(), "old你");
++}
++
++TEST_F(TextInputControllerTest, ReusedTagWithANewFamilyGetsAFreshEditor) {
++    commitTextInput(folly::dynamic::object("text", "old"));
++    type("X");
++    const auto previous = mountedField_;
++    shadowTree_->commit([this](const RootShadowNode& root) {
++        return react_native_linux::cloneRootWithChildren(
++            root, std::make_shared<const ChildList>(ChildList{
++                      makeField(kFieldTag, folly::dynamic::object("text", "new")("width", 200)("height", 40))}));
++    });
++    mountedField_ = newestFieldNode();
++    ASSERT_NE(&previous->getFamily(), &mountedField_->getFamily());
++    controller_->setMountedFields({mountedField_});
++    controller_->setFocusedNode(mountedField_);
++    controller_->synchronize();
++    EXPECT_EQ(copiedFieldText(), "new");
++}
++
+ } // namespace
+diff --git a/packages/core/tests/hermes/CMakeLists.txt b/packages/core/tests/hermes/CMakeLists.txt
+--- a/packages/core/tests/hermes/CMakeLists.txt
++++ b/packages/core/tests/hermes/CMakeLists.txt
+@@ -99,6 +99,9 @@
+ # rather than linked from rnl_react_core because the runner exists only for tests, and rnl_react_core is what
+ # rnl_window links.
+ add_executable(rnl_core_hermes_tests
++    ../EditorTest.cpp
++    ../AccessibilitySnapshotTest.cpp
++    ../NativeAccessibilityActionTest.cpp
+     ../ClipboardBackendTest.cpp
+     ../TextInputControllerTest.cpp
+     AdditionalSurfaceTest.cpp

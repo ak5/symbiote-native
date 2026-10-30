@@ -48,6 +48,11 @@ jobs:
           git -C .linux-host apply "$PWD/core/engine/linux/host/system-clipboard.patch"
           git -C .linux-host apply --check "$PWD/core/engine/linux/host/layout-conformance.patch"
           git -C .linux-host apply "$PWD/core/engine/linux/host/layout-conformance.patch"
+          git -C .linux-host apply --check "$PWD/core/engine/linux/host/accessibility.patch"
+          git -C .linux-host apply "$PWD/core/engine/linux/host/accessibility.patch"
+      - name: Check native accessibility source formatting
+        run: |
+          nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/AccessibilityBridge.cpp .linux-host/packages/core/src/AccessibilityBridge.h .linux-host/packages/core/src/EditorModel.cpp .linux-host/packages/core/src/EditorModel.h .linux-host/packages/core/src/RetainedScene.cpp .linux-host/packages/core/src/RetainedScene.h .linux-host/packages/core/src/LinuxMountingManager.cpp .linux-host/packages/core/src/LinuxMountingManager.h .linux-host/packages/core/src/InputDispatcher.cpp .linux-host/packages/core/src/InputDispatcher.h .linux-host/packages/core/src/FabricHost.h .linux-host/packages/core/src/WindowSession.cpp .linux-host/packages/core/src/WindowSession.h .linux-host/packages/core/src/WindowMain.cpp .linux-host/packages/core/tests/{AccessibilitySnapshotTest,NativeAccessibilityActionTest,EditorTest}.cpp
       - name: Check the standalone clipboard backend
         run: |
           nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/{Clipboard.cpp,Clipboard.h,ClipboardText.h,WaylandClipboard.cpp,WaylandClipboard.h,WaylandSeat.cpp,WaylandSeat.h,WaylandWindow.cpp,WaylandWindow.h,TextInputController.cpp,TextInputController.h,TurboModuleRegistry.cpp,FabricHost.cpp,LayoutConformanceComponent.h} .linux-host/packages/core/tests/ClipboardBackendTest.cpp .linux-host/packages/core/tests/TextInputControllerTest.cpp .linux-host/packages/core/tests/hermes/{ClipboardModuleTest.cpp,LayoutConformanceHostTest.cpp}
@@ -105,11 +110,11 @@ jobs:
         run: |
           nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_ENABLE_SKIA=OFF -DRNL_AUTOLINKING_CMAKE="$PWD/.linux-host/symbiote-generated/rnl_autolinking.cmake"
           nice -n 10 cmake --build .linux-host/build/symbiote --target hello_react --parallel 2
-      - name: Verify native text clipboard safety and layout boundaries
+      - name: Verify native text, layout and accessibility regressions
         run: |
           set -o pipefail
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_core_hermes_tests --parallel 2
-          nice -n 10 ctest --test-dir .linux-host/build/symbiote --verbose --output-on-failure --no-tests=error --timeout 60 -j 1 -R '^(TextInputControllerTest|ClipboardBackendTest|ClipboardTextTest|ClipboardModuleTest|LayoutConformanceHostTest)\.' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
+          nice -n 10 ctest --test-dir .linux-host/build/symbiote --verbose --output-on-failure --no-tests=error --timeout 60 -j 1 -R '^(TextInputControllerTest|ClipboardBackendTest|ClipboardTextTest|ClipboardModuleTest|LayoutConformanceHostTest|AccessibilitySnapshotTest|NativeAccessibilityActionTest|EditorModelTest)\.' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
       - name: Exercise module initialization and Fabric commits in Hermes
         run: |
           set -o pipefail
@@ -136,6 +141,8 @@ jobs:
           nice -n 10 node .linux-host/scripts/vendor-fonts.ts
       - name: Build the native window and input driver
         run: |
+          rustc --version
+          cargo --version
           nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_window rnl_inject --parallel 2
           # The host's existing e2e harness locates its executables under build/dev.

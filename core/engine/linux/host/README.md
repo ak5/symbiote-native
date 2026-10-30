@@ -15,6 +15,8 @@ git -C <host> apply --check "$PWD/core/engine/linux/host/system-clipboard.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/system-clipboard.patch"
 git -C <host> apply --check "$PWD/core/engine/linux/host/layout-conformance.patch"
 git -C <host> apply "$PWD/core/engine/linux/host/layout-conformance.patch"
+git -C <host> apply --check "$PWD/core/engine/linux/host/accessibility.patch"
+git -C <host> apply "$PWD/core/engine/linux/host/accessibility.patch"
 ```
 
 `clipboard-safety.patch` prevents secure text from entering the clipboard,
@@ -57,4 +59,15 @@ cached. It creates no native view and changes no React Native or Yoga source.
 Its Hermes/Fabric tests check percentage sizing against a padded parent, nested
 boundaries and changing the mode without replacing descendants. Initial and
 nested modes passed in `41026127748`; the mode-change regression exposed the
-invalidation issue. Native validation of the descriptor fix remains pending.
+invalidation issue. Run `41026955352` passed all 39 native cases, all 18 independent-client
+clipboard cases, all five framework window journeys and native persistence.
+
+`accessibility.patch` is an implementation in progress. It maps the native scene
+to AccessKit's pinned C ABI and real Unix AT-SPI transport, and routes focus,
+activation, text replacement and selection through native controllers. Worker
+callbacks use immutable publications and a bounded queue; late callbacks cannot
+retain a destroyed session. Programmatic text changes revoke old edits even
+when React event counts do not change. Its ADR-0005 records the dependency and
+threading contracts. Window builds require Rust 1.87 or newer and fetch the
+pinned AccessKit/Corrosion dependencies. Native compilation and an independent
+AT-SPI client are required before this can be described as verified accessibility.
