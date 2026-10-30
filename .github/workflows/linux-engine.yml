@@ -124,7 +124,7 @@ jobs:
           nice -n 10 node --test scripts/linux-persistence-probe.test.mjs
           nice -n 10 node scripts/run-linux-persistence-consumers.mjs .linux-host .linux-host/symbiote-app
       - uses: actions/cache/save@v4
-        if: always() && steps.native-build.outcome == 'success'
+        if: always() && steps.compiler-cache.outputs.cache-primary-key != ''
         with:
           path: ~/.cache/ccache
           key: ${{ steps.compiler-cache.outputs.cache-primary-key }}

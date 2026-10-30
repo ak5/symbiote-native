@@ -403,14 +403,13 @@ index c8264e46b1dd6cac400b86ed0c4302042970d5b2..59b409ffd841e8ab62442470a6da0ce6
      TextInputField* fieldUnderPointer(facebook::react::Point surfacePoint);
      const TextInputField* focusedField() const;
 diff --git a/packages/core/src/TurboModuleRegistry.cpp b/packages/core/src/TurboModuleRegistry.cpp
-index 7e717fc1cc2dd9dc8a2f7e6f7e6218a96627eb4a..4a5ec27f6050cda46ef3d8f82617cae4178e6f65 100644
+index 7e717fc1cc2dd9dc8a2f7e6f7e6218a96627eb4a..ec2aa480a4b6d5b294d3d60162881707551b32f7 100644
 --- a/packages/core/src/TurboModuleRegistry.cpp
 +++ b/packages/core/src/TurboModuleRegistry.cpp
-@@ -798,31 +798,46 @@ public:
-     static constexpr std::string_view kModuleName = "RNCClipboard";
+@@ -799,30 +799,47 @@ public:
  
      explicit LinuxClipboardModule(std::shared_ptr<facebook::react::CallInvoker> jsInvoker)
--        : TurboModule(std::string(kModuleName), std::move(jsInvoker)) {
+         : TurboModule(std::string(kModuleName), std::move(jsInvoker)) {
 -        methodMap_["getString"] = {0, [](facebook::jsi::Runtime& runtime, TurboModule& /*turboModule*/,
 -                                         const facebook::jsi::Value* /*arguments*/, size_t /*count*/) {
 -                                       return resolved(runtime,
@@ -428,13 +427,14 @@ index 7e717fc1cc2dd9dc8a2f7e6f7e6218a96627eb4a..4a5ec27f6050cda46ef3d8f82617cae4
 -
 -                                       return facebook::jsi::Value::undefined();
 -                                   }};
-+        : TurboModule(std::string(kModuleName), jsInvoker) {
-+        methodMap_["getString"] = {0, [jsInvoker](facebook::jsi::Runtime& runtime, TurboModule&,
-+                                                  const facebook::jsi::Value*,
-+                                                  size_t) { return readResult(runtime, jsInvoker, false); }};
-+        methodMap_["hasString"] = {0, [jsInvoker](facebook::jsi::Runtime& runtime, TurboModule&,
-+                                                  const facebook::jsi::Value*,
-+                                                  size_t) { return readResult(runtime, jsInvoker, true); }};
++        methodMap_["getString"] = {
++            0, [](facebook::jsi::Runtime& runtime, TurboModule& module, const facebook::jsi::Value*, size_t) {
++                return readResult(runtime, static_cast<LinuxClipboardModule&>(module).jsInvoker_, false);
++            }};
++        methodMap_["hasString"] = {
++            0, [](facebook::jsi::Runtime& runtime, TurboModule& module, const facebook::jsi::Value*, size_t) {
++                return readResult(runtime, static_cast<LinuxClipboardModule&>(module).jsInvoker_, true);
++            }};
 +        methodMap_["setString"] = {
 +            1, [](facebook::jsi::Runtime& runtime, TurboModule&, const facebook::jsi::Value* arguments, size_t count) {
 +                if (count != 1 || !arguments[0].isString()) {
