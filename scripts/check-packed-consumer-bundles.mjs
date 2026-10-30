@@ -577,6 +577,7 @@ async function processExample(
         );
       }
       if (process.env.SYMBIOTE_CATALYST_RESULTS) {
+        mkdirSync(process.env.SYMBIOTE_CATALYST_RESULTS, { recursive: true });
         writeFileSync(
           join(process.env.SYMBIOTE_CATALYST_RESULTS, 'starter-build.log'),
           buildLog,
