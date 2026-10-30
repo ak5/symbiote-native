@@ -43,6 +43,11 @@ jobs:
         run: |
           nice -n 10 pnpm install --frozen-lockfile --ignore-scripts
           nice -n 10 pnpm --dir .linux-host install --frozen-lockfile --ignore-scripts
+      - name: Apply the pinned Linux host changes
+        run: |
+          test "$(git -C .linux-host rev-parse HEAD)" = 4db5e336b529c15628ffb8ba94cd6d880ff9a450
+          git -C .linux-host apply --check "$PWD/core/engine/linux/host/clipboard-safety.patch"
+          git -C .linux-host apply "$PWD/core/engine/linux/host/clipboard-safety.patch"
       - name: Generate native registration from the package configuration
         run: |
           node --input-type=commonjs <<'NODE'
@@ -70,6 +75,11 @@ jobs:
         run: |
           nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_STANDARD_REQUIRED=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_ENABLE_SKIA=OFF -DRNL_AUTOLINKING_CMAKE="$PWD/.linux-host/symbiote-generated/rnl_autolinking.cmake"
           nice -n 10 cmake --build .linux-host/build/symbiote --target hello_react --parallel 2
+      - name: Verify native text clipboard safety
+        run: |
+          set -o pipefail
+          nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_core_hermes_tests --parallel 2
+          nice -n 10 .linux-host/build/symbiote/bin/rnl_core_hermes_tests --gtest_filter='TextInputControllerTest.*' 2>&1 | tee .linux-host/symbiote-host-clipboard.log
       - name: Exercise module initialization and Fabric commits in Hermes
         run: |
           set -o pipefail

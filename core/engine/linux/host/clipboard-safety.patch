@@ -1,0 +1,134 @@
+--- a/packages/core/src/TextInputController.cpp
++++ b/packages/core/src/TextInputController.cpp
+@@ -223,17 +223,13 @@
+         return TextInputKeyResult::Consumed;
+     }
+ 
+-    if (event.key == kCopyKey) {
+-        setClipboardText(field.editor.selectedText());
+-
+-        return TextInputKeyResult::Consumed;
+-    }
+-
+-    if (event.key == kCutKey) {
+-        setClipboardText(field.editor.selectedText());
+-
+-        if (isEditable) {
+-            field.editor.deleteBackward();
++    if (event.key == kCopyKey || event.key == kCutKey) {
++        if (!field.shadowNode->getConcreteProps().secureTextEntry && field.editor.hasSelection()) {
++            setClipboardText(field.editor.selectedText());
++
++            if (event.key == kCutKey && isEditable) {
++                field.editor.deleteBackward();
++            }
+         }
+ 
+         return TextInputKeyResult::Consumed;
+@@ -241,7 +237,11 @@
+ 
+     if (event.key == kPasteKey) {
+         if (isEditable) {
+-            field.editor.insertText(clipboardText());
++            const std::string text = clipboardText();
++
++            if (!text.empty()) {
++                field.editor.insertText(text);
++            }
+         }
+ 
+         return TextInputKeyResult::Consumed;
+--- a/packages/core/tests/TextInputControllerTest.cpp
++++ b/packages/core/tests/TextInputControllerTest.cpp
+@@ -1,4 +1,5 @@
+ #include "TextInputController.h"
++#include "Clipboard.h"
+ 
+ #include "ShadowTreeTestSupport.h"
+ 
+@@ -305,6 +306,75 @@
+     EXPECT_EQ(countRecorded(kChangeEvent), 1U);
+ }
+ 
++TEST_F(TextInputControllerTest, SecureFieldsCannotCopyOrCutTheirContents) {
++    commitTextInput(folly::dynamic::object("secureTextEntry", true));
++    type("password");
++    controller_->synchronize();
++    const InputModifiers control{.control = true};
++    controller_->handleKey(key("a", control));
++    controller_->synchronize();
++    recordedEventTypes_->clear();
++    react_native_linux::setClipboardText("keep clipboard");
++
++    for (const auto* shortcut : {"c", "x"}) {
++        EXPECT_EQ(controller_->handleKey(key(shortcut, control)), TextInputKeyResult::Consumed);
++        controller_->synchronize();
++        EXPECT_EQ(react_native_linux::clipboardText(), "keep clipboard");
++        EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++        EXPECT_EQ(countRecorded(kSelectionChangeEvent), 0U);
++    }
++}
++
++TEST_F(TextInputControllerTest, CopyAndCutWithoutASelectionPreserveBothTextAndClipboard) {
++    commitTextInput(folly::dynamic::object());
++    type("keep field");
++    controller_->synchronize();
++    recordedEventTypes_->clear();
++    react_native_linux::setClipboardText("keep clipboard");
++    const InputModifiers control{.control = true};
++
++    for (const auto* shortcut : {"c", "x"}) {
++        EXPECT_EQ(controller_->handleKey(key(shortcut, control)), TextInputKeyResult::Consumed);
++        controller_->synchronize();
++        EXPECT_EQ(react_native_linux::clipboardText(), "keep clipboard");
++        EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++    }
++    controller_->handleKey(key("a", control));
++    controller_->handleKey(key("c", control));
++    EXPECT_EQ(react_native_linux::clipboardText(), "keep field");
++}
++
++TEST_F(TextInputControllerTest, EmptyClipboardPastePreservesTheSelectedText) {
++    commitTextInput(folly::dynamic::object());
++    type("keep selection");
++    const InputModifiers control{.control = true};
++    controller_->handleKey(key("a", control));
++    controller_->synchronize();
++    recordedEventTypes_->clear();
++    react_native_linux::setClipboardText("");
++
++    EXPECT_EQ(controller_->handleKey(key("v", control)), TextInputKeyResult::Consumed);
++    controller_->synchronize();
++    EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++    EXPECT_EQ(countRecorded(kSelectionChangeEvent), 0U);
++    controller_->handleKey(key("c", control));
++    EXPECT_EQ(react_native_linux::clipboardText(), "keep selection");
++}
++
++TEST_F(TextInputControllerTest, ReadOnlyCutCopiesTheSelectionWithoutDeletingIt) {
++    commitTextInput(folly::dynamic::object("text", "read only")("readOnly", true));
++    const InputModifiers control{.control = true};
++    controller_->handleKey(key("a", control));
++    controller_->synchronize();
++    recordedEventTypes_->clear();
++    react_native_linux::setClipboardText("old clipboard");
++
++    EXPECT_EQ(controller_->handleKey(key("x", control)), TextInputKeyResult::Consumed);
++    controller_->synchronize();
++    EXPECT_EQ(react_native_linux::clipboardText(), "read only");
++    EXPECT_EQ(countRecorded(kChangeEvent), 0U);
++}
++
+ TEST_F(TextInputControllerTest, ATextKeyIsConsumedAndAnUnfocusedControllerIgnoresEverything) {
+     commitTextInput(folly::dynamic::object());
+ 
+--- a/packages/core/tests/hermes/CMakeLists.txt
++++ b/packages/core/tests/hermes/CMakeLists.txt
+@@ -99,6 +99,7 @@
+ # rather than linked from rnl_react_core because the runner exists only for tests, and rnl_react_core is what
+ # rnl_window links.
+ add_executable(rnl_core_hermes_tests
++    ../TextInputControllerTest.cpp
+     AdditionalSurfaceTest.cpp
+     ClipboardModuleTest.cpp
+     CrossThreadPromiseStressTest.cpp

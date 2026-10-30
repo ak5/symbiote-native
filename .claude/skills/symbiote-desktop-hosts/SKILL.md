@@ -13,6 +13,15 @@ React Native, Fabric and Yoga sources remain unchanged. Application bundles use 
 
 ## Linux integration
 
+The owner confirmed that missing Linux host features remain in scope; do not
+replace them with stubs or close the goal by merely documenting them as absent.
+Host changes live under `core/engine/linux/host`, against the documented host
+pin. They may change this separate Linux platform host, never stock React
+Native, Fabric or Yoga. Keep them in this fork; no submissions elsewhere.
+Clipboard shortcut guards and native controller tests precede a real Wayland
+backend and second-client verification. System clipboard, AT-SPI, modal,
+refresh and layout-conformance behavior still need implementation and proof.
+
 The experimental engine target follows `react-native-linux/react-native-linux` at
 `4db5e336b529c15628ffb8ba94cd6d880ff9a450`, which consumes React Native 0.87.1.
 The host's current code has Metro and C++ autolinking even though its README still describes them as planned.

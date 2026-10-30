@@ -10,6 +10,9 @@ The target compiles the same retained tree and prop rules as Android and iOS.
 React Native, Fabric and Yoga sources remain unchanged. Application bundles use
 Metro and ordinary installed packages.
 
+Apply the [pinned native host changes](./host/README.md) before configuring the
+host. CI checks the exact host revision and applies the same patch.
+
 The Linux component map follows React Native's non-iOS wrappers: SafeAreaView
 renders a plain View, and InputAccessoryView omits its whole subtree. Each
 framework fixture uses a SafeAreaView root; the bundle gate requires the Linux
