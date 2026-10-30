@@ -109,8 +109,11 @@ licenses. Only the hash-pinned Wayland protocol wrap can supply a fallback
 dependency. The resulting ICD manifest selects the generated driver for the
 private test session, and the client checks the real window's process mappings.
 `scripts/build-linux-lavapipe.py` applies this patch only to the downloaded Mesa source.
-This build never installs into the system library directories. Its compilation
-and actual TSan client run remain to be verified.
+This build never installs into the system library directories. Run `41083977831`
+compiled the fully instrumented Skia, Mesa and native window. Its TSan runtime
+exposed concurrent reads and writes to Mesa's lazy `MESA_VK_MAX_TIMEOUT` cache.
+The patch uses Mesa's existing atomic operations for that cache and a local
+snapshot for each wait; the actual native runtime check remains required.
 
 `custom-actions.patch` retains declared native action names, labels and handler
 flags. Its frame owner checks the current declaration and emits React Native's
@@ -133,3 +136,10 @@ statics, so their font managers are destroyed first. Finalization belongs to the
 standalone executable; embedded hosts retain control of their process lifetime.
 Passing both full sanitized shutdown cycles remains required. Leak detection and
 halt-on-error remain enabled.
+
+Run `41083977831` passed 110 native C++ cases, both ownership tests, ten transport
+tests, both normal AT-SPI lifecycle cycles and all five-framework window and
+persistence journeys. ASan no longer reported the owned-text or Wayland proxy
+allocations, but shutdown still reported 2,602 bytes in 59 Fontconfig allocations.
+Those allocations remain under investigation; process finalization alone did not
+remove them. Neither sanitizer gate is complete.

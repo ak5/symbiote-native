@@ -19,3 +19,28 @@ diff --git a/meson.build b/meson.build
  else
    pre_args += '-DTHREAD_SANITIZER=0'
  endif
+diff --git a/src/vulkan/runtime/vk_sync.c b/src/vulkan/runtime/vk_sync.c
+--- a/src/vulkan/runtime/vk_sync.c
++++ b/src/vulkan/runtime/vk_sync.c
+@@ -201,13 +201,16 @@
+ get_max_abs_timeout_ns(void)
+ {
+    static int max_timeout_ms = -1;
+-   if (max_timeout_ms < 0)
+-      max_timeout_ms = debug_get_num_option("MESA_VK_MAX_TIMEOUT", 0);
+-
+-   if (max_timeout_ms == 0)
++   int timeout_ms = p_atomic_read(&max_timeout_ms);
++   if (timeout_ms < 0) {
++      timeout_ms = debug_get_num_option("MESA_VK_MAX_TIMEOUT", 0);
++      p_atomic_set(&max_timeout_ms, timeout_ms);
++   }
++
++   if (timeout_ms == 0)
+       return UINT64_MAX;
+    else
+-      return os_time_get_absolute_timeout(max_timeout_ms * 1000000ull);
++      return os_time_get_absolute_timeout(timeout_ms * 1000000ull);
+ }
+ 
+ static VkResult

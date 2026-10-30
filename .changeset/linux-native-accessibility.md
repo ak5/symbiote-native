@@ -34,3 +34,6 @@ Verify the real window loaded that exact driver during the external client gate.
 
 Release owned C ABI action text, the Wayland activation proxy and process font
 resources during shutdown, retaining the real leak-detection gate.
+
+Use atomic access for the pinned Mesa driver's shared fence-timeout cache after
+its fully instrumented native run exposed concurrent lazy initialization.
