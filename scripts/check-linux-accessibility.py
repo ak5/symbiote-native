@@ -515,11 +515,16 @@ def main():
                               '--title', title, '--no-decorations']
             window_command.append('--automation')
             window = start(window_command, f'native-{cycle}')
-            keys = start(['wtype', '-s', '300', '-P', 'Shift_L', '-p', 'Shift_L', '-s', '60000'],
+            keys = start(['wtype', '-s', '300', '-P', 'Shift_L', '-p', 'Shift_L', '-s', '300000'],
                          f'keyboard-{cycle}')
             alive = [compositor, window, keys]
             desktop = Atspi.get_desktop(0)
             root = until(lambda: named(desktop, title), 'real AT-SPI window', alive, 20)
+            # A native window is published before its instrumented JavaScript startup commits.
+            ready = {'accessibility': 'Native group', 'modal': 'Modal background',
+                     'refresh': 'Refresh draft'}[args.scenario]
+            until(lambda: named(root, ready), f'first committed {args.scenario} app tree', alive, 60)
+            print(f'PASS native app first committed tree scenario={args.scenario} cycle={cycle}', flush=True)
             if environment.get('VK_DRIVER_FILES'):
                 driver = json.loads(Path(environment['VK_DRIVER_FILES']).read_text())
                 library = Path(driver['ICD']['library_path'])
