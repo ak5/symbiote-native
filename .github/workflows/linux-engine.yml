@@ -159,11 +159,41 @@ jobs:
           sudo nice -n 10 apt-get install -y libfontconfig-dev libfreetype-dev libvulkan-dev libwayland-dev mesa-vulkan-drivers wayland-protocols cage at-spi2-core python3-gi python3-pil gir1.2-atspi-2.0 libglib2.0-bin dbus-daemon
           nice -n 10 node .linux-host/scripts/vendor-skia.ts
           nice -n 10 node .linux-host/scripts/vendor-fonts.ts
+      - name: Register the installed engine for native window verification
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const app = path.resolve('.linux-host/symbiote-app/react');
+          const root = path.join(app, 'node_modules/@symbiote-native/engine');
+          const config = require(path.join(root, 'react-native.config.cjs'));
+          fs.writeFileSync('.linux-host/symbiote-config.json', JSON.stringify({
+            root: app,
+            dependencies: { '@symbiote-native/engine': { root, platforms: config.dependency.platforms } },
+          }));
+          NODE
+          nice -n 10 node .linux-host/scripts/autolink.ts .linux-host/symbiote-config.json .linux-host/symbiote-generated
       - name: Build the native window and input driver
         run: |
           rustc --version
           cargo --version
-          nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON
+          nice -n 10 cmake -S .linux-host -B .linux-host/build/symbiote -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          node --input-type=commonjs <<'NODE'
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const root = path.resolve('.linux-host/symbiote-app/react/node_modules/@symbiote-native/engine');
+          const commands = JSON.parse(fs.readFileSync('.linux-host/build/symbiote/compile_commands.json', 'utf8'));
+          const sources = new Set(commands
+            .map(({ directory, file }) => path.resolve(directory, file))
+            .filter(file => fs.existsSync(file))
+            .map(file => fs.realpathSync(file)));
+          for (const file of ['linux/SymbioteEngineModule.cpp', 'cpp/SymbioteEngineBindings.cpp']) {
+            const source = fs.realpathSync(path.join(root, file));
+            assert(sources.has(source), `Native window must compile the installed engine: ${source}`);
+            console.log(`Installed engine native source: ${source}`);
+          }
+          NODE
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_accessibility_transport_tests --parallel 2
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_accessibility_ownership_tests --parallel 2
           nice -n 10 cmake --build .linux-host/build/symbiote --target rnl_window rnl_inject --parallel 2

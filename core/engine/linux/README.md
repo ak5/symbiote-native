@@ -21,8 +21,10 @@ framework fixture uses a SafeAreaView root; the bundle gate requires the Linux
 component map as well as the Linux Platform module.
 
 The fork's Linux workflow builds the host and engine, then installs and bundles
-React, Svelte, Vue, Solid and Angular applications. Native checks cover module
-initialization, Fabric updates, keyboard focus, controlled input, native
+React, Svelte, Vue, Solid and Angular applications. Before the window build, it
+regenerates registration from the installed engine package and checks the CMake
+compile commands for its native bridge and shared bindings. Native checks cover
+module initialization, Fabric updates, keyboard focus, controlled input, native
 copy/paste and dimension updates. Resize uses the host's injected configure
 events under Cage.
 
