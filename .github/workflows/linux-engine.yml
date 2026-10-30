@@ -214,7 +214,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: linux-accessibility-bundle
-          include-hidden-files: true
           path: .linux-accessibility
       - name: Install native compiler and accessibility dependencies
         run: |
