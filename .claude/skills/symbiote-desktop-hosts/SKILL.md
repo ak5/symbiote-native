@@ -68,14 +68,18 @@ Capture changes on the UI thread, protect snapshots for the JS thread and hold m
 Remove the subclass and revoke text-scale notifications on destruction. Install the subclass last to avoid dangling callbacks
 if startup configuration throws. Native run40993232079 at e1884e4a passed the installed provider, all five exact client
 984x749/scale1 checks and real OS resize updates, five graceful shutdowns and ten storage phases.
-This is default-scale verification; a real OS scale change remains to be tested.
+Run `41000685723` at `900504b9` also passed live OS scaling in all five apps:
+Windows Settings changed100%/96DPI ->125%/120DPI ->100%/96DPI while each app stayed running.
+Actual native client dimensions and each framework's width/height/scale agreed at every stage.
+The shared PowerShell helper restores the display in finally and fails on restoration errors.
+Do not replace this with synthetic WM_DPICHANGED messages. Physical multi-monitor movement is unverified.
 
 Fork run `40986359425` at `f5e4e27f` passed all five native framework journeys:
 layout updates, UI Automation focus/typing/controlled uppercase, native Ctrl+C with a separate OS clipboard client,
 external Unicode paste, real SetWindowPos resize reaching each framework's dimension hook, and OS wheel/native scroll callbacks.
 The ScrollView must remain accessible with its list role/label for UIA lookup. Do not remove accessibility to make tests pass.
 The runner attempts every framework, retains logs and fails if any journey fails.
-This default-scale resize result does not prove HiDPI or multi-monitor correctness.
+The later live scale gate supplies fractional-DPI proof; this earlier resize result alone does not.
 
 ## Windows persistence gate
 

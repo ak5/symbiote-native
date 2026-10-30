@@ -96,10 +96,14 @@ snapshots share only application-owned state through the SDK's typed property
 bag. Module callbacks hold weak references to avoid retaining an old runtime.
 
 The native gate compares each framework's width, height and scale with actual
-Win32 client bounds and DPI before and after OS resizing. The input driver uses
-per-monitor DPI awareness for its coordinate queries and restores its previous
-thread context afterward. Tests at the runner's default display scale do not
-establish physical HiDPI or multi-monitor calibration.
+Win32 client bounds and DPI before and after OS resizing. Each application also
+stays running while Windows Settings changes the real display scale from 100%
+to 125% and back. The gate requires matching framework metrics at 96, 120 and
+96 DPI; cleanup restores the original display scale even when verification fails.
+The input driver uses per-monitor DPI awareness for its coordinate queries and
+restores its previous thread context afterward. Fork run `41000685723` passed
+these checks for all five frameworks. Physical multi-monitor movement remains
+unverified.
 
 ## Persistent storage interoperability
 
