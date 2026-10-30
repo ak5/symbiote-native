@@ -297,7 +297,18 @@ diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDisp
                     (props && (props->accessibilityElementsHidden ||
                                props->importantForAccessibility ==
                                    facebook::react::ImportantForAccessibility::NoHideDescendants));
-@@ -470,7 +512,7 @@
+@@ -446,6 +488,10 @@
+             continue;
+         }
+ 
++        if (modalRootTag_ != 0 && focusableNode(command.tag) == nullptr) {
++            continue;
++        }
++
+         const std::optional<bool> focusVisible = readFocusVisible(command.args);
+         const FocusTransition transition = focusVisible.has_value()
+                                                ? focusModel_.focusTagWithVisibility(command.tag, focusVisible.value())
+@@ -470,7 +516,7 @@
      return textInputController_.advanceCaretBlink(frameMilliseconds);
  }
  
@@ -306,7 +317,7 @@ diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDisp
      std::shared_ptr<const facebook::react::ShadowNode> root;
  
      uiManager_->getShadowTreeRegistry().visit(surfaceId_, [&root](const facebook::react::ShadowTree& shadowTree) {
-@@ -480,6 +522,15 @@
+@@ -480,6 +526,15 @@
      return root;
  }
  
@@ -322,7 +333,7 @@ diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDisp
  PointerTarget InputDispatcher::resolveTarget(const InputEvent& event) const {
      const std::shared_ptr<const facebook::react::ShadowNode> root = rootShadowNode();
  
-@@ -496,6 +547,9 @@
+@@ -496,6 +551,9 @@
                                   .offset = pointerOffsetWithinTarget(transformOfHit(paintedHit), event.surfacePoint)};
          }
  
@@ -332,7 +343,7 @@ diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDisp
          const std::shared_ptr<const facebook::react::ShadowNode> hit =
              uiManager_->findNodeAtPoint(root, event.surfacePoint);
  
-@@ -617,6 +671,13 @@
+@@ -617,6 +675,13 @@
          return;
      }
  
@@ -346,7 +357,7 @@ diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDisp
      const TextInputKeyResult editorResult = textInputController_.handleKey(event);
  
      if (editorResult == TextInputKeyResult::ConsumedAndBlurred) {
-@@ -728,7 +789,7 @@
+@@ -728,7 +793,7 @@
  }
  
  void InputDispatcher::syncFocusables() {
@@ -355,7 +366,7 @@ diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDisp
  
      if (root == syncedRoot_) {
          return;
-@@ -739,7 +800,12 @@
+@@ -739,7 +804,12 @@
      textInputNodes_.clear();
  
      if (root != nullptr) {
@@ -369,7 +380,7 @@ diff --git a/packages/core/src/InputDispatcher.cpp b/packages/core/src/InputDisp
      }
  
      // Before the focus transition below, so a commit that dropped the focused field finds the new field set
-@@ -771,20 +837,25 @@
+@@ -771,20 +841,25 @@
  
  void InputDispatcher::collectFocusables(const facebook::react::ShadowNode& shadowNode, bool isHidden) {
      for (const std::shared_ptr<const facebook::react::ShadowNode>& child : shadowNode.getChildren()) {
@@ -1103,6 +1114,34 @@ new file mode 100644
 +}
 +
 +} // namespace react_native_linux
+diff --git a/packages/core/src/TextInputController.cpp b/packages/core/src/TextInputController.cpp
+--- a/packages/core/src/TextInputController.cpp
++++ b/packages/core/src/TextInputController.cpp
+@@ -720,10 +720,6 @@
+     }
+ 
+     if (isFocused && textInputFocusSink_ != nullptr) {
+-        const EditorModel::SurroundingText surrounding = field.editor.surroundingText();
+-
+-        textInputFocusSink_->setSurroundingText(surrounding.text, static_cast<int32_t>(surrounding.cursorByte),
+-                                                static_cast<int32_t>(surrounding.anchorByte));
+         textInputFocusSink_->setCursorRectangle(
+             static_cast<int32_t>(box.origin.x + geometry.caret.origin.x - field.scrollOffsetX),
+             static_cast<int32_t>(box.origin.y + geometry.caret.origin.y),
+@@ -732,6 +728,13 @@
+ #else
+     field.contentSize = field.shadowNode->getLayoutMetrics().frame.size;
+ #endif
++
++    // Surrounding text belongs to the editor buffer, independent of renderer geometry.
++    if (isFocused && textInputFocusSink_ != nullptr) {
++        const EditorModel::SurroundingText surrounding = field.editor.surroundingText();
++        textInputFocusSink_->setSurroundingText(surrounding.text, static_cast<int32_t>(surrounding.cursorByte),
++                                                static_cast<int32_t>(surrounding.anchorByte));
++    }
+ 
+     mountingManager_->setEditorState(field.shadowNode->getTag(), editorState);
+     emitEvents(field);
 diff --git a/packages/core/src/WindowSession.cpp b/packages/core/src/WindowSession.cpp
 --- a/packages/core/src/WindowSession.cpp
 +++ b/packages/core/src/WindowSession.cpp
