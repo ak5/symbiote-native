@@ -18,5 +18,8 @@
   },
   "engines": {
     "node": ">= 22.11.0"
+  },
+  "scripts": {
+    "macos:build": "cd ios && bundle exec pod install && xcodebuild -quiet -workspace Canary.xcworkspace -scheme Canary -configuration Release -destination 'platform=macOS,variant=Mac Catalyst' -derivedDataPath build/catalyst -jobs 1 CODE_SIGN_IDENTITY=- build"
   }
 }

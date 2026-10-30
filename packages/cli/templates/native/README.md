@@ -46,3 +46,14 @@ splash-screen (see `../README.md`'s "Design decisions" section) but not for this
 `examples/expo-react`) is wired through `postinstall` (`@symbiote-native/expo-modules-link`)
 and CocoaPods/Gradle autolinking at install time, not through static differences in the
 checked-in native project files themselves. One `native/` shell covers both profiles.
+
+## Catalyst
+
+The shared shell also enables Mac Catalyst. Its scene-based window lifecycle,
+Podfile deployment mapping and pre-embedding framework normalization follow the
+verified Svelte Catalyst host.
+Keep `scripts/normalize-catalyst-frameworks.mjs` identical to the example; the
+normalizer test requires equality. `macos:build` uses the generated app identity
+and builds Release with one Xcode worker. Changes to these target settings need
+scaffold checks plus a native build, launch and counter interaction in a generated
+consumer.

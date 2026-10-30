@@ -111,3 +111,22 @@ test('rejects missing framework layouts before removing anything', () => {
     rmSync(directory, { recursive: true });
   }
 });
+
+test('the CLI starter ships the verified standalone framework normalizer', () => {
+  assert.equal(
+    readFileSync(
+      new URL(
+        '../packages/cli/templates/native/scripts/normalize-catalyst-frameworks.mjs',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+    readFileSync(
+      new URL(
+        '../examples/svelte/scripts/normalize-catalyst-frameworks.mjs',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+});

@@ -45,6 +45,22 @@ it:
 `--styling` picks the App stub's styling convention: `css` (default), `css-modules`, `scss`,
 `less`, `stylus`, or `stylesheet` (`StyleSheet.create`).
 
+### macOS Catalyst
+
+The shared native starter includes a Catalyst target for every framework. On a Mac
+with Xcode, install the app dependencies and Ruby gems, then build it:
+
+```sh
+bundle install
+nice -n 10 npm run macos:build
+```
+
+The command installs CocoaPods and builds the Release app under
+`ios/build/catalyst/Build/Products/Release-maccatalyst/`. Open the generated app there,
+or select **My Mac (Mac Catalyst)** in the generated Xcode workspace. The starter
+uses the same entry point as iOS. Optional native companions need their own Catalyst
+compatibility checks. This target is under native verification in the fork.
+
 ### Extend an existing app
 
 ```bash

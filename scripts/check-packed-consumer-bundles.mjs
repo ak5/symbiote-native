@@ -514,11 +514,122 @@ async function processExample(
       console.log(
         `${framework}: building and testing the packed Catalyst app ...`,
       );
+      await runAsync(
+        process.execPath,
+        [
+          join(exampleRoot, 'node_modules/@symbiote-native/cli/bundle.js'),
+          'new',
+          'CatalystStarter',
+          '--framework',
+          'svelte',
+          '--pm',
+          'npm',
+          '--bundle-id',
+          'dev.symbiotenative.catalyststarter',
+          '--styling',
+          'css',
+        ],
+        { cwd: matrixRoot, env: frameworkNpmEnvironment },
+      );
+      const starterRoot = join(matrixRoot, 'CatalystStarter');
+      const starterManifest = JSON.parse(
+        readFileSync(join(starterRoot, 'package.json'), 'utf8'),
+      );
+      // The adapter normally installs this transitively; pin this unpublished checkout for the probe.
+      starterManifest.dependencies['@symbiote-native/components'] = 'latest';
+      writeFileSync(
+        join(starterRoot, 'package.json'),
+        JSON.stringify(
+          rewriteInternalDependencies(starterManifest, tarballs),
+          null,
+          2,
+        ) + '\n',
+      );
+      await installWithCacheRetry(
+        starterRoot,
+        frameworkNpmEnvironment,
+        frameworkNpmCache,
+      );
+      verifyInstalledTarballs(
+        starterRoot,
+        directInternalDependencies(starterManifest),
+        tarballs,
+      );
+      console.log(`${framework}: building the generated Catalyst starter ...`);
+      const buildLog = await runAsync('npm', ['run', 'macos:build'], {
+        cwd: starterRoot,
+        env: {
+          ...frameworkNpmEnvironment,
+          FORCE_BUNDLING: '1',
+          EXTRA_PACKAGER_ARGS: '--max-workers 1',
+        },
+      });
+      if (
+        !existsSync(
+          join(
+            starterRoot,
+            'ios/build/catalyst/Build/Products/Release-maccatalyst/CatalystStarter.app/Contents/Info.plist',
+          ),
+        )
+      ) {
+        throw new Error(
+          'Generated Catalyst starter did not produce a native app',
+        );
+      }
+      if (process.env.SYMBIOTE_CATALYST_RESULTS) {
+        writeFileSync(
+          join(process.env.SYMBIOTE_CATALYST_RESULTS, 'starter-build.log'),
+          buildLog,
+        );
+      }
+      log.push(
+        `${framework}/catalyst: packed CLI generated starter native build passed`,
+      );
+      const starterApp = join(
+        starterRoot,
+        'ios/build/catalyst/Build/Products/Release-maccatalyst/CatalystStarter.app',
+      );
+      const bundleId = run('/usr/libexec/PlistBuddy', [
+        '-c',
+        'Print :CFBundleIdentifier',
+        join(starterApp, 'Contents/Info.plist'),
+      ]).trim();
+      if (!/^[a-zA-Z0-9.-]+$/.test(bundleId))
+        throw new Error('Unexpected generated starter bundle identifier');
+      const uiTests = join(
+        exampleRoot,
+        'ios/CanaryCatalystUITests/CanaryCatalystUITests.swift',
+      );
+      writeFileSync(
+        uiTests,
+        readFileSync(uiTests, 'utf8') +
+          `
+@MainActor
+final class GeneratedCatalystStarterUITests: XCTestCase {
+  func testGeneratedStarterLaunchAndCounter() {
+    let starter = XCUIApplication(bundleIdentifier: ${JSON.stringify(bundleId)})
+    starter.launch()
+    defer { starter.terminate() }
+    XCTAssertTrue(starter.staticTexts["Welcome to SymbioteNative!"].waitForExistence(timeout: 30))
+    XCTAssertTrue(starter.staticTexts["0"].exists)
+    let button = starter.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Tap me")).firstMatch
+    XCTAssertTrue(button.waitForExistence(timeout: 5))
+    button.click()
+    XCTAssertTrue(starter.staticTexts["1"].waitForExistence(timeout: 5))
+  }
+}
+`,
+      );
+      await runAsync('open', ['-n', starterApp], {
+        env: frameworkNpmEnvironment,
+      });
       await runAsync('npm', ['run', 'test:catalyst'], {
         cwd: exampleRoot,
         env: frameworkNpmEnvironment,
       });
-      log.push(`${framework}/catalyst: native UI tests passed`);
+      log.push(
+        `${framework}/catalyst: canary and generated starter native UI tests passed`,
+      );
     }
 
     log.push(
@@ -558,12 +669,18 @@ async function main() {
       FRAMEWORK_EXAMPLES[framework],
     ]);
     const manifests = new Map(
-      selectedExamples.map(([framework, example]) => [
-        framework,
-        JSON.parse(
+      selectedExamples.map(([framework, example]) => {
+        const manifest = JSON.parse(
           readFileSync(join(REPO_ROOT, example.dir, 'package.json'), 'utf8'),
-        ),
-      ]),
+        );
+        if (process.env.SYMBIOTE_CONSUMER_CATALYST === '1') {
+          manifest.devDependencies = {
+            ...manifest.devDependencies,
+            '@symbiote-native/cli': 'latest',
+          };
+        }
+        return [framework, manifest];
+      }),
     );
     const packageNames = [
       ...new Set(
