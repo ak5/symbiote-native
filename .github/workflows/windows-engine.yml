@@ -164,7 +164,7 @@ jobs:
           npx --no-install react-native init-windows --template cpp-app --name SymbioteFabricProbe --namespace SymbioteFabricProbe --overwrite
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Pop-Location
-      - name: Use the SDK PackageReferences for the storage provider
+      - name: Configure the Windows storage provider
         shell: pwsh
         run: |
           $directory = '.windows-fabric-probe/node_modules/@react-native-async-storage/async-storage/windows/ReactNativeAsyncStorage'
@@ -177,6 +177,14 @@ jobs:
           $project = Get-Content $projectPath -Raw
           $entry = '<None Include="packages.config" />'
           if (-not $project.Contains($entry)) { throw 'The storage provider project changed' }
+          $autolink = '<RunAutolinkCheck>false</RunAutolinkCheck>'
+          $module = Get-Content (Join-Path $directory '../code/RNCAsyncStorage.h') -Raw
+          $provider = Get-Content (Join-Path $directory '../code/ReactPackageProvider.cpp') -Raw
+          if (-not $project.Contains($autolink) -or -not $module.Contains('REACT_MODULE(RNCAsyncStorage)') -or -not $provider.Contains('AddAttributedModules(packageBuilder, true)')) {
+            throw 'Review the storage provider handwritten module registration'
+          }
+          # The Windows module is handwritten; CppWinRT still generates the provider from IDL.
+          $project = $project.Replace($autolink, $autolink + "`n    <RunCodegenWindows>false</RunCodegenWindows>")
           # RNW already supplies CppWinRT and the full App SDK graph through PackageReference.
           Set-Content $projectPath $project.Replace($entry, '')
           Remove-Item $configPath
