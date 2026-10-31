@@ -120,30 +120,29 @@ event, and tries an old selection handle after an in-process reload. Numeric
 range publication does not establish arbitrary numeric-value setters.
 
 The lifecycle patch releases C ABI action payload ownership and the window's
-Wayland activation proxy. The executable purges Skia's global CPU font cache
-after session locals are destroyed and before static font-manager teardown, then
-finalizes Fontconfig. Embedded hosts retain control of process finalization.
+Wayland activation and unfinished presentation-feedback proxies. Completed or
+discarded feedback leaves the window's ownership before its proxy is freed.
+The executable purges Skia's global CPU font cache after session locals are
+destroyed and before static font-manager teardown, then finalizes Fontconfig.
+Embedded hosts retain control of process finalization.
 
 ## Verification
 
-[Run 41128043290](https://github.com/ak5/symbiote-native/actions/runs/41128043290)
-at `07bce45d` passed its normal native job: all 172 CTest cases, including the
-39 refresh regressions; independent AT-SPI lifecycle, custom actions, selection
-and value-event checks; the five-framework keyboard/clipboard/resize/scrolling
-matrix; 30 modal animation/cycle journeys; ten refresh journeys; and ten
-fresh-process persistence phases. Saved stdout, persistence logs and actual PNG
-headers were checked. The Angular refresh screenshot was also visually inspected.
-The window build compiled the bridge and shared C++ bindings from the installed
-engine package, with their paths checked against CMake's compile commands.
+The fork's [Linux engine integration workflow](https://github.com/ak5/symbiote-native/actions/workflows/linux-engine.yml)
+builds the exact pinned host with this patch series. Its normal job requires all
+native controller and Hermes/Fabric regressions, independent AT-SPI lifecycle,
+custom actions, selection and value events, and the five-framework keyboard,
+clipboard, resize and scrolling journeys. It checks the actual CMake compile
+commands for the consuming application's installed engine bridge and shared C++
+bindings. The five-framework matrix also completes 30 modal animation/cycle
+journeys, ten refresh journeys and ten fresh-process persistence phases.
 
-That run's ASan and TSan jobs built instrumented C++, Rust dependencies and Rust
-std; actual archive symbols were checked. Both stopped at the first native tab
-lookup before exercising the accessibility fixture. Their saved native logs
-contained no sanitizer report before that timeout. They do not establish a full
-sanitizer pass or graceful shutdown. The client now waits for a committed fixture
-control before starting functional assertions; that correction still requires
-native verification. All functional assertions and sanitizer detectors remain
-enabled.
+The independent client waits for a scenario-specific committed control at startup
+and after in-process reload, because the native window is published before its
+JavaScript application commits. Interaction, data retention, stale-handle and
+shutdown assertions remain separate from that bounded readiness wait. Event
+subscriptions are released before the client's diagnostic logs close, including
+when a native lifecycle check fails.
 
 The workflow requires discovery and execution of all 39 refresh regressions in
 the actual Hermes target. Five packed framework applications each run twice on
@@ -152,24 +151,27 @@ acceptance/rejection, native pixels, keyboard/AT-SPI activation, draft preservat
 removal, modal isolation and in-process reload. Selection/value checks extend the
 independent accessibility journey without replacing its existing assertions.
 
-Full native window sanitizer verification remains required. The workflow replays
-the packed React accessibility, modal and refresh apps under ASan/UBSan/LSan and
-TSan, with halt-on-error,
-leak detection and no suppressions. Standalone controller cases and Hermes cases
-run in separate CTest processes so ReactHost can install feature defaults before
-first use. All builds run sequentially with at most two compiler workers.
+The separate full-window sanitizer jobs replay the packed React accessibility,
+modal and refresh apps under ASan/UBSan/LSan and
+TSan, with halt-on-error, leak detection and no suppressions. Both cycles of each
+scenario must complete their native interactions, reload checks and graceful
+shutdown. Standalone controller cases and Hermes cases run in separate CTest
+processes so ReactHost can install feature defaults before first use. All builds
+run sequentially with at most two compiler workers.
 
 `scripts/build-linux-skia.py` builds the locked Skia archives with RTTI and
-matching sanitizers; GN's effective flags are checked. `rust-sanitizers.patch` propagates ASan/TSan instrumentation to Rust dependencies
-and rebuilds std with the matching mode. The sanitizer jobs use
+matching sanitizers; GN's effective flags are checked. `rust-sanitizers.patch`
+propagates ASan/TSan instrumentation to Rust dependencies and rebuilds std with
+the matching mode. The sanitizer jobs use
 `nightly-2026-10-29` plus rust-src and `-Zexternal-clangrt` to share the C++ runtime.
 Ordinary host builds keep their stable Rust requirement. Cargo remains locked
 with two workers; Corrosion supplies an explicit target so host build scripts
 and procedural macros are not instrumented. CI checks the real archive for
 sanitizer references, including TSan atomic operations, before runtime tests.
 See [Rust's sanitizer guidance](https://doc.rust-lang.org/unstable-book/compiler-flags/sanitizer.html#threadsanitizer)
-for the need to expose all synchronization and rebuild the standard library. TSan also uses a fully instrumented Mesa
-25.2.8 driver built from its checksum-pinned official archive.
+for the need to expose all synchronization and rebuild the standard library.
+TSan also uses a fully instrumented Mesa 25.2.8 driver built from its
+checksum-pinned official archive.
 [mesa-tsan.patch](mesa-tsan.patch) removes default sanitizer exclusions, uses
 atomic access for the timeout cache and synchronizes fence completion queries
 with the final signaler's mutex release. Driver sources retain their licenses;

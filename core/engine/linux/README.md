@@ -12,6 +12,10 @@ Metro and ordinary installed packages. The consumer installs Virtualized Lists
 at the same version as its React Native SDK; shared components use that peer
 package rather than installing a second SDK dependency.
 
+The standard Symbiote CLI generates mobile hosts. Linux uses the pinned SDK's
+native host and autolinker; the disposable consumer matrix is a verification
+fixture, not an application scaffolder.
+
 Apply the [pinned native host changes](./host/README.md) before configuring the
 host. CI checks the exact host revision and applies the same patch series.
 
@@ -52,7 +56,7 @@ Cage, Lavapipe and the host's compiled `rnl_window` and `rnl_inject` executables
 The persistence runner reuses the pinned host's compositor launcher and refuses
 to overwrite an earlier result directory.
 
-## Host limits
+## Native controls and verification
 
 The modal patch registers stock `ModalHostView` with native presentation,
 controlled close requests, animation, input isolation and focus restoration.
@@ -60,30 +64,38 @@ The workflow requires its controller, scene and Hermes/Fabric regression cases.
 Each framework also runs a packed modal application through an independent
 AT-SPI client on a private Sway seat, covering opaque/transparent rendering,
 real window resizing, nested dialogs, editor state and in-process reload.
-The normal native job in run `41128043290` at `07bce45d` passed all five
-frameworks in both cycles with none/fade/slide animations, including native editor
-acknowledgement. Full lifecycle sanitizer verification remains required.
+The native journeys require both cycles with none/fade/slide animations and
+application acknowledgement of editor changes before testing state retention.
 
 The refresh patch supplies the stock `PullToRefreshView` descriptor, native
 pull/release handling, controlled refreshing, viewport indicator/title painting
 and accessible native activation. The workflow requires its 39 native cases and
-five-framework window journeys. Run `41128043290` passed all 39 cases and both
-native refresh cycles in every framework, including Angular conditional mounting.
-Preserve unknown-component diagnostics for any unavailable control.
+five-framework window journeys, including Angular conditional mounting. Preserve
+unknown-component diagnostics for any unavailable control.
 
 The host patch uses React Native's existing `LayoutConformance` shadow node and
 Yoga strict/compatibility behavior. A Linux descriptor invalidates layout on
-mode-only changes. Run `41026955352` passed all three native layout cases, including mode-only
-invalidation, in the full application matrix.
+mode-only changes. Native Hermes/Fabric regressions cover percentage sizing,
+nested strict/compatibility boundaries and mode-only invalidation.
 
 The pinned host's clipboard starts as process-local storage. The host patch adds
-a Wayland data-device backend. Run `41016615907` passed native checks and
-second-client exchange verification, including ASan/UBSan and TSan builds.
+a Wayland data-device backend. Independent native clients verify exact clipboard
+exchange, stalled transfers, late-result rejection and shutdown with pending work
+under normal, ASan/UBSan and TSan builds.
+
 The accessibility patch connects the host to AccessKit's Unix AT-SPI transport.
-Its independent normal client, selection/value events and reload checks passed
-both cycles in run `41128043290`. Full lifecycle sanitizer checks remain pending;
-automation-tree inspection and injected input alone do not establish
+An independent client verifies roles, text, selection/value events, custom
+actions, edits and stale handles across reloads. It waits for a committed
+application tree at startup and after reload before testing response behavior.
+Automation-tree inspection and injected input alone do not establish
 screen-reader interoperability.
+
+The workflow separately replays packed accessibility, modal and refresh apps
+under ASan/UBSan/LSan and TSan. Both cycles must complete their native interactions,
+reload checks and graceful shutdown with strict detectors and no exclusions.
+See the [host verification requirements](./host/README.md#verification) for pinned
+Rust, Skia and Mesa instrumentation.
+
 Expo-backed companion modules require their own Linux ports; their presence in
 the workspace does not make their native APIs available.
 
