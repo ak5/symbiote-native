@@ -2,4 +2,4 @@
 '@symbiote-native/engine': patch
 ---
 
-Document the Linux native verification gates, strict sanitizer lifecycle checks and retained crash diagnostics.
+Document Linux native verification gates and retained shutdown diagnostics, including the assertion-enabled TSan runtime.

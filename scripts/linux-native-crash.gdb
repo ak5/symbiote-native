@@ -2,6 +2,7 @@ set pagination off
 set confirm off
 set debuginfod enabled off
 handle SIGSEGV stop print pass
+handle SIGABRT stop print pass
 handle SIGPIPE nostop noprint pass
 handle SIGUSR1 nostop noprint pass
 handle SIGUSR2 nostop noprint pass

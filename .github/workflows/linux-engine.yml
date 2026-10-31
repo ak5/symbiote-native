@@ -296,7 +296,7 @@ jobs:
           if [ "${{ matrix.sanitizer }}" = tsan ]; then
             # Match the shadow mapping used by the independent clipboard TSan gate.
             sudo sysctl -w vm.mmap_rnd_bits=28 kernel.yama.ptrace_scope=0
-            sudo nice -n 10 apt-get install -y gdb python3-venv python3-mako python3-yaml python3-packaging llvm-19-dev libdrm-dev libelf-dev libexpat1-dev libzstd-dev bison flex glslang-tools
+            sudo nice -n 10 apt-get install -y gdb llvm-18-dev python3-venv python3-mako python3-yaml python3-packaging llvm-19-dev libdrm-dev libelf-dev libexpat1-dev libzstd-dev bison flex glslang-tools
           fi
       - name: Install pinned Rust sanitizer toolchain and standard library sources
         run: nice -n 10 rustup toolchain install nightly-2026-10-29 --profile minimal --component rust-src
@@ -330,6 +330,11 @@ jobs:
           path: ~/.cache/ccache
           key: linux-accessibility-${{ matrix.sanitizer }}-4db5e33-${{ github.sha }}
           restore-keys: linux-accessibility-${{ matrix.sanitizer }}-4db5e33-
+      - name: Build TSan with its existing shadow-stack assertions
+        if: matrix.sanitizer == 'tsan'
+        run: |
+          nice -n 10 python3 scripts/build-linux-tsan-runtime.py .linux-host
+          echo "RNL_TSAN_RESOURCE=$PWD/.linux-host/build/tsan-runtime/resource" >> "$GITHUB_ENV"
       - name: Build the pinned Skia with matching sanitizers and RTTI
         run: nice -n 10 python3 scripts/build-linux-skia.py .linux-host "${{ matrix.sanitizer }}"
       - name: Build instrumented lavapipe without sanitizer exclusions
@@ -342,7 +347,11 @@ jobs:
       - name: Build the real native window with sanitizers
         working-directory: .linux-host
         run: |
-          nice -n 10 cmake --preset "${{ matrix.sanitizer }}" -DRust_TOOLCHAIN=nightly-2026-10-29 -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_AUTOLINKING_CMAKE="$GITHUB_WORKSPACE/.linux-host/symbiote-generated/rnl_autolinking.cmake"
+          linker_args=()
+          if [ "${{ matrix.sanitizer }}" = tsan ]; then
+            linker_args+=("-DCMAKE_EXE_LINKER_FLAGS=-resource-dir=$RNL_TSAN_RESOURCE")
+          fi
+          nice -n 10 cmake --preset "${{ matrix.sanitizer }}" "${linker_args[@]}" -DRust_TOOLCHAIN=nightly-2026-10-29 -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_AUTOLINKING_CMAKE="$GITHUB_WORKSPACE/.linux-host/symbiote-generated/rnl_autolinking.cmake"
           nice -n 10 cmake --build --preset "${{ matrix.sanitizer }}" --target rnl_window rnl_inject --parallel 2
       - name: Verify Rust sanitizer instrumentation
         run: |
@@ -388,6 +397,9 @@ jobs:
             .linux-host/refresh-${{ matrix.sanitizer }}-results
             .linux-host/third_party/skia/out/symbiote-*/args.gn
             .linux-host/third_party/skia/.source-sanitizer.json
+            .linux-host/build/tsan-runtime/source.json
+            .linux-host/build/tsan-runtime/shadow-stack-probe.log
+            .linux-host/build/tsan-runtime/native/CMakeCache.txt
             .linux-host/build/lavapipe-tsan/driver.json
             .linux-host/build/lavapipe-tsan/native/meson-logs/meson-log.txt
             .linux-host/build/lavapipe-tsan/native/meson-info/intro-buildoptions.json
