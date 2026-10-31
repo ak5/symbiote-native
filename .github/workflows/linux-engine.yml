@@ -295,8 +295,8 @@ jobs:
           sudo nice -n 10 apt-get install -y ccache patch clang-18 cmake ninja-build pkg-config libboost-dev libdouble-conversion-dev libfmt-dev libgoogle-glog-dev libcurl4-openssl-dev libsqlite3-dev libxkbcommon-dev libicu-dev libwayland-dev libfontconfig-dev libfreetype-dev libvulkan-dev mesa-vulkan-drivers wayland-protocols sway wtype at-spi2-core python3-gi python3-pil gir1.2-atspi-2.0 libglib2.0-bin dbus-daemon
           if [ "${{ matrix.sanitizer }}" = tsan ]; then
             # Match the shadow mapping used by the independent clipboard TSan gate.
-            sudo sysctl -w vm.mmap_rnd_bits=28
-            sudo nice -n 10 apt-get install -y python3-venv python3-mako python3-yaml python3-packaging llvm-19-dev libdrm-dev libelf-dev libexpat1-dev libzstd-dev bison flex glslang-tools
+            sudo sysctl -w vm.mmap_rnd_bits=28 kernel.yama.ptrace_scope=0
+            sudo nice -n 10 apt-get install -y gdb python3-venv python3-mako python3-yaml python3-packaging llvm-19-dev libdrm-dev libelf-dev libexpat1-dev libzstd-dev bison flex glslang-tools
           fi
       - name: Install pinned Rust sanitizer toolchain and standard library sources
         run: nice -n 10 rustup toolchain install nightly-2026-10-29 --profile minimal --component rust-src
@@ -355,13 +355,17 @@ jobs:
       - name: Exercise the actual accessibility app, reload and stale handles
         run: |
           set -o pipefail
-          nice -n 10 /usr/bin/python3 scripts/check-linux-accessibility.py ".linux-host/build/${{ matrix.sanitizer }}/bin/rnl_window" .linux-accessibility/accessibility.linux.bundle.js ".linux-host/accessibility-${{ matrix.sanitizer }}-results" 2>&1 | tee ".linux-host/symbiote-accessibility-${{ matrix.sanitizer }}.log"
+          debug_args=()
+          if [ "${{ matrix.sanitizer }}" = tsan ]; then debug_args+=(--debug-native); fi
+          nice -n 10 /usr/bin/python3 scripts/check-linux-accessibility.py ".linux-host/build/${{ matrix.sanitizer }}/bin/rnl_window" .linux-accessibility/accessibility.linux.bundle.js ".linux-host/accessibility-${{ matrix.sanitizer }}-results" "${debug_args[@]}" 2>&1 | tee ".linux-host/symbiote-accessibility-${{ matrix.sanitizer }}.log"
       - name: Exercise native modal and refresh ownership with sanitizers
         run: |
           set -o pipefail
           failed=0
+          debug_args=()
+          if [ "${{ matrix.sanitizer }}" = tsan ]; then debug_args+=(--debug-native); fi
           for scenario in modal refresh; do
-            nice -n 10 /usr/bin/python3 scripts/check-linux-accessibility.py ".linux-host/build/${{ matrix.sanitizer }}/bin/rnl_window" ".linux-accessibility/$scenario.linux.bundle.js" ".linux-host/$scenario-${{ matrix.sanitizer }}-results" --scenario "$scenario" 2>&1 | tee ".linux-host/symbiote-$scenario-${{ matrix.sanitizer }}.log" || failed=1
+            nice -n 10 /usr/bin/python3 scripts/check-linux-accessibility.py ".linux-host/build/${{ matrix.sanitizer }}/bin/rnl_window" ".linux-accessibility/$scenario.linux.bundle.js" ".linux-host/$scenario-${{ matrix.sanitizer }}-results" --scenario "$scenario" "${debug_args[@]}" 2>&1 | tee ".linux-host/symbiote-$scenario-${{ matrix.sanitizer }}.log" || failed=1
           done
           exit "$failed"
       - uses: actions/cache/save@v4

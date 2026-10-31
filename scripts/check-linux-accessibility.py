@@ -37,6 +37,7 @@ def main():
     parser.add_argument('bundle', type=Path)
     parser.add_argument('output', type=Path)
     parser.add_argument('--scenario', choices=('accessibility', 'modal', 'refresh'), default='accessibility')
+    parser.add_argument('--debug-native', action='store_true', help='Attach GDB for native crash diagnostics')
     parser.add_argument('--private-session', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     if sys.platform != 'linux':
@@ -48,7 +49,7 @@ def main():
         os.execvpe('dbus-run-session', ['dbus-run-session', '--', sys.executable,
                    str(Path(__file__).resolve()), str(args.executable.resolve()),
                    str(args.bundle.resolve()), str(args.output.resolve()), '--private-session',
-                   '--scenario', args.scenario], environment)
+                   '--scenario', args.scenario, *(['--debug-native'] if args.debug_native else [])], environment)
 
     # Import only inside the newly created bus; never attach a client to the user's desktop.
     import gi
@@ -550,6 +551,13 @@ def main():
             window_command.append('--automation')
             window = start(window_command, f'native-{cycle}')
             capture_maps(window, cycle)
+            if args.debug_native:
+                debugger = start(['gdb', '--nx', '--batch', '-p', str(window.pid),
+                                  '-x', str(Path(__file__).with_name('linux-native-crash.gdb').resolve())],
+                                 f'native-debugger-{cycle}')
+                until(lambda: 'SYMBIOTE_NATIVE_DEBUGGER_READY' in
+                      (args.output / f'native-debugger-{cycle}.log').read_text(errors='replace'),
+                      'native debugger attached', [compositor, window, debugger])
             keys = start(['wtype', '-s', '300', '-P', 'Shift_L', '-p', 'Shift_L', '-s', '300000'],
                          f'keyboard-{cycle}')
             alive = [compositor, window, keys]

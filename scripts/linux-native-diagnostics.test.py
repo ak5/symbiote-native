@@ -3,6 +3,7 @@
 from pathlib import Path
 import runpy
 import tempfile
+from types import SimpleNamespace
 import unittest
 
 
@@ -54,6 +55,33 @@ class NativeImageBaseTest(unittest.TestCase):
         data[16:18] = (2).to_bytes(2, 'big')
         self.executable.write_bytes(data)
         self.assertEqual(native_image_base(self.executable, ''), 0)
+
+
+class NativeCrashDebuggerTest(unittest.TestCase):
+    def inspect(self, pid):
+        commands = []
+        reports = []
+
+        def execute(command):
+            commands.append(command)
+            if command == 'info registers':
+                raise RuntimeError('registers unavailable')
+
+        debugger = SimpleNamespace(selected_inferior=lambda: SimpleNamespace(pid=pid),
+                                   execute=execute, error=RuntimeError, write=reports.append)
+        script = Path(__file__).with_name('linux-native-crash.gdb').read_text()
+        python = script.split('\npython\n', 1)[1].rsplit('\nend', 1)[0]
+        exec(compile(python, 'linux-native-crash.gdb', 'exec'), {'gdb': debugger})
+        return commands, reports
+
+    def test_inspection_error_preserves_signal_delivery(self):
+        commands, reports = self.inspect(123)
+        self.assertTrue(reports)
+        self.assertIn('thread apply all bt 8', commands)
+        self.assertEqual(commands[-1], 'continue')
+
+    def test_clean_exit_does_not_inspect_a_missing_inferior(self):
+        self.assertEqual(self.inspect(0), ([], []))
 
 
 if __name__ == '__main__':

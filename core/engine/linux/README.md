@@ -94,7 +94,9 @@ The workflow separately replays packed accessibility, modal and refresh apps
 under ASan/UBSan/LSan and TSan. Both cycles must complete their native interactions,
 reload checks and graceful shutdown with strict detectors and no exclusions.
 See the [host verification requirements](./host/README.md#verification) for pinned
-Rust, Skia and Mesa instrumentation.
+Rust, Skia and Mesa instrumentation. The fork’s TSan runner attaches GDB to retain
+fatal registers, instruction disassembly, thread stacks and sanitizer stack depth
+in `native-debugger-*.log`; the original signal still reaches the sanitizer.
 
 Expo-backed companion modules require their own Linux ports; their presence in
 the workspace does not make their native APIs available.
