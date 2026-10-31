@@ -6,11 +6,29 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import socket
 import subprocess
 import sys
 import tempfile
 import time
+
+
+def native_image_base(executable, mappings):
+    with executable.open('rb') as binary:
+        header = binary.read(18)
+    if len(header) < 18 or header[:4] != b'\x7fELF' or header[5] not in (1, 2):
+        raise ValueError('Native executable has no ELF header')
+    kind = int.from_bytes(header[16:18], 'little' if header[5] == 1 else 'big')
+    if kind == 2:  # Fixed-address executable; symbol addresses already include its base.
+        return 0
+    if kind != 3:
+        raise ValueError(f'Unsupported native ELF type: {kind}')
+    for line in mappings.splitlines():
+        fields = line.split(maxsplit=5)
+        if len(fields) == 6 and fields[5] == str(executable):
+            return int(fields[0].split('-')[0], 16) - int(fields[2], 16)
+    raise ValueError('Native executable is absent from its saved process mappings')
 
 
 def main():
@@ -58,6 +76,13 @@ def main():
 
     def command(command):
         return subprocess.check_output(command, env=environment, timeout=5, text=True)
+
+    def capture_maps(window, cycle):
+        try:
+            (args.output / f'native-maps-{cycle}.txt').write_text(
+                Path(f'/proc/{window.pid}/maps').read_text())
+        except OSError as error:
+            print(f'Could not collect native process mappings: {error}', file=sys.stderr)
 
     def pump():
         while context.pending():
@@ -524,12 +549,14 @@ def main():
                               '--title', title, '--no-decorations']
             window_command.append('--automation')
             window = start(window_command, f'native-{cycle}')
+            capture_maps(window, cycle)
             keys = start(['wtype', '-s', '300', '-P', 'Shift_L', '-p', 'Shift_L', '-s', '300000'],
                          f'keyboard-{cycle}')
             alive = [compositor, window, keys]
             desktop = Atspi.get_desktop(0)
             root = until(lambda: named(desktop, title), 'real AT-SPI window', alive, 20)
             wait_for_app_tree(root, alive)
+            capture_maps(window, cycle)
             print(f'PASS native app first committed tree scenario={args.scenario} cycle={cycle}', flush=True)
             if environment.get('VK_DRIVER_FILES'):
                 driver = json.loads(Path(environment['VK_DRIVER_FILES']).read_text())
@@ -683,6 +710,7 @@ def main():
                 print(f'PASS native AT-SPI stale selection handles after reload cycle={cycle}', flush=True)
 
 
+            capture_maps(window, cycle)
             command(['swaymsg', f'[title="{title}"]', 'kill'])
             assert window.wait(timeout=10) == 0, 'Native shutdown failed'
             until(lambda: not named(desktop, title), 'AT-SPI session removal', [compositor], 10)
@@ -733,6 +761,27 @@ def main():
                     process.stdin.close()
                 except BrokenPipeError:
                     pass
+        if 'window' in locals() and window.returncode:
+            try:
+                native_log = (args.output / f'native-{cycle}.log').read_text(errors='replace')
+                program_counter = re.search(r'\bpc (0x[0-9a-fA-F]+)', native_log)
+                if program_counter:
+                    executable = args.executable.resolve()
+                    mappings = (args.output / f'native-maps-{cycle}.txt').read_text()
+                    base = native_image_base(executable, mappings)
+                    symbolizer = (shutil.which('llvm-symbolizer-19') or
+                                  shutil.which('llvm-symbolizer-18') or shutil.which('llvm-symbolizer'))
+                    if symbolizer is None:
+                        raise RuntimeError('LLVM symbolizer is unavailable')
+                    with (args.output / f'failure-symbolized-{cycle}.log').open('x') as report:
+                        address = program_counter.group(1)
+                        report.write(f'Executable: {executable}\nBase: {base:#x}\nPC: {address}\n')
+                        report.flush()
+                        subprocess.run([symbolizer, '--obj', str(executable),
+                                        f'--adjust-vma={base:#x}', address], stdout=report,
+                                       stderr=subprocess.STDOUT, timeout=20, check=False)
+            except Exception as error:
+                print(f'Could not symbolize native failure: {error}', file=sys.stderr)
         for stream in streams:
             stream.close()
         runtime_directory.cleanup()

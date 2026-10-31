@@ -66,6 +66,7 @@ jobs:
           git -C .linux-host apply "$PWD/core/engine/linux/host/rust-sanitizers.patch"
       - name: Check native accessibility source formatting
         run: |
+          nice -n 10 python3 scripts/linux-native-diagnostics.test.py
           nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/AccessibilityBridge.cpp .linux-host/packages/core/src/AccessibilityBridge.h .linux-host/packages/core/src/EditorModel.cpp .linux-host/packages/core/src/EditorModel.h .linux-host/packages/core/src/RetainedScene.cpp .linux-host/packages/core/src/RetainedScene.h .linux-host/packages/core/src/LinuxMountingManager.cpp .linux-host/packages/core/src/LinuxMountingManager.h .linux-host/packages/core/src/InputDispatcher.cpp .linux-host/packages/core/src/InputDispatcher.h .linux-host/packages/core/src/FabricHost.h .linux-host/packages/core/src/WindowSession.cpp .linux-host/packages/core/src/WindowSession.h .linux-host/packages/core/src/WindowMain.cpp .linux-host/packages/core/tests/{AccessibilitySnapshotTest,NativeAccessibilityActionTest,EditorTest}.cpp
       - name: Check native modal source formatting
         run: nice -n 10 clang-format-18 --dry-run --Werror .linux-host/packages/core/src/{ModalController.cpp,ModalController.h,ShadowNodeLookup.h,ScrollController.cpp,ScrollController.h,FantomTester.cpp,FantomTester.h} .linux-host/packages/core/tests/{ModalControllerTest.cpp,ModalSceneTest.cpp} .linux-host/packages/core/tests/hermes/ModalHostTest.cpp
