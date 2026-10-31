@@ -84,5 +84,24 @@ class NativeCrashDebuggerTest(unittest.TestCase):
         self.assertEqual(self.inspect(0), ([], []))
 
 
+class ShadowStackExitCheckTest(unittest.TestCase):
+    def setUp(self):
+        self.enable = runpy.run_path(str(Path(__file__).with_name(
+            'build-linux-tsan-runtime.py')))['enable_exit_check']
+        self.check = 'DCHECK_GT(thr->shadow_stack_pos, thr->shadow_stack);'
+
+    def test_only_the_exit_bound_check_is_promoted(self):
+        header = f'prefix\n{self.check}\nDCHECK_LT(pos, end);\nsuffix\n'
+        patched = self.enable(header)
+        self.assertEqual(patched, header.replace('DCHECK_GT', 'CHECK_GT'))
+        self.assertIn('DCHECK_LT(pos, end);', patched)
+
+    def test_changed_or_ambiguous_source_is_rejected(self):
+        for header in ('unrelated source', self.check + self.check):
+            with self.subTest(header=header):
+                with self.assertRaisesRegex(RuntimeError, 'exactly one source site'):
+                    self.enable(header)
+
+
 if __name__ == '__main__':
     unittest.main()

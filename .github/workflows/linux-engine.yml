@@ -330,7 +330,7 @@ jobs:
           path: ~/.cache/ccache
           key: linux-accessibility-${{ matrix.sanitizer }}-4db5e33-${{ github.sha }}
           restore-keys: linux-accessibility-${{ matrix.sanitizer }}-4db5e33-
-      - name: Build TSan with its existing shadow-stack assertions
+      - name: Build TSan with its shadow-stack exit check
         if: matrix.sanitizer == 'tsan'
         run: |
           nice -n 10 python3 scripts/build-linux-tsan-runtime.py .linux-host
@@ -349,7 +349,7 @@ jobs:
         run: |
           linker_args=()
           if [ "${{ matrix.sanitizer }}" = tsan ]; then
-            linker_args+=("-DCMAKE_EXE_LINKER_FLAGS=-resource-dir=$RNL_TSAN_RESOURCE")
+            linker_args+=("-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread -resource-dir=$RNL_TSAN_RESOURCE")
           fi
           nice -n 10 cmake --preset "${{ matrix.sanitizer }}" "${linker_args[@]}" -DRust_TOOLCHAIN=nightly-2026-10-29 -DRNL_ENABLE_SKIA=ON -DRNL_ENABLE_WINDOW=ON -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DRNL_AUTOLINKING_CMAKE="$GITHUB_WORKSPACE/.linux-host/symbiote-generated/rnl_autolinking.cmake"
           nice -n 10 cmake --build --preset "${{ matrix.sanitizer }}" --target rnl_window rnl_inject --parallel 2

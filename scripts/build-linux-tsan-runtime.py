@@ -1,8 +1,9 @@
-"""Build LLVM's pinned TSan runtime with its shadow-stack assertions enabled."""
+"""Build LLVM's optimized TSan runtime with its shadow-stack exit check enabled."""
 
 import argparse
 import hashlib
 import json
+import shlex
 from pathlib import Path
 import subprocess
 import tarfile
@@ -13,6 +14,13 @@ ARCHIVES = {
     'compiler-rt': 'e054e99a9c9240720616e927cb52363abbc8b4f1ef0286bad3df79ec8fdf892f',
     'cmake': '59badef592dd34893cd319d42b323aaa990b452d05c7180ff20f23ab1b41e837',
 }
+
+
+def enable_exit_check(header):
+    check = 'DCHECK_GT(thr->shadow_stack_pos, thr->shadow_stack);'
+    if header.count(check) != 1:
+        raise RuntimeError('Pinned TSan FuncExit check must have exactly one source site')
+    return header.replace(check, 'CHECK_GT(thr->shadow_stack_pos, thr->shadow_stack);')
 
 
 def build(host):
@@ -29,18 +37,22 @@ def build(host):
         archive.write_bytes(content)
         with tarfile.open(archive) as source:
             source.extractall(workspace, filter='data')
+    source = workspace / 'compiler-rt-18.1.8.src'
+    header = source / 'lib/tsan/rtl/tsan_rtl.h'
+    # Keep release-runtime behavior; only catch an invalid pop before it corrupts the stack.
+    header.write_text(enable_exit_check(header.read_text()))
     output = workspace / 'native'
     resource = workspace / 'resource'
     llvm_cmake = subprocess.check_output(['llvm-config-18', '--cmakedir'], text=True).strip()
     subprocess.run([
-        'cmake', '-S', str(workspace / 'compiler-rt-18.1.8.src'), '-B', str(output), '-G', 'Ninja',
+        'cmake', '-S', str(source), '-B', str(output), '-G', 'Ninja',
         '-DCMAKE_BUILD_TYPE=RelWithDebInfo', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
         f'-DLLVM_COMMON_CMAKE_UTILS={workspace / "cmake-18.1.8.src"}',
         f'-DLLVM_CMAKE_DIR={llvm_cmake}', f'-DCMAKE_INSTALL_PREFIX={resource}',
         '-DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF', '-DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON',
         '-DCMAKE_C_COMPILER_TARGET=x86_64-unknown-linux-gnu',
         '-DCMAKE_CXX_COMPILER_TARGET=x86_64-unknown-linux-gnu',
-        '-DCOMPILER_RT_DEBUG=ON', '-DCOMPILER_RT_SANITIZERS_TO_BUILD=tsan',
+        '-DCOMPILER_RT_DEBUG=OFF', '-DCOMPILER_RT_SANITIZERS_TO_BUILD=tsan',
         '-DCOMPILER_RT_BUILD_BUILTINS=OFF', '-DCOMPILER_RT_BUILD_XRAY=OFF',
         '-DCOMPILER_RT_BUILD_LIBFUZZER=OFF', '-DCOMPILER_RT_BUILD_PROFILE=OFF',
         '-DCOMPILER_RT_BUILD_MEMPROF=OFF', '-DCOMPILER_RT_BUILD_ORC=OFF',
@@ -48,13 +60,18 @@ def build(host):
     ], check=True)
     commands = json.loads((output / 'compile_commands.json').read_text())
     tsan = [entry for entry in commands if entry['file'].endswith('/tsan_rtl.cpp')]
-    if not tsan or any('-DSANITIZER_DEBUG=1' not in entry['command'] for entry in tsan):
-        raise RuntimeError('TSan runtime must compile its existing internal assertions')
+    if not tsan:
+        raise RuntimeError('Missing TSan runtime compilation')
+    for entry in tsan:
+        flags = shlex.split(entry['command'])
+        optimization = [flag for flag in flags if flag.startswith('-O')]
+        if '-DSANITIZER_DEBUG=1' in flags or not optimization or optimization[-1] != '-O3':
+            raise RuntimeError('The focused exit check must retain optimized runtime settings')
     subprocess.run(['cmake', '--build', str(output), '--target', 'install', '--parallel', '2'], check=True)
     for filename in ['libclang_rt.tsan-x86_64.a', 'libclang_rt.tsan_cxx-x86_64.a',
                      'libclang_rt.tsan-x86_64.a.syms', 'libclang_rt.tsan_cxx-x86_64.a.syms']:
         if not (resource / 'lib/linux' / filename).is_file():
-            raise RuntimeError(f'Missing debug TSan runtime: {filename}')
+            raise RuntimeError(f'Missing assertion-enabled TSan runtime: {filename}')
 
     # An uninstrumented main has no shadow-stack entry: its first pop must fail.
     probe = workspace / 'shadow-stack-probe.cpp'
@@ -69,11 +86,11 @@ def build(host):
     (workspace / 'shadow-stack-probe.log').write_text(result.stdout)
     if result.returncode == 0 or not all(value in result.stdout for value in
                                         ['CHECK failed:', 'tsan_rtl.h', 'shadow_stack_pos']):
-        raise RuntimeError(f'Debug runtime did not catch a shadow-stack underflow:\n{result.stdout}')
+        raise RuntimeError(f'Runtime did not catch a shadow-stack underflow:\n{result.stdout}')
     (workspace / 'source.json').write_text(json.dumps({
-        'version': '18.1.8', 'archives': ARCHIVES, 'debug': True, 'resource': str(resource),
+        'version': '18.1.8', 'archives': ARCHIVES, 'debug': False, 'shadow_stack_exit_check': True, 'resource': str(resource),
     }, indent=2) + '\n')
-    print(f'PASS debug TSan catches the first invalid shadow-stack pop: {resource}', flush=True)
+    print(f'PASS optimized TSan catches the first invalid shadow-stack pop: {resource}', flush=True)
 
 
 if __name__ == '__main__':

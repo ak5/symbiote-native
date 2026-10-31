@@ -97,8 +97,9 @@ See the [host verification requirements](./host/README.md#verification) for pinn
 Rust, Skia and Mesa instrumentation. The fork’s TSan runner attaches GDB to retain
 fatal registers, instruction disassembly, thread stacks and sanitizer stack depth
 in `native-debugger-*.log`; the original signal still reaches the sanitizer.
-The TSan job builds checksum-pinned LLVM 18.1.8 compiler-rt with its internal
-assertions enabled. A separate deliberately invalid pop must fail before the
+The TSan job builds checksum-pinned LLVM 18.1.8 compiler-rt with its existing
+FuncExit bounds check promoted to an always-on check. Other runtime settings
+retain the optimized build. A separate deliberately invalid pop must fail before the
 window runs, proving that the selected runtime detects shadow-stack underflow.
 
 Expo-backed companion modules require their own Linux ports; their presence in
